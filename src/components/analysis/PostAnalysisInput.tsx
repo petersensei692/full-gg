@@ -1,0 +1,180 @@
+"use client";
+
+import { useRef, useState, useCallback } from "react";
+import { Bold, Italic, Underline, Paperclip, AtSign, PenSquare } from "lucide-react";
+import { useImagePaste } from "@/hooks/useImagePaste";
+import { Dialog, DialogContent } from "@/components/ui/Dialog";
+
+interface PostAnalysisInputProps {
+  placeholder: string;
+  /** Called when user clicks Create with editor HTML and selected analysis type */
+  onCreated?: (contentHtml: string, analysisType: string) => void;
+}
+
+const ANALYSIS_TYPES = [
+  { value: "daily", label: "Daily" },
+  { value: "weekly", label: "Weekly" },
+  { value: "monthly", label: "Monthly" },
+  { value: "qoq", label: "QoQ" },
+  { value: "yearly", label: "Yearly" },
+] as const;
+
+export function PostAnalysisInput({ placeholder, onCreated }: PostAnalysisInputProps) {
+  const editorRef = useRef<HTMLDivElement>(null);
+  const [zoomedImageSrc, setZoomedImageSrc] = useState<string | null>(null);
+  const [analysisType, setAnalysisType] = useState<string>("daily");
+
+  const { handlePaste } = useImagePaste({ editorRef });
+
+  const applyFormat = useCallback((command: "bold" | "italic" | "underline") => {
+    document.execCommand(command, false);
+    editorRef.current?.focus();
+  }, []);
+
+  const applyHeading = useCallback((block: "h1" | "h2" | "h3") => {
+    document.execCommand("formatBlock", false, block);
+    editorRef.current?.focus();
+  }, []);
+
+  const handleEditorClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    const target = e.target as HTMLElement;
+    if (target.tagName === "IMG" && target instanceof HTMLImageElement) {
+      e.preventDefault();
+      setZoomedImageSrc(target.src);
+    }
+  }, []);
+
+  const handleCreate = useCallback(() => {
+    const html = editorRef.current?.innerHTML?.trim() ?? "";
+    if (!html) return;
+    onCreated?.(html, analysisType);
+    if (editorRef.current) {
+      editorRef.current.innerHTML = "";
+    }
+  }, [analysisType, onCreated]);
+
+  return (
+    <div className="rounded-xl border border-sidebar-border bg-sidebar/50 p-3 mt-6">
+      <div
+        ref={editorRef}
+        contentEditable
+        data-placeholder={placeholder}
+        role="textbox"
+        aria-multiline="true"
+        aria-placeholder={placeholder}
+        onPaste={handlePaste}
+        onClick={handleEditorClick}
+        className="min-h-[82px] w-full rounded-lg border border-sidebar-border bg-header-input px-3 py-2.5 text-sm text-dashboard-foreground placeholder:text-dashboard-foreground/50 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary [&:empty::before]:content-[attr(data-placeholder)] [&:empty::before]:text-dashboard-foreground/50 [&_img]:max-w-[50%] [&_img]:w-[50%] [&_img]:h-auto [&_img]:object-contain [&_img]:rounded-lg [&_img]:cursor-pointer [&_img]:block [&_img]:my-2 [&_h1]:text-xl [&_h1]:font-bold [&_h2]:text-lg [&_h2]:font-semibold [&_h3]:text-base [&_h3]:font-medium"
+        suppressContentEditableWarning
+      />
+      <div className="flex items-center justify-between mt-2">
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() => applyFormat("bold")}
+            className="rounded p-1.5 text-dashboard-foreground/60 hover:bg-sidebar-hover hover:text-dashboard-foreground transition-colors"
+            aria-label="Bold"
+            title="Bold"
+          >
+            <Bold className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            onClick={() => applyFormat("italic")}
+            className="rounded p-1.5 text-dashboard-foreground/60 hover:bg-sidebar-hover hover:text-dashboard-foreground transition-colors"
+            aria-label="Italic"
+            title="Italic"
+          >
+            <Italic className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            onClick={() => applyFormat("underline")}
+            className="rounded p-1.5 text-dashboard-foreground/60 hover:bg-sidebar-hover hover:text-dashboard-foreground transition-colors"
+            aria-label="Underline"
+            title="Underline"
+          >
+            <Underline className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            onClick={() => applyHeading("h1")}
+            className="rounded p-1.5 text-dashboard-foreground/60 hover:bg-sidebar-hover hover:text-dashboard-foreground transition-colors text-xs font-bold"
+            aria-label="Heading 1"
+            title="Heading 1"
+          >
+            H1
+          </button>
+          <button
+            type="button"
+            onClick={() => applyHeading("h2")}
+            className="rounded p-1.5 text-dashboard-foreground/60 hover:bg-sidebar-hover hover:text-dashboard-foreground transition-colors text-xs font-semibold"
+            aria-label="Heading 2"
+            title="Heading 2"
+          >
+            H2
+          </button>
+          <button
+            type="button"
+            onClick={() => applyHeading("h3")}
+            className="rounded p-1.5 text-dashboard-foreground/60 hover:bg-sidebar-hover hover:text-dashboard-foreground transition-colors text-xs font-medium"
+            aria-label="Heading 3"
+            title="Heading 3"
+          >
+            H3
+          </button>
+          <button
+            type="button"
+            className="rounded p-1.5 text-dashboard-foreground/60 hover:bg-sidebar-hover hover:text-dashboard-foreground transition-colors"
+            aria-label="Attach"
+          >
+            <Paperclip className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            className="rounded p-1.5 text-dashboard-foreground/60 hover:bg-sidebar-hover hover:text-dashboard-foreground transition-colors"
+            aria-label="Mention"
+          >
+            <AtSign className="h-4 w-4" />
+          </button>
+        </div>
+        <div className="flex items-center gap-2">
+          <select
+            value={analysisType}
+            onChange={(e) => setAnalysisType(e.target.value)}
+            className="rounded-lg border border-sidebar-border bg-header-input px-3 py-2 text-sm text-dashboard-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+            aria-label="Analysis type"
+          >
+            {ANALYSIS_TYPES.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+          <button
+            type="button"
+            onClick={handleCreate}
+            className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
+          >
+            <PenSquare className="h-4 w-4" />
+            Create
+          </button>
+        </div>
+      </div>
+
+      {zoomedImageSrc && (
+        <Dialog open={!!zoomedImageSrc} onOpenChange={(open) => !open && setZoomedImageSrc(null)}>
+          <DialogContent showClose={true} className="bg-black/95 border-0">
+            <div className="relative w-full h-[90dvh] flex items-center justify-center">
+              <img
+                src={zoomedImageSrc}
+                alt="Zoomed"
+                className="max-w-full max-h-full w-auto h-auto object-contain"
+              />
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
+    </div>
+  );
+}

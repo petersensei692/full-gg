@@ -1,0 +1,99 @@
+export type StreamEntryTag = "WEEKLY OUTLOOK" | "INTRADAY UPDATE" | "POLICY NOTE" | "MARKET PULSE";
+
+export interface StreamEntry {
+  id: string;
+  author: string;
+  authorAvatar?: string;
+  time: string;
+  tag: StreamEntryTag;
+  tagColor: "green" | "orange" | "blue" | "purple";
+  content: string; // plain text or HTML from editor
+  bullets?: string[];
+  chartData?: { label: string; value: number }[];
+  quote?: { text: string; source: string };
+  pairUpdates?: { pair: string; value: string; positive: boolean }[];
+  /** Optional timestamp for sorting and date grouping */
+  createdAt?: number;
+}
+
+export interface AssetSnapshot {
+  indexLabel: string;
+  indexValue: string;
+  indexChange: string;
+  indexChangePositive: boolean;
+  sentimentLabel: string;
+  sentimentPercent: number;
+  events: { date: string; title: string; time: string }[];
+}
+
+export interface AssetConfig {
+  slug: string;
+  label: string;
+  symbol?: string; // e.g. "DXY" for USD
+  indexLabel: string; // e.g. "DXY INDEX"
+  placeholder: string; // e.g. "Post a new USD analysis entry..."
+}
+
+export const ASSET_CONFIGS: Record<string, AssetConfig> = {
+  usd: {
+    slug: "usd",
+    label: "USD",
+    symbol: "DXY",
+    indexLabel: "DXY INDEX",
+    placeholder: "Post a new USD analysis entry...",
+  },
+  eur: {
+    slug: "eur",
+    label: "EUR",
+    indexLabel: "EUR INDEX",
+    placeholder: "Post a new EUR analysis entry...",
+  },
+  gbp: {
+    slug: "gbp",
+    label: "GBP",
+    indexLabel: "GBP INDEX",
+    placeholder: "Post a new GBP analysis entry...",
+  },
+  jpy: {
+    slug: "jpy",
+    label: "JPY",
+    indexLabel: "JPY INDEX",
+    placeholder: "Post a new JPY analysis entry...",
+  },
+  cad: {
+    slug: "cad",
+    label: "CAD",
+    indexLabel: "CAD INDEX",
+    placeholder: "Post a new CAD analysis entry...",
+  },
+  chf: {
+    slug: "chf",
+    label: "CHF",
+    indexLabel: "CHF INDEX",
+    placeholder: "Post a new CHF analysis entry...",
+  },
+  aud: {
+    slug: "aud",
+    label: "AUD",
+    indexLabel: "AUD INDEX",
+    placeholder: "Post a new AUD analysis entry...",
+  },
+  nzd: {
+    slug: "nzd",
+    label: "NZD",
+    indexLabel: "NZD INDEX",
+    placeholder: "Post a new NZD analysis entry...",
+  },
+  commodities: {
+    slug: "commodities",
+    label: "Commodities",
+    indexLabel: "COMMODITIES",
+    placeholder: "Post a new Commodities analysis entry...",
+  },
+  stocks: {
+    slug: "stocks",
+    label: "Stocks",
+    indexLabel: "STOCKS",
+    placeholder: "Post a new Stocks analysis entry...",
+  },
+};
