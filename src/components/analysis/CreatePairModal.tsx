@@ -40,7 +40,7 @@ export function CreatePairModal({
 
   useEffect(() => {
     if (open) {
-      setCalendarId((selectedCalendarId || calendars.find((c) => c.assetSlug === currentAssetSlug)?.id) ?? "");
+      setCalendarId((selectedCalendarId || calendars[0]?.id) ?? "");
       setBaseAsset(currentAssetSlug);
       const other = Object.keys(ASSET_CONFIGS).find((s) => s !== currentAssetSlug) ?? "usd";
       setQuoteAsset(other);
@@ -108,19 +108,17 @@ export function CreatePairModal({
     onOpenChange(false);
   };
 
-  const assetCalendars = useMemo(
-    () => calendars.filter((c) => c.assetSlug === currentAssetSlug),
-    [calendars, currentAssetSlug]
-  );
+  const assetCalendars = calendars;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         showClose={true}
         containToMain={true}
-        className="max-w-2xl w-full max-h-[85dvh] overflow-y-auto bg-sidebar border border-sidebar-border rounded-xl p-6"
+        className="max-h-[85dvh] flex flex-col items-stretch justify-start overflow-hidden bg-sidebar border border-sidebar-border rounded-xl p-0 shadow-xl"
       >
-        <div className="space-y-6">
+        <div className="scrollbar-modal flex flex-col min-h-0 flex-1 overflow-y-auto overflow-x-hidden p-6">
+          <div className="space-y-6 min-w-0 overflow-x-hidden">
           <div>
             <span className="text-xs font-semibold uppercase tracking-wider text-dashboard-foreground/60">
               New entry
@@ -287,6 +285,7 @@ export function CreatePairModal({
               <ChevronRight className="h-4 w-4" />
             </button>
           </div>
+        </div>
         </div>
 
         {zoomedImageSrc && (

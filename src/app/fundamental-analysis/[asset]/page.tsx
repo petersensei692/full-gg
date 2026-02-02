@@ -17,7 +17,7 @@ export default async function AssetPage({ params }: AssetPageProps) {
   }
 
   return (
-    <DashboardLayout showHeader={false}>
+    <DashboardLayout>
       <AssetAnalysisView asset={asset} />
     </DashboardLayout>
   );

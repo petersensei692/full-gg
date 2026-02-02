@@ -1,0 +1,161 @@
+"use client";
+
+import { useState, useMemo } from "react";
+import { Calendar, ChevronDown } from "lucide-react";
+import { useWatchlistCalendar } from "@/context/WatchlistCalendarContext";
+import type { WeeklyCalendar } from "@/types/calendar";
+import { WatchlistEntryCard } from "@/components/analysis/WatchlistEntryCard";
+
+const DISPLAY_OPTIONS = [
+  { value: "1", label: "Latest" },
+  { value: "2", label: "Last 2" },
+  { value: "4", label: "Last 4" },
+  { value: "8", label: "Last 8" },
+  { value: "12", label: "Last 12" },
+  { value: "all", label: "All" },
+] as const;
+
+function formatDateRange(start: string, end: string): string {
+  const s = new Date(start + "T12:00:00").toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+  const e = new Date(end + "T12:00:00").toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+  return `${s} → ${e}`;
+}
+
+export function WatchListView() {
+  const { calendars, watchlistEntries } = useWatchlistCalendar();
+
+  const [displayCount, setDisplayCount] = useState<string>("4");
+  const [displayDropdownOpen, setDisplayDropdownOpen] = useState(false);
+
+  const sortedCalendars = useMemo(
+    () => [...calendars].sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0)),
+    [calendars]
+  );
+
+  const displayedCalendars = useMemo(() => {
+    if (displayCount === "all") return sortedCalendars;
+    const n = Math.max(1, parseInt(displayCount, 10) || 1);
+    return sortedCalendars.slice(0, n);
+  }, [sortedCalendars, displayCount]);
+
+  const pairsByCalendarId = useMemo(() => {
+    const map: Record<string, typeof watchlistEntries> = {};
+    watchlistEntries.forEach((e) => {
+      if (!map[e.weeklyCalendarId]) map[e.weeklyCalendarId] = [];
+      map[e.weeklyCalendarId].push(e);
+    });
+    Object.keys(map).forEach((id) =>
+      map[id].sort((a, b) => b.createdAt - a.createdAt)
+    );
+    return map;
+  }, [watchlistEntries]);
+
+  const displayLabel =
+    DISPLAY_OPTIONS.find((o) => o.value === displayCount)?.label ?? "Last 4";
+
+  return (
+    <div className="flex h-full min-h-0 flex-col overflow-auto">
+      <div className="p-6 pt-4 flex flex-col min-h-0 flex-1">
+        <h1 className="text-xl font-semibold text-dashboard-foreground mb-4">
+          Weekly Watchlists
+        </h1>
+        <p className="text-sm text-dashboard-foreground/70 mb-4">
+          Create weekly watchlists and pairs from any asset&apos;s Pair Watchlist tab. They appear here as cards.
+        </p>
+
+        <div className="flex flex-wrap items-center gap-3 mb-6">
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setDisplayDropdownOpen((o) => !o)}
+              className="flex items-center gap-2 rounded-lg border border-sidebar-border bg-sidebar px-3 py-2 text-sm font-medium text-dashboard-foreground hover:bg-sidebar-hover transition-colors"
+            >
+              Display: {displayLabel}
+              <ChevronDown className="h-4 w-4" />
+            </button>
+            {displayDropdownOpen && (
+              <>
+                <div
+                  className="fixed inset-0 z-40"
+                  aria-hidden
+                  onClick={() => setDisplayDropdownOpen(false)}
+                />
+                <div className="absolute left-0 top-full mt-1 z-50 min-w-[140px] rounded-lg border border-sidebar-border bg-sidebar py-1 shadow-lg">
+                  {DISPLAY_OPTIONS.map((opt) => (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => {
+                        setDisplayCount(opt.value);
+                        setDisplayDropdownOpen(false);
+                      }}
+                      className={`w-full text-left px-3 py-2 text-sm hover:bg-sidebar-hover transition-colors ${
+                        displayCount === opt.value
+                          ? "text-primary font-medium"
+                          : "text-dashboard-foreground"
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+
+        <div className="flex-1 min-h-0 overflow-auto space-y-6">
+          {displayedCalendars.length === 0 ? (
+            <div className="flex flex-col items-center justify-center min-h-[280px] text-dashboard-foreground/60 text-sm rounded-xl border border-sidebar-border bg-sidebar/30">
+              <Calendar className="h-12 w-12 mb-3 opacity-50" />
+              <p>No weekly watchlists yet.</p>
+              <p className="text-xs mt-1">Create one from an asset&apos;s Pair Watchlist tab.</p>
+            </div>
+          ) : (
+            displayedCalendars.map((cal: WeeklyCalendar) => {
+              const pairs = (pairsByCalendarId[cal.id] ?? []).sort(
+                (a, b) => b.createdAt - a.createdAt
+              );
+              return (
+                <div
+                  key={cal.id}
+                  className="rounded-xl border border-sidebar-border bg-sidebar/50 overflow-hidden shadow-sm"
+                >
+                  <div className="px-5 py-4 border-b border-sidebar-border bg-sidebar/80">
+                    <div className="flex items-center gap-2">
+                      <Calendar className="h-5 w-5 text-primary/80" />
+                      <h2 className="text-lg font-semibold text-dashboard-foreground">
+                        {formatDateRange(cal.startDate, cal.endDate)}
+                      </h2>
+                    </div>
+                  </div>
+                  <div className="p-5">
+                    {pairs.length === 0 ? (
+                      <p className="text-sm text-dashboard-foreground/50 py-4">
+                        No pairs in this watchlist yet.
+                      </p>
+                    ) : (
+                      <div className="space-y-6">
+                        {pairs.map((entry) => (
+                          <WatchlistEntryCard key={entry.id} entry={entry} />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}

@@ -7,7 +7,6 @@ import type { WeeklyCalendar } from "@/types/calendar";
 interface WeeklyCalendarModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  assetSlug: string;
   /** When "watchlist", shows "Weekly Watchlist" title/button (e.g. for Pair Watchlist tab). */
   variant?: "calendar" | "watchlist";
   onCreated: (calendar: WeeklyCalendar) => void;
@@ -16,7 +15,6 @@ interface WeeklyCalendarModalProps {
 export function WeeklyCalendarModal({
   open,
   onOpenChange,
-  assetSlug,
   variant = "calendar",
   onCreated,
 }: WeeklyCalendarModalProps) {
@@ -33,7 +31,6 @@ export function WeeklyCalendarModal({
 
     const calendar: WeeklyCalendar = {
       id: `wc-${Date.now()}`,
-      assetSlug,
       startDate,
       endDate,
       createdAt: Date.now(),

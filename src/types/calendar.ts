@@ -1,6 +1,6 @@
+/** Shared across all assets; created from any asset and selectable everywhere */
 export interface WeeklyCalendar {
   id: string;
-  assetSlug: string;
   startDate: string; // ISO date YYYY-MM-DD
   endDate: string;
   createdAt: number;
@@ -16,6 +16,7 @@ export interface EconomicEvent {
   date: string; // ISO date YYYY-MM-DD (day within the week)
   time?: string; // optional e.g. "08:30"
   currency?: string; // e.g. "USD", "EUR"
+  country?: string; // e.g. "USD", "EUR", "GBP" for sort/group by country
 }
 
 export interface WatchlistEntry {

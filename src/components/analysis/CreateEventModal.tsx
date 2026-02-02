@@ -85,12 +85,13 @@ export function CreateEventModal({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         showClose={true}
-        className="max-w-md w-full bg-sidebar border border-sidebar-border rounded-xl p-6"
+        containToMain={true}
+        className="max-w-md w-full max-h-[85dvh] overflow-y-auto bg-sidebar border border-sidebar-border rounded-xl p-6"
       >
-        <h3 className="text-lg font-semibold text-dashboard-foreground mb-4">
+        <h3 className="text-lg font-semibold text-dashboard-foreground mb-4 shrink-0">
           Create Event
         </h3>
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4 min-w-0">
           <div>
             <label
               htmlFor="event-calendar"

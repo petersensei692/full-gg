@@ -48,3 +48,30 @@ body {
   color: var(--foreground);
   font-family: var(--font-sans), system-ui, sans-serif;
 }
+
+/* Modal / dialog scrollbar: visible thumb, no horizontal scroll when not needed */
+.scrollbar-modal {
+  overflow-x: hidden;
+  scrollbar-gutter: stable;
+  scrollbar-width: auto;
+  scrollbar-color: #52525b var(--sidebar-border);
+}
+.scrollbar-modal::-webkit-scrollbar {
+  width: 10px;
+}
+.scrollbar-modal::-webkit-scrollbar-track {
+  background: var(--sidebar-border);
+  border-radius: 5px;
+  margin: 2px 0;
+}
+.scrollbar-modal::-webkit-scrollbar-thumb {
+  background: #52525b;
+  border-radius: 5px;
+  min-height: 40px;
+}
+.scrollbar-modal::-webkit-scrollbar-thumb:hover {
+  background: #71717a;
+}
+.scrollbar-modal::-webkit-scrollbar-corner {
+  background: var(--sidebar-border);
+}

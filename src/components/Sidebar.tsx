@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  LayoutDashboard,
   BookOpen,
   BarChart3,
   Eye,
@@ -28,8 +27,6 @@ const ASSETS = [
 ];
 
 const navItems = [
-  { href: "/", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/trade-journal", label: "Trade Journal", icon: BookOpen },
   {
     href: "/fundamental-analysis",
     label: "Fundamental Analysis",
@@ -40,6 +37,7 @@ const navItems = [
       { href: "/calendar", label: "Calendar", icon: Calendar },
     ],
   },
+  { href: "/notes", label: "Notes", icon: BookOpen },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 
@@ -69,9 +67,7 @@ export function Sidebar() {
       <nav className="flex-1 overflow-y-auto py-3">
         <ul className="space-y-0.5 px-2">
           {navItems.map((item) => {
-            const isActive =
-              pathname === item.href ||
-              (item.href !== "/" && pathname.startsWith(item.href));
+            const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
             const Icon = item.icon;
 
             if ("assets" in item || "subNav" in item) {

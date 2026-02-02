@@ -4,6 +4,7 @@ import { useState, useMemo } from "react";
 import { Calendar, Plus, ChevronDown } from "lucide-react";
 import type { AssetConfig } from "@/types/asset";
 import type { WeeklyCalendar, WatchlistEntry } from "@/types/calendar";
+import { useWatchlistCalendar } from "@/context/WatchlistCalendarContext";
 import { WeeklyCalendarModal } from "./WeeklyCalendarModal";
 import { CreatePairModal } from "./CreatePairModal";
 import { WatchlistEntryCard } from "./WatchlistEntryCard";
@@ -13,40 +14,34 @@ interface PairWatchlistViewProps {
 }
 
 export function PairWatchlistView({ asset }: PairWatchlistViewProps) {
-  const [calendars, setCalendars] = useState<WeeklyCalendar[]>([]);
-  const [entries, setEntries] = useState<WatchlistEntry[]>([]);
+  const { calendars, addCalendar, watchlistEntries: entries, addWatchlistEntry } =
+    useWatchlistCalendar();
+
   const [selectedCalendarId, setSelectedCalendarId] = useState<string | null>(null);
   const [calendarModalOpen, setCalendarModalOpen] = useState(false);
   const [pairModalOpen, setPairModalOpen] = useState(false);
   const [calendarDropdownOpen, setCalendarDropdownOpen] = useState(false);
 
-  const assetCalendars = useMemo(
-    () => calendars.filter((c) => c.assetSlug === asset.slug),
-    [calendars, asset.slug]
-  );
-
-  const selectedCalendar = assetCalendars.find((c) => c.id === selectedCalendarId);
+  const selectedCalendar = calendars.find((c) => c.id === selectedCalendarId);
 
   const watchlistEntries = useMemo(
     () =>
-      entries
-        .filter(
-          (e) =>
-            e.weeklyCalendarId === selectedCalendarId &&
-            e.assetSlug === asset.slug
-        )
-        .sort((a, b) => b.createdAt - a.createdAt),
-    [entries, selectedCalendarId, asset.slug]
+      selectedCalendarId
+        ? entries
+            .filter((e) => e.weeklyCalendarId === selectedCalendarId)
+            .sort((a, b) => b.createdAt - a.createdAt)
+        : [],
+    [entries, selectedCalendarId]
   );
 
   const handleCalendarCreated = (calendar: WeeklyCalendar) => {
-    setCalendars((prev) => [...prev, calendar]);
+    addCalendar(calendar);
     setSelectedCalendarId(calendar.id);
     setCalendarDropdownOpen(false);
   };
 
   const handlePairCreated = (entry: WatchlistEntry) => {
-    setEntries((prev) => [...prev, entry]);
+    addWatchlistEntry(entry);
     setPairModalOpen(false);
   };
 
@@ -74,12 +69,12 @@ export function PairWatchlistView({ asset }: PairWatchlistViewProps) {
                 onClick={() => setCalendarDropdownOpen(false)}
               />
               <div className="absolute left-0 top-full mt-1 z-50 min-w-[220px] rounded-lg border border-sidebar-border bg-sidebar py-1 shadow-lg">
-                {assetCalendars.length === 0 ? (
+                {calendars.length === 0 ? (
                   <p className="px-3 py-2 text-sm text-dashboard-foreground/70">
                     No watchlists yet
                   </p>
                 ) : (
-                  assetCalendars.map((cal) => (
+                  calendars.map((cal) => (
                     <button
                       key={cal.id}
                       type="button"
@@ -145,14 +140,13 @@ export function PairWatchlistView({ asset }: PairWatchlistViewProps) {
       <WeeklyCalendarModal
         open={calendarModalOpen}
         onOpenChange={setCalendarModalOpen}
-        assetSlug={asset.slug}
         variant="watchlist"
         onCreated={handleCalendarCreated}
       />
       <CreatePairModal
         open={pairModalOpen}
         onOpenChange={setPairModalOpen}
-        calendars={assetCalendars}
+        calendars={calendars}
         selectedCalendarId={selectedCalendarId}
         currentAssetSlug={asset.slug}
         currentAssetLabel={asset.label}

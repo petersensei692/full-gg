@@ -4,6 +4,7 @@ import { useState, useMemo } from "react";
 import { Calendar, Plus, ChevronDown } from "lucide-react";
 import type { AssetConfig } from "@/types/asset";
 import type { WeeklyCalendar, EconomicEvent, EventImpact } from "@/types/calendar";
+import { useWatchlistCalendar } from "@/context/WatchlistCalendarContext";
 import { WeeklyCalendarModal } from "./WeeklyCalendarModal";
 import { CreateEventModal } from "./CreateEventModal";
 
@@ -37,19 +38,15 @@ const IMPACT_DOTS: Record<EventImpact, string> = {
 };
 
 export function EconomicEventsView({ asset }: EconomicEventsViewProps) {
-  const [calendars, setCalendars] = useState<WeeklyCalendar[]>([]);
-  const [events, setEvents] = useState<EconomicEvent[]>([]);
+  const { calendars, addCalendar, economicEvents: events, addEconomicEvent } =
+    useWatchlistCalendar();
+
   const [selectedCalendarId, setSelectedCalendarId] = useState<string | null>(null);
   const [calendarModalOpen, setCalendarModalOpen] = useState(false);
   const [eventModalOpen, setEventModalOpen] = useState(false);
   const [calendarDropdownOpen, setCalendarDropdownOpen] = useState(false);
 
-  const assetCalendars = useMemo(
-    () => calendars.filter((c) => c.assetSlug === asset.slug),
-    [calendars, asset.slug]
-  );
-
-  const selectedCalendar = assetCalendars.find((c) => c.id === selectedCalendarId);
+  const selectedCalendar = calendars.find((c) => c.id === selectedCalendarId);
 
   const daysInWeek = useMemo(
     () =>
@@ -73,13 +70,13 @@ export function EconomicEventsView({ asset }: EconomicEventsViewProps) {
   }, [events, selectedCalendarId]);
 
   const handleCalendarCreated = (calendar: WeeklyCalendar) => {
-    setCalendars((prev) => [...prev, calendar]);
+    addCalendar(calendar);
     setSelectedCalendarId(calendar.id);
     setCalendarDropdownOpen(false);
   };
 
   const handleEventCreated = (event: EconomicEvent) => {
-    setEvents((prev) => [...prev, event]);
+    addEconomicEvent(event);
     setEventModalOpen(false);
   };
 
@@ -107,12 +104,12 @@ export function EconomicEventsView({ asset }: EconomicEventsViewProps) {
                 onClick={() => setCalendarDropdownOpen(false)}
               />
               <div className="absolute left-0 top-full mt-1 z-50 min-w-[220px] rounded-lg border border-sidebar-border bg-sidebar py-1 shadow-lg">
-                {assetCalendars.length === 0 ? (
+                {calendars.length === 0 ? (
                   <p className="px-3 py-2 text-sm text-dashboard-foreground/70">
                     No calendars yet
                   </p>
                 ) : (
-                  assetCalendars.map((cal) => (
+                  calendars.map((cal) => (
                     <button
                       key={cal.id}
                       type="button"
@@ -245,13 +242,12 @@ export function EconomicEventsView({ asset }: EconomicEventsViewProps) {
       <WeeklyCalendarModal
         open={calendarModalOpen}
         onOpenChange={setCalendarModalOpen}
-        assetSlug={asset.slug}
         onCreated={handleCalendarCreated}
       />
       <CreateEventModal
         open={eventModalOpen}
         onOpenChange={setEventModalOpen}
-        calendars={assetCalendars}
+        calendars={calendars}
         selectedCalendarId={selectedCalendarId}
         defaultCurrency={asset.label}
         onCreated={handleEventCreated}
