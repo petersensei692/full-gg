@@ -10,33 +10,24 @@ import {
   Settings,
   ChevronDown,
   ChevronRight,
+  Loader2,
 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { useState } from "react";
+import { useAssets } from "@/context/AssetsContext";
+import type { AssetConfig } from "@/types/asset";
 
-const ASSETS = [
-  "USD",
-  "EUR",
-  "GBP",
-  "JPY",
-  "CAD",
-  "CHF",
-  "AUD",
-  "NZD",
-  "Commodities",
-  "Stocks",
-];
+type NavSubItem = { href: string; label: string; icon: LucideIcon };
+type NavItemWithAssets = {
+  href: string;
+  label: string;
+  icon: LucideIcon;
+  assets: AssetConfig[];
+  subNav: NavSubItem[];
+};
+type NavItemSimple = { href: string; label: string; icon: LucideIcon };
 
-const navItems = [
-  {
-    href: "/fundamental-analysis",
-    label: "Fundamental Analysis",
-    icon: BarChart3,
-    assets: ASSETS,
-    subNav: [
-      { href: "/watch-list", label: "Watch List", icon: Eye },
-      { href: "/calendar", label: "Calendar", icon: Calendar },
-    ],
-  },
+const otherNavItems: NavItemSimple[] = [
   { href: "/notes", label: "Notes", icon: BookOpen },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
@@ -45,6 +36,20 @@ export function Sidebar() {
   const pathname = usePathname();
   const [fundamentalOpen, setFundamentalOpen] = useState(true);
   const [assetsOpen, setAssetsOpen] = useState(true);
+  const { assets, loading } = useAssets();
+
+  const fundamentalNavItem: NavItemWithAssets = {
+    href: "/fundamental-analysis",
+    label: "Fundamental Analysis",
+    icon: BarChart3,
+    assets,
+    subNav: [
+      { href: "/watch-list", label: "Watch List", icon: Eye },
+      { href: "/calendar", label: "Calendar", icon: Calendar },
+    ],
+  };
+
+  const navItems: (NavItemWithAssets | NavItemSimple)[] = [fundamentalNavItem, ...otherNavItems];
 
   return (
     <aside className="flex h-full w-[260px] shrink-0 flex-col border-r border-sidebar-border bg-sidebar">
@@ -70,11 +75,12 @@ export function Sidebar() {
             const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
             const Icon = item.icon;
 
-            if ("assets" in item || "subNav" in item) {
+            if ("assets" in item) {
+              const itemWithAssets = item as NavItemWithAssets;
               const isExpanded = fundamentalOpen;
               const subActive =
                 pathname.startsWith(item.href) ||
-                (item.subNav?.some((s) => pathname === s.href) ?? false);
+                itemWithAssets.subNav.some((s: NavSubItem) => pathname === s.href);
               return (
                 <li key={item.href}>
                   <button
@@ -98,7 +104,7 @@ export function Sidebar() {
                   </button>
                   {isExpanded && (
                     <ul className="mt-0.5 space-y-0.5 pl-4">
-                      {item.assets && item.assets.length > 0 && (
+                      {itemWithAssets.assets.length > 0 && (
                         <li>
                           <button
                             type="button"
@@ -114,21 +120,28 @@ export function Sidebar() {
                           </button>
                           {assetsOpen && (
                             <ul className="mt-0.5 space-y-0.5 pl-2">
-                              {item.assets.map((asset) => (
-                                <li key={asset}>
-                                  <Link
-                                    href={`${item.href}/${asset.toLowerCase().replace(/\s/g, "-")}`}
-                                    className="block rounded-lg px-3 py-2 text-xs text-sidebar-foreground hover:bg-sidebar-hover"
-                                  >
-                                    {asset}
-                                  </Link>
+                              {loading ? (
+                                <li className="px-3 py-2 flex items-center gap-2 text-xs text-sidebar-muted">
+                                  <Loader2 className="h-3 w-3 animate-spin" />
+                                  Loading...
                                 </li>
-                              ))}
+                              ) : (
+                                itemWithAssets.assets.map((asset) => (
+                                  <li key={asset.id ?? asset.slug}>
+                                    <Link
+                                      href={`${item.href}/${asset.slug}`}
+                                      className="block rounded-lg px-3 py-2 text-xs text-sidebar-foreground hover:bg-sidebar-hover"
+                                    >
+                                      {asset.label}
+                                    </Link>
+                                  </li>
+                                ))
+                              )}
                             </ul>
                           )}
                         </li>
                       )}
-                      {item.subNav?.map((sub) => {
+                      {itemWithAssets.subNav.map((sub) => {
                         const SubIcon = sub.icon;
                         const isSubActive = pathname === sub.href;
                         return (

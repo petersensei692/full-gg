@@ -19,6 +19,8 @@ export interface EconomicEvent {
   country?: string; // e.g. "USD", "EUR", "GBP" for sort/group by country
 }
 
+export type WatchlistBias = "bullish" | "bearish";
+
 export interface WatchlistEntry {
   id: string;
   weeklyCalendarId: string;
@@ -29,4 +31,5 @@ export interface WatchlistEntry {
   thesis: string; // HTML from contenteditable
   chartImages: string[]; // base64 data URLs
   createdAt: number;
+  bias?: WatchlistBias; // bullish or bearish
 }

@@ -14,6 +14,8 @@ export interface StreamEntry {
   pairUpdates?: { pair: string; value: string; positive: boolean }[];
   /** Optional timestamp for sorting and date grouping */
   createdAt?: number;
+  /** Analysis type for filtering: daily | weekly | monthly | qoq | yearly */
+  analysisType?: string;
 }
 
 export interface AssetSnapshot {
@@ -27,6 +29,7 @@ export interface AssetSnapshot {
 }
 
 export interface AssetConfig {
+  id?: string; // UUID from API
   slug: string;
   label: string;
   symbol?: string; // e.g. "DXY" for USD
@@ -34,6 +37,35 @@ export interface AssetConfig {
   placeholder: string; // e.g. "Post a new USD analysis entry..."
 }
 
+const KNOWN_SYMBOLS: Record<string, string> = {
+  usd: "DXY",
+  eur: "EUR",
+  gbp: "GBP",
+  jpy: "JPY",
+  cad: "CAD",
+  chf: "CHF",
+  aud: "AUD",
+  nzd: "NZD",
+  xau: "XAU",
+  xag: "XAG",
+  stocks: "STOCKS",
+};
+
+/** Convert API Asset to frontend AssetConfig */
+export function assetToConfig(asset: { id: string; name: string }): AssetConfig {
+  const slug = asset.name.toLowerCase().replace(/\s/g, "-");
+  const symbol = KNOWN_SYMBOLS[slug];
+  return {
+    id: asset.id,
+    slug,
+    label: asset.name,
+    symbol,
+    indexLabel: symbol ? `${symbol} INDEX` : `${asset.name} INDEX`,
+    placeholder: `Post a new ${asset.name} analysis entry...`,
+  };
+}
+
+/** Fallback configs when API is unavailable (no id) */
 export const ASSET_CONFIGS: Record<string, AssetConfig> = {
   usd: {
     slug: "usd",

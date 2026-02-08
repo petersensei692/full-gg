@@ -21,6 +21,15 @@ function formatTime(date: Date): string {
   return date.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true });
 }
 
+const ANALYSIS_FILTER_OPTIONS = [
+  { value: "all", label: "All" },
+  { value: "daily", label: "Daily" },
+  { value: "weekly", label: "Weekly" },
+  { value: "monthly", label: "Monthly" },
+  { value: "qoq", label: "QoQ" },
+  { value: "yearly", label: "Yearly" },
+] as const;
+
 function formatDateGroup(ts: number): string {
   const d = new Date(ts);
   const today = new Date();
@@ -31,6 +40,22 @@ function formatDateGroup(ts: number): string {
   return d.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
 }
 
+function formatWeekGroup(ts: number): string {
+  const d = new Date(ts);
+  const dayOfWeek = d.getDay();
+  const monday = new Date(d);
+  monday.setDate(d.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1));
+  return `Week of ${monday.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}`;
+}
+
+function getWeekKey(ts: number): string {
+  const d = new Date(ts);
+  const dayOfWeek = d.getDay();
+  const monday = new Date(d);
+  monday.setDate(d.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1));
+  return monday.toISOString().slice(0, 10);
+}
+
 interface AssetAnalysisViewProps {
   asset: AssetConfig;
 }
@@ -38,6 +63,7 @@ interface AssetAnalysisViewProps {
 export function AssetAnalysisView({ asset }: AssetAnalysisViewProps) {
   const [activeTab, setActiveTab] = useState<"stream" | "events" | "watchlist">("stream");
   const [entries, setEntries] = useState<StreamEntry[]>([]);
+  const [analysisFilter, setAnalysisFilter] = useState<string>("all");
 
   const handleCreate = useCallback(
     (contentHtml: string, analysisType: string) => {
@@ -51,6 +77,7 @@ export function AssetAnalysisView({ asset }: AssetAnalysisViewProps) {
         tagColor,
         content: contentHtml,
         createdAt: now,
+        analysisType: analysisType,
       };
       setEntries((prev) => [...prev, entry]);
     },
@@ -62,15 +89,33 @@ export function AssetAnalysisView({ asset }: AssetAnalysisViewProps) {
     streamScrollRef.current?.scrollTo({ top: streamScrollRef.current.scrollHeight, behavior: "smooth" });
   }, [entries.length]);
 
-  const entriesWithDateGroups = useMemo(() => {
-    let lastDateGroup: string | undefined;
-    return entries.map((entry) => {
-      const group = entry.createdAt ? formatDateGroup(entry.createdAt) : undefined;
-      const showDateGroup = group && group !== lastDateGroup;
-      if (showDateGroup) lastDateGroup = group;
-      return { entry, dateGroup: showDateGroup ? group : undefined };
+  const filteredEntries = useMemo(() => {
+    if (analysisFilter === "all") return entries;
+    return entries.filter((e) => (e.analysisType ?? "daily") === analysisFilter);
+  }, [entries, analysisFilter]);
+
+  const entriesWithGroups = useMemo(() => {
+    let lastWeekKey: string | undefined;
+    let lastDateKey: string | undefined;
+    return filteredEntries.map((entry, index) => {
+      const ts = entry.createdAt ?? 0;
+      const weekKey = ts ? getWeekKey(ts) : undefined;
+      const dateKey = ts ? new Date(ts).toDateString() : undefined;
+      const isNewWeek = weekKey && weekKey !== lastWeekKey;
+      const isNewDay = dateKey && dateKey !== lastDateKey;
+      if (weekKey) lastWeekKey = weekKey;
+      if (dateKey) lastDateKey = dateKey;
+      let separatorType: "same-day" | "new-day" | "new-week" | "first" = "first";
+      if (index > 0) {
+        if (isNewWeek) separatorType = "new-week";
+        else if (isNewDay) separatorType = "new-day";
+        else separatorType = "same-day";
+      }
+      const weekGroup = isNewWeek && ts ? formatWeekGroup(ts) : undefined;
+      const dateGroup = isNewDay && ts ? formatDateGroup(ts) : undefined;
+      return { entry, separatorType, weekGroup, dateGroup };
     });
-  }, [entries]);
+  }, [filteredEntries]);
 
   const displayTitle = asset.symbol
     ? `${asset.label} (${asset.symbol})`
@@ -91,11 +136,27 @@ export function AssetAnalysisView({ asset }: AssetAnalysisViewProps) {
 
         {activeTab === "stream" && (
           <div ref={streamScrollRef} className="flex-1 p-6 pt-4 overflow-auto w-full flex flex-col min-h-0">
-            <div className="w-full max-w-full space-y-6 flex-1">
-              {entriesWithDateGroups.map(({ entry, dateGroup }) => (
+            <div className="flex flex-wrap items-center gap-3 mb-4">
+              <span className="text-sm text-dashboard-foreground/70">Filter:</span>
+              <select
+                value={analysisFilter}
+                onChange={(e) => setAnalysisFilter(e.target.value)}
+                className="rounded-lg border border-sidebar-border bg-sidebar px-3 py-2 text-sm text-dashboard-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+              >
+                {ANALYSIS_FILTER_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="w-full max-w-full space-y-0 flex-1">
+              {entriesWithGroups.map(({ entry, separatorType, weekGroup, dateGroup }) => (
                 <StreamEntryComponent
                   key={entry.id}
                   entry={entry}
+                  separatorType={separatorType}
+                  weekGroup={weekGroup}
                   dateGroup={dateGroup}
                 />
               ))}

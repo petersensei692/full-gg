@@ -2,17 +2,36 @@ import type { StreamEntry as StreamEntryType } from "@/types/asset";
 
 interface StreamEntryProps {
   entry: StreamEntryType;
+  separatorType: "same-day" | "new-day" | "new-week" | "first";
+  weekGroup?: string;
   dateGroup?: string;
 }
 
-export function StreamEntry({ entry, dateGroup }: StreamEntryProps) {
+export function StreamEntry({ entry, separatorType, weekGroup, dateGroup }: StreamEntryProps) {
+  const separatorTop =
+    separatorType === "first" ? null : separatorType === "new-week" ? (
+      <div className="pt-6 mt-6 border-t-2 border-primary/30">
+        {weekGroup && (
+          <p className="text-xs font-semibold text-primary/90 uppercase tracking-wider mb-4">
+            {weekGroup}
+          </p>
+        )}
+      </div>
+    ) : separatorType === "new-day" ? (
+      <div className="pt-4 mt-4 border-t border-sidebar-border">
+        {dateGroup && (
+          <p className="text-xs font-medium text-dashboard-foreground/60 uppercase tracking-wider mb-4">
+            {dateGroup}
+          </p>
+        )}
+      </div>
+    ) : (
+      <div className="pt-3 mt-3 border-t border-sidebar-border/50" />
+    );
+
   return (
-    <article className="border-b border-sidebar-border pb-6 last:border-0">
-      {dateGroup && (
-        <p className="text-xs font-medium text-dashboard-foreground/50 uppercase tracking-wider mb-4">
-          {dateGroup}
-        </p>
-      )}
+    <article className="pb-6 last:pb-0">
+      {separatorTop}
       <div className="min-w-0">
         <div
           className="stream-entry-content text-sm text-dashboard-foreground/90 leading-relaxed mb-2 [&_img]:max-w-full [&_img]:max-h-[300px] [&_img]:rounded-lg [&_img]:my-2 [&_img]:cursor-pointer [&_h1]:text-xl [&_h1]:font-bold [&_h2]:text-lg [&_h2]:font-semibold [&_h3]:text-base [&_h3]:font-medium"

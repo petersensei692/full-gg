@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState, useCallback } from "react";
-import { Bold, Italic, Underline, Paperclip, AtSign, PenSquare } from "lucide-react";
+import { Bold, Italic, Underline, PenSquare } from "lucide-react";
 import { useImagePaste } from "@/hooks/useImagePaste";
 import { Dialog, DialogContent } from "@/components/ui/Dialog";
 
@@ -122,20 +122,6 @@ export function PostAnalysisInput({ placeholder, onCreated }: PostAnalysisInputP
             title="Heading 3"
           >
             H3
-          </button>
-          <button
-            type="button"
-            className="rounded p-1.5 text-dashboard-foreground/60 hover:bg-sidebar-hover hover:text-dashboard-foreground transition-colors"
-            aria-label="Attach"
-          >
-            <Paperclip className="h-4 w-4" />
-          </button>
-          <button
-            type="button"
-            className="rounded p-1.5 text-dashboard-foreground/60 hover:bg-sidebar-hover hover:text-dashboard-foreground transition-colors"
-            aria-label="Mention"
-          >
-            <AtSign className="h-4 w-4" />
           </button>
         </div>
         <div className="flex items-center gap-2">

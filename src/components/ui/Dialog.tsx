@@ -49,7 +49,7 @@ const DialogContent = React.forwardRef<
     >
       {showClose && (
         <DialogPrimitive.Close
-          className="absolute right-4 top-4 rounded-lg p-2 text-white/80 hover:bg-white/10 hover:text-white transition-colors z-10"
+          className="absolute right-0 top-4 rounded-lg p-2 text-white/80 hover:bg-white/10 hover:text-white transition-colors z-10"
           aria-label="Close"
         >
           <X className="h-5 w-5" />

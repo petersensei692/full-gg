@@ -3,11 +3,9 @@
 import { useState, useRef, useCallback, useMemo, useEffect } from "react";
 import { Wrench, PenLine, ChevronRight } from "lucide-react";
 import { Dialog, DialogContent } from "@/components/ui/Dialog";
-import { ASSET_CONFIGS } from "@/types/asset";
-import type { WeeklyCalendar, WatchlistEntry } from "@/types/calendar";
+import type { WeeklyCalendar, WatchlistEntry, WatchlistBias } from "@/types/calendar";
 import { useImagePaste } from "@/hooks/useImagePaste";
-
-const ASSET_OPTIONS = Object.values(ASSET_CONFIGS);
+import { useAssets } from "@/context/AssetsContext";
 
 interface CreatePairModalProps {
   open: boolean;
@@ -28,12 +26,14 @@ export function CreatePairModal({
   currentAssetLabel,
   onCreated,
 }: CreatePairModalProps) {
+  const { assets: assetOptions } = useAssets();
   const [calendarId, setCalendarId] = useState(selectedCalendarId || "");
   const [baseAsset, setBaseAsset] = useState(currentAssetSlug);
   const [quoteAsset, setQuoteAsset] = useState(
     currentAssetSlug === "usd" ? "eur" : "usd"
   );
   const [thesisHtml, setThesisHtml] = useState("");
+  const [bias, setBias] = useState<WatchlistBias>("bullish");
   const [zoomedImageSrc, setZoomedImageSrc] = useState<string | null>(null);
   const [error, setError] = useState("");
   const thesisRef = useRef<HTMLDivElement>(null);
@@ -42,9 +42,10 @@ export function CreatePairModal({
     if (open) {
       setCalendarId((selectedCalendarId || calendars[0]?.id) ?? "");
       setBaseAsset(currentAssetSlug);
-      const other = Object.keys(ASSET_CONFIGS).find((s) => s !== currentAssetSlug) ?? "usd";
+      const other = assetOptions.find((a) => a.slug !== currentAssetSlug)?.slug ?? "usd";
       setQuoteAsset(other);
       setThesisHtml("");
+      setBias("bullish");
       setError("");
     }
   }, [open, selectedCalendarId, calendars, currentAssetSlug]);
@@ -52,10 +53,10 @@ export function CreatePairModal({
   const { handlePaste: handleThesisPaste } = useImagePaste({ editorRef: thesisRef });
 
   const pairName = useMemo(() => {
-    const base = ASSET_CONFIGS[baseAsset]?.label ?? baseAsset.toUpperCase();
-    const quote = ASSET_CONFIGS[quoteAsset]?.label ?? quoteAsset.toUpperCase();
+    const base = assetOptions.find((a) => a.slug === baseAsset)?.label ?? baseAsset.toUpperCase();
+    const quote = assetOptions.find((a) => a.slug === quoteAsset)?.label ?? quoteAsset.toUpperCase();
     return `${base} / ${quote}`;
-  }, [baseAsset, quoteAsset]);
+  }, [baseAsset, quoteAsset, assetOptions]);
 
   const isValidPair = baseAsset === currentAssetSlug || quoteAsset === currentAssetSlug;
 
@@ -94,6 +95,7 @@ export function CreatePairModal({
       thesis,
       chartImages: [],
       createdAt: Date.now(),
+      bias,
     };
     onCreated(entry);
     setThesisHtml("");
@@ -117,8 +119,8 @@ export function CreatePairModal({
         containToMain={true}
         className="max-h-[85dvh] flex flex-col items-stretch justify-start overflow-hidden bg-sidebar border border-sidebar-border rounded-xl p-0 shadow-xl"
       >
-        <div className="scrollbar-modal flex flex-col min-h-0 flex-1 overflow-y-auto overflow-x-hidden p-6">
-          <div className="space-y-6 min-w-0 overflow-x-hidden">
+        <div className="scrollbar-modal flex flex-col min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
+          <div className="space-y-6 min-w-0 overflow-x-hidden p-6">
           <div>
             <span className="text-xs font-semibold uppercase tracking-wider text-dashboard-foreground/60">
               New entry
@@ -168,12 +170,12 @@ export function CreatePairModal({
                       setQuoteAsset(currentAssetSlug);
                     }
                     if (next === quoteAsset) {
-                      setQuoteAsset(currentAssetSlug === next ? Object.keys(ASSET_CONFIGS).find((s) => s !== next) ?? "usd" : currentAssetSlug);
+                      setQuoteAsset(currentAssetSlug === next ? (assetOptions.find((a) => a.slug !== next)?.slug ?? "usd") : currentAssetSlug);
                     }
                   }}
                   className="w-full rounded-lg border border-sidebar-border bg-header-input px-3 py-2 text-sm text-dashboard-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                 >
-                  {ASSET_OPTIONS.map((a) => (
+                  {assetOptions.map((a) => (
                     <option key={a.slug} value={a.slug}>
                       {a.label}
                     </option>
@@ -191,12 +193,12 @@ export function CreatePairModal({
                       setBaseAsset(currentAssetSlug);
                     }
                     if (next === baseAsset) {
-                      setBaseAsset(currentAssetSlug === next ? Object.keys(ASSET_CONFIGS).find((s) => s !== next) ?? "usd" : currentAssetSlug);
+                      setBaseAsset(currentAssetSlug === next ? (assetOptions.find((a) => a.slug !== next)?.slug ?? "usd") : currentAssetSlug);
                     }
                   }}
                   className="w-full rounded-lg border border-sidebar-border bg-header-input px-3 py-2 text-sm text-dashboard-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                 >
-                  {ASSET_OPTIONS.map((a) => (
+                  {assetOptions.map((a) => (
                     <option key={a.slug} value={a.slug}>
                       {a.label}
                     </option>
@@ -215,6 +217,21 @@ export function CreatePairModal({
                 One of Base or Quote must be {currentAssetLabel} (current asset).
               </p>
             )}
+          </div>
+
+          {/* Bias */}
+          <div>
+            <label className="block text-sm font-medium text-dashboard-foreground/80 mb-2">
+              Bias
+            </label>
+            <select
+              value={bias}
+              onChange={(e) => setBias(e.target.value as WatchlistBias)}
+              className="w-full rounded-lg border border-sidebar-border bg-header-input px-3 py-2 text-sm text-dashboard-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+            >
+              <option value="bullish">Bullish</option>
+              <option value="bearish">Bearish</option>
+            </select>
           </div>
 
           {/* Technical Thesis & Notes */}

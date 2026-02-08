@@ -14,7 +14,20 @@ export function WatchlistEntryCard({ entry }: WatchlistEntryCardProps) {
   return (
     <article className="border-b border-sidebar-border pb-6 last:border-0">
       <div className="min-w-0">
-        <h4 className="text-base font-semibold text-primary mb-2">{entry.pairName}</h4>
+        <div className="flex items-center gap-2 mb-2">
+          <h4 className="text-base font-semibold text-primary">{entry.pairName}</h4>
+          {entry.bias && (
+            <span
+              className={`text-xs font-medium px-2 py-0.5 rounded ${
+                entry.bias === "bullish"
+                  ? "bg-emerald-500/20 text-emerald-400"
+                  : "bg-red-500/20 text-red-400"
+              }`}
+            >
+              {entry.bias === "bullish" ? "Bullish" : "Bearish"}
+            </span>
+          )}
+        </div>
         {entry.thesis && (
           <div
             className="text-sm text-dashboard-foreground/90 leading-relaxed mb-3 prose prose-invert prose-sm max-w-none [&_h1]:text-xl [&_h1]:font-bold [&_h2]:text-lg [&_h2]:font-semibold [&_h3]:text-base [&_h3]:font-medium [&_img]:max-w-[50%] [&_img]:rounded-lg [&_img]:cursor-pointer [&_img]:my-2"
