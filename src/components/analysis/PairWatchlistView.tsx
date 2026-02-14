@@ -1,9 +1,9 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { Calendar, Plus, ChevronDown } from "lucide-react";
+import { Calendar, Plus, ChevronDown, Trash2 } from "lucide-react";
 import type { AssetConfig } from "@/types/asset";
-import type { WeeklyCalendar, WatchlistEntry } from "@/types/calendar";
+import type { WeeklyWatchlist, WatchItem, CreateWatchItemDto } from "@/types/api";
 import { useWatchlistCalendar } from "@/context/WatchlistCalendarContext";
 import { WeeklyCalendarModal } from "./WeeklyCalendarModal";
 import { CreatePairModal } from "./CreatePairModal";
@@ -14,34 +14,54 @@ interface PairWatchlistViewProps {
 }
 
 export function PairWatchlistView({ asset }: PairWatchlistViewProps) {
-  const { calendars, addCalendar, watchlistEntries: entries, addWatchlistEntry } =
-    useWatchlistCalendar();
+  const {
+    weeklyWatchlists,
+    watchItems,
+    createWeeklyWatchlist,
+    updateWeeklyWatchlist,
+    createWatchItem,
+    updateWatchItem,
+    deleteWeeklyWatchlist,
+  } = useWatchlistCalendar();
 
   const [selectedCalendarId, setSelectedCalendarId] = useState<string | null>(null);
   const [calendarModalOpen, setCalendarModalOpen] = useState(false);
+  const [editingWatchlist, setEditingWatchlist] = useState<WeeklyWatchlist | null>(null);
   const [pairModalOpen, setPairModalOpen] = useState(false);
+  const [editingItem, setEditingItem] = useState<WatchItem | null>(null);
   const [calendarDropdownOpen, setCalendarDropdownOpen] = useState(false);
 
-  const selectedCalendar = calendars.find((c) => c.id === selectedCalendarId);
+  const selectedCalendar = weeklyWatchlists.find((c) => c.id === selectedCalendarId);
 
   const watchlistEntries = useMemo(
     () =>
       selectedCalendarId
-        ? entries
-            .filter((e) => e.weeklyCalendarId === selectedCalendarId)
-            .sort((a, b) => b.createdAt - a.createdAt)
+        ? watchItems
+            .filter((e) => e.watchlist.id === selectedCalendarId)
+            .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
         : [],
-    [entries, selectedCalendarId]
+    [watchItems, selectedCalendarId]
   );
 
-  const handleCalendarCreated = (calendar: WeeklyCalendar) => {
-    addCalendar(calendar);
-    setSelectedCalendarId(calendar.id);
+  const handleCalendarSubmit = async (dto: { startDate: string; endDate: string }) => {
+    if (editingWatchlist) {
+      const updated = await updateWeeklyWatchlist(editingWatchlist.id, dto);
+      setSelectedCalendarId(updated.id);
+    } else {
+      const created = await createWeeklyWatchlist(dto);
+      setSelectedCalendarId(created.id);
+    }
+    setEditingWatchlist(null);
     setCalendarDropdownOpen(false);
   };
 
-  const handlePairCreated = (entry: WatchlistEntry) => {
-    addWatchlistEntry(entry);
+  const handlePairSubmit = async (dto: CreateWatchItemDto) => {
+    if (editingItem) {
+      await updateWatchItem(editingItem.id, dto);
+    } else {
+      await createWatchItem(dto);
+    }
+    setEditingItem(null);
     setPairModalOpen(false);
   };
 
@@ -57,7 +77,9 @@ export function PairWatchlistView({ asset }: PairWatchlistViewProps) {
           >
             <Calendar className="h-4 w-4" />
             {selectedCalendar
-              ? `${selectedCalendar.startDate} → ${selectedCalendar.endDate}`
+              ? `${new Date(selectedCalendar.startDate).toISOString().slice(0, 10)} → ${new Date(
+                  selectedCalendar.endDate
+                ).toISOString().slice(0, 10)}`
               : "Choose or create weekly watchlist"}
             <ChevronDown className="h-4 w-4" />
           </button>
@@ -69,27 +91,50 @@ export function PairWatchlistView({ asset }: PairWatchlistViewProps) {
                 onClick={() => setCalendarDropdownOpen(false)}
               />
               <div className="absolute left-0 top-full mt-1 z-50 min-w-[220px] rounded-lg border border-sidebar-border bg-sidebar py-1 shadow-lg">
-                {calendars.length === 0 ? (
+                {weeklyWatchlists.length === 0 ? (
                   <p className="px-3 py-2 text-sm text-dashboard-foreground/70">
                     No watchlists yet
                   </p>
                 ) : (
-                  calendars.map((cal) => (
-                    <button
-                      key={cal.id}
-                      type="button"
-                      onClick={() => {
-                        setSelectedCalendarId(cal.id);
-                        setCalendarDropdownOpen(false);
-                      }}
-                      className={`w-full text-left px-3 py-2 text-sm hover:bg-sidebar-hover transition-colors ${
-                        selectedCalendarId === cal.id
-                          ? "text-primary font-medium"
-                          : "text-dashboard-foreground"
-                      }`}
-                    >
-                      {cal.startDate} → {cal.endDate}
-                    </button>
+                  weeklyWatchlists.map((cal) => (
+                    <div key={cal.id} className="flex items-center gap-2 px-3 py-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedCalendarId(cal.id);
+                          setCalendarDropdownOpen(false);
+                        }}
+                        className={`flex-1 text-left text-sm hover:text-primary transition-colors ${
+                          selectedCalendarId === cal.id
+                            ? "text-primary font-medium"
+                            : "text-dashboard-foreground"
+                        }`}
+                      >
+                        {new Date(cal.startDate).toISOString().slice(0, 10)} →{" "}
+                        {new Date(cal.endDate).toISOString().slice(0, 10)}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => deleteWeeklyWatchlist(cal.id)}
+                        className="text-dashboard-foreground/50 hover:text-red-400 transition-colors"
+                        aria-label="Delete watchlist"
+                        title="Delete watchlist"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditingWatchlist(cal);
+                          setCalendarModalOpen(true);
+                        }}
+                        className="text-dashboard-foreground/50 hover:text-primary transition-colors"
+                        aria-label="Edit watchlist"
+                        title="Edit watchlist"
+                      >
+                        ✎
+                      </button>
+                    </div>
                   ))
                 )}
                 <button
@@ -130,8 +175,15 @@ export function PairWatchlistView({ asset }: PairWatchlistViewProps) {
           </div>
         ) : (
           <div className="w-full max-w-full space-y-6">
-            {watchlistEntries.map((entry) => (
-              <WatchlistEntryCard key={entry.id} entry={entry} />
+            {watchlistEntries.map((entry: WatchItem) => (
+              <WatchlistEntryCard
+                key={entry.id}
+                entry={entry}
+                onEdit={() => {
+                  setEditingItem(entry);
+                  setPairModalOpen(true);
+                }}
+              />
             ))}
           </div>
         )}
@@ -141,16 +193,21 @@ export function PairWatchlistView({ asset }: PairWatchlistViewProps) {
         open={calendarModalOpen}
         onOpenChange={setCalendarModalOpen}
         variant="watchlist"
-        onCreated={handleCalendarCreated}
+        mode={editingWatchlist ? "edit" : "create"}
+        initialStartDate={editingWatchlist?.startDate}
+        initialEndDate={editingWatchlist?.endDate}
+        onSubmit={handleCalendarSubmit}
       />
       <CreatePairModal
         open={pairModalOpen}
         onOpenChange={setPairModalOpen}
-        calendars={calendars}
+        calendars={weeklyWatchlists}
         selectedCalendarId={selectedCalendarId}
         currentAssetSlug={asset.slug}
         currentAssetLabel={asset.label}
-        onCreated={handlePairCreated}
+        mode={editingItem ? "edit" : "create"}
+        initialItem={editingItem ?? undefined}
+        onSubmit={handlePairSubmit}
       />
     </div>
   );

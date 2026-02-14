@@ -1,10 +1,13 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { Calendar, ChevronDown } from "lucide-react";
+import { Calendar, ChevronDown, Trash2 } from "lucide-react";
 import { useWatchlistCalendar } from "@/context/WatchlistCalendarContext";
-import type { WeeklyCalendar } from "@/types/calendar";
+import type { WeeklyWatchlist, WatchItem } from "@/types/api";
 import { WatchlistEntryCard } from "@/components/analysis/WatchlistEntryCard";
+import { CreatePairModal } from "@/components/analysis/CreatePairModal";
+import { useAssets } from "@/context/AssetsContext";
+import { WeeklyCalendarModal } from "@/components/analysis/WeeklyCalendarModal";
 
 const DISPLAY_OPTIONS = [
   { value: "1", label: "Latest" },
@@ -16,12 +19,12 @@ const DISPLAY_OPTIONS = [
 ] as const;
 
 function formatDateRange(start: string, end: string): string {
-  const s = new Date(start + "T12:00:00").toLocaleDateString("en-US", {
+  const s = new Date(start).toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
     year: "numeric",
   });
-  const e = new Date(end + "T12:00:00").toLocaleDateString("en-US", {
+  const e = new Date(end).toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
     year: "numeric",
@@ -30,14 +33,29 @@ function formatDateRange(start: string, end: string): string {
 }
 
 export function WatchListView() {
-  const { calendars, watchlistEntries } = useWatchlistCalendar();
+  const {
+    weeklyWatchlists,
+    watchItems,
+    deleteWeeklyWatchlist,
+    updateWeeklyWatchlist,
+    updateWatchItem,
+  } = useWatchlistCalendar();
+  const { assets } = useAssets();
 
   const [displayCount, setDisplayCount] = useState<string>("4");
   const [displayDropdownOpen, setDisplayDropdownOpen] = useState(false);
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [editingWatchlist, setEditingWatchlist] = useState<WeeklyWatchlist | null>(null);
+  const [editItemOpen, setEditItemOpen] = useState(false);
+  const [editingItem, setEditingItem] = useState<WatchItem | null>(null);
 
   const sortedCalendars = useMemo(
-    () => [...calendars].sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0)),
-    [calendars]
+    () =>
+      [...weeklyWatchlists].sort(
+        (a, b) =>
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      ),
+    [weeklyWatchlists]
   );
 
   const displayedCalendars = useMemo(() => {
@@ -47,16 +65,19 @@ export function WatchListView() {
   }, [sortedCalendars, displayCount]);
 
   const pairsByCalendarId = useMemo(() => {
-    const map: Record<string, typeof watchlistEntries> = {};
-    watchlistEntries.forEach((e) => {
-      if (!map[e.weeklyCalendarId]) map[e.weeklyCalendarId] = [];
-      map[e.weeklyCalendarId].push(e);
+    const map: Record<string, WatchItem[]> = {};
+    watchItems.forEach((e) => {
+      const id = e.watchlist.id;
+      if (!map[id]) map[id] = [];
+      map[id].push(e);
     });
     Object.keys(map).forEach((id) =>
-      map[id].sort((a, b) => b.createdAt - a.createdAt)
+      map[id].sort(
+        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      )
     );
     return map;
-  }, [watchlistEntries]);
+  }, [watchItems]);
 
   const displayLabel =
     DISPLAY_OPTIONS.find((o) => o.value === displayCount)?.label ?? "Last 4";
@@ -120,22 +141,44 @@ export function WatchListView() {
               <p className="text-xs mt-1">Create one from an asset&apos;s Pair Watchlist tab.</p>
             </div>
           ) : (
-            displayedCalendars.map((cal: WeeklyCalendar) => {
+            displayedCalendars.map((cal: WeeklyWatchlist) => {
               const pairs = (pairsByCalendarId[cal.id] ?? []).sort(
-                (a, b) => b.createdAt - a.createdAt
+                (a, b) =>
+                  new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
               );
               return (
                 <div
                   key={cal.id}
                   className="rounded-xl border border-sidebar-border bg-sidebar/50 overflow-hidden shadow-sm"
                 >
-                  <div className="px-5 py-4 border-b border-sidebar-border bg-sidebar/80">
+                  <div className="px-5 py-4 border-b border-sidebar-border bg-sidebar/80 flex items-center justify-between gap-3">
                     <div className="flex items-center gap-2">
                       <Calendar className="h-5 w-5 text-primary/80" />
                       <h2 className="text-lg font-semibold text-dashboard-foreground">
                         {formatDateRange(cal.startDate, cal.endDate)}
                       </h2>
                     </div>
+                    <button
+                      type="button"
+                      onClick={() => deleteWeeklyWatchlist(cal.id)}
+                      className="text-dashboard-foreground/50 hover:text-red-400 transition-colors"
+                      aria-label="Delete watchlist"
+                      title="Delete watchlist"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditingWatchlist(cal);
+                        setEditModalOpen(true);
+                      }}
+                      className="text-dashboard-foreground/50 hover:text-primary transition-colors"
+                      aria-label="Edit watchlist"
+                      title="Edit watchlist"
+                    >
+                      ✎
+                    </button>
                   </div>
                   <div className="p-5">
                     {pairs.length === 0 ? (
@@ -145,7 +188,14 @@ export function WatchListView() {
                     ) : (
                       <div className="space-y-6">
                         {pairs.map((entry) => (
-                          <WatchlistEntryCard key={entry.id} entry={entry} />
+                          <WatchlistEntryCard
+                            key={entry.id}
+                            entry={entry}
+                            onEdit={() => {
+                              setEditingItem(entry);
+                              setEditItemOpen(true);
+                            }}
+                          />
                         ))}
                       </div>
                     )}
@@ -157,5 +207,42 @@ export function WatchListView() {
         </div>
       </div>
     </div>
+    <WeeklyCalendarModal
+      open={editModalOpen}
+      onOpenChange={setEditModalOpen}
+      mode="edit"
+      variant="watchlist"
+      initialStartDate={editingWatchlist?.startDate}
+      initialEndDate={editingWatchlist?.endDate}
+      onSubmit={async (dto) => {
+        if (!editingWatchlist) return;
+        await updateWeeklyWatchlist(editingWatchlist.id, dto);
+        setEditModalOpen(false);
+        setEditingWatchlist(null);
+      }}
+    />
+    {editingItem && (
+      <CreatePairModal
+        open={editItemOpen}
+        onOpenChange={setEditItemOpen}
+        calendars={weeklyWatchlists}
+        selectedCalendarId={editingItem.watchlist.id}
+        currentAssetSlug={
+          assets.find((a) => a.label === editingItem.baseAsset.name)?.slug ??
+          editingItem.baseAsset.name.toLowerCase()
+        }
+        currentAssetLabel={
+          assets.find((a) => a.label === editingItem.baseAsset.name)?.label ??
+          editingItem.baseAsset.name
+        }
+        mode="edit"
+        initialItem={editingItem}
+        onSubmit={async (dto) => {
+          await updateWatchItem(editingItem.id, dto);
+          setEditItemOpen(false);
+          setEditingItem(null);
+        }}
+      />
+    )}
   );
 }

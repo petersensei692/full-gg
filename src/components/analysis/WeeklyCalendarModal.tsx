@@ -1,41 +1,65 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent } from "@/components/ui/Dialog";
-import type { WeeklyCalendar } from "@/types/calendar";
+import type { CreateWeeklyCalendarDto, CreateWeeklyWatchlistDto } from "@/types/api";
 
 interface WeeklyCalendarModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   /** When "watchlist", shows "Weekly Watchlist" title/button (e.g. for Pair Watchlist tab). */
   variant?: "calendar" | "watchlist";
-  onCreated: (calendar: WeeklyCalendar) => void;
+  mode?: "create" | "edit";
+  initialStartDate?: string;
+  initialEndDate?: string;
+  onSubmit: (dto: CreateWeeklyCalendarDto | CreateWeeklyWatchlistDto) => void;
 }
 
 export function WeeklyCalendarModal({
   open,
   onOpenChange,
   variant = "calendar",
-  onCreated,
+  mode = "create",
+  initialStartDate,
+  initialEndDate,
+  onSubmit,
 }: WeeklyCalendarModalProps) {
   const isWatchlist = variant === "watchlist";
-  const title = isWatchlist ? "Create Weekly Watchlist" : "Create Weekly Calendar";
-  const submitLabel = isWatchlist ? "Create watchlist" : "Create calendar";
+  const title = isWatchlist
+    ? mode === "edit"
+      ? "Edit Weekly Watchlist"
+      : "Create Weekly Watchlist"
+    : mode === "edit"
+    ? "Edit Weekly Calendar"
+    : "Create Weekly Calendar";
+  const submitLabel = isWatchlist
+    ? mode === "edit"
+      ? "Save watchlist"
+      : "Create watchlist"
+    : mode === "edit"
+    ? "Save calendar"
+    : "Create calendar";
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
+
+  const normalizeDate = (value?: string) =>
+    value ? new Date(value).toISOString().slice(0, 10) : "";
+
+  useEffect(() => {
+    if (open) {
+      setStartDate(normalizeDate(initialStartDate));
+      setEndDate(normalizeDate(initialEndDate));
+    }
+  }, [open, initialStartDate, initialEndDate]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!startDate || !endDate) return;
     if (new Date(endDate) < new Date(startDate)) return;
 
-    const calendar: WeeklyCalendar = {
-      id: `wc-${Date.now()}`,
-      startDate,
-      endDate,
-      createdAt: Date.now(),
-    };
-    onCreated(calendar);
+    const startIso = new Date(`${startDate}T00:00:00.000Z`).toISOString();
+    const endIso = new Date(`${endDate}T23:59:59.999Z`).toISOString();
+    onSubmit({ startDate: startIso, endDate: endIso });
     setStartDate("");
     setEndDate("");
     onOpenChange(false);

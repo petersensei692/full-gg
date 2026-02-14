@@ -12,7 +12,7 @@ export class ApiError extends Error {
   }
 }
 
-export async function handleResponse<T>(res: Response): Promise<T> {
+export async function handleResponse<T>(res: Response, requestUrl?: string): Promise<T> {
   if (!res.ok) {
     let body: unknown;
     try {
@@ -26,7 +26,8 @@ export async function handleResponse<T>(res: Response): Promise<T> {
             ? (body as { message: string[] }).message.join(", ")
             : (body as { message: string }).message)
         : res.statusText;
-    throw new ApiError(message, res.status, body);
+    const urlSuffix = requestUrl ? ` (${requestUrl})` : "";
+    throw new ApiError(`${message}${urlSuffix}`, res.status, body);
   }
   if (res.status === 204 || res.headers.get("content-length") === "0") {
     return undefined as T;

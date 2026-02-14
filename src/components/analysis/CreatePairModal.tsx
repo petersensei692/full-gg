@@ -3,18 +3,23 @@
 import { useState, useRef, useCallback, useMemo, useEffect } from "react";
 import { Wrench, PenLine, ChevronRight } from "lucide-react";
 import { Dialog, DialogContent } from "@/components/ui/Dialog";
-import type { WeeklyCalendar, WatchlistEntry, WatchlistBias } from "@/types/calendar";
+import type { WeeklyWatchlist, CreateWatchItemDto, WatchItem } from "@/types/api";
+import type { WatchlistBias } from "@/types/calendar";
 import { useImagePaste } from "@/hooks/useImagePaste";
+import { deleteStoredImage } from "@/lib/imageUpload";
+import { getImageUrl } from "@/lib/imageUrls";
 import { useAssets } from "@/context/AssetsContext";
 
 interface CreatePairModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  calendars: WeeklyCalendar[];
+  calendars: WeeklyWatchlist[];
   selectedCalendarId: string | null;
   currentAssetSlug: string;
   currentAssetLabel: string;
-  onCreated: (entry: WatchlistEntry) => void;
+  mode?: "create" | "edit";
+  initialItem?: WatchItem;
+  onSubmit: (dto: CreateWatchItemDto) => void;
 }
 
 export function CreatePairModal({
@@ -24,7 +29,9 @@ export function CreatePairModal({
   selectedCalendarId,
   currentAssetSlug,
   currentAssetLabel,
-  onCreated,
+  mode = "create",
+  initialItem,
+  onSubmit,
 }: CreatePairModalProps) {
   const { assets: assetOptions } = useAssets();
   const [calendarId, setCalendarId] = useState(selectedCalendarId || "");
@@ -35,22 +42,60 @@ export function CreatePairModal({
   const [thesisHtml, setThesisHtml] = useState("");
   const [bias, setBias] = useState<WatchlistBias>("bullish");
   const [zoomedImageSrc, setZoomedImageSrc] = useState<string | null>(null);
+  const [thesisImages, setThesisImages] = useState<Array<{ path: string; url: string }>>([]);
   const [error, setError] = useState("");
   const thesisRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (open) {
-      setCalendarId((selectedCalendarId || calendars[0]?.id) ?? "");
-      setBaseAsset(currentAssetSlug);
-      const other = assetOptions.find((a) => a.slug !== currentAssetSlug)?.slug ?? "usd";
-      setQuoteAsset(other);
-      setThesisHtml("");
-      setBias("bullish");
+      if (mode === "edit" && initialItem) {
+        const baseSlug =
+          assetOptions.find((a) => a.label === initialItem.baseAsset.name)?.slug ??
+          initialItem.baseAsset.name.toLowerCase();
+        const quoteSlug =
+          assetOptions.find((a) => a.label === initialItem.quoteAsset.name)?.slug ??
+          initialItem.quoteAsset.name.toLowerCase();
+        setCalendarId(initialItem.watchlist.id);
+        setBaseAsset(baseSlug);
+        setQuoteAsset(quoteSlug);
+        setThesisHtml(initialItem.thesis?.notes ?? "");
+        setBias((initialItem.bias as WatchlistBias) ?? "bullish");
+        setThesisImages(
+          (initialItem.thesis?.images ?? []).map((path) => ({
+            path,
+            url: getImageUrl(path),
+          }))
+        );
+        if (thesisRef.current) {
+          thesisRef.current.innerHTML = initialItem.thesis?.notes ?? "";
+        }
+      } else {
+        setCalendarId((selectedCalendarId || calendars[0]?.id) ?? "");
+        setBaseAsset(currentAssetSlug);
+        const other = assetOptions.find((a) => a.slug !== currentAssetSlug)?.slug ?? "usd";
+        setQuoteAsset(other);
+        setThesisHtml("");
+        setBias("bullish");
+        setThesisImages([]);
+        if (thesisRef.current) {
+          thesisRef.current.innerHTML = "";
+        }
+      }
       setError("");
     }
-  }, [open, selectedCalendarId, calendars, currentAssetSlug]);
+  }, [
+    open,
+    selectedCalendarId,
+    calendars,
+    currentAssetSlug,
+    assetOptions,
+    mode,
+    initialItem,
+  ]);
 
-  const { handlePaste: handleThesisPaste } = useImagePaste({ editorRef: thesisRef });
+  const { handlePaste: handleThesisPaste } = useImagePaste({
+    onImageReady: (img) => setThesisImages((prev) => [...prev, img]),
+  });
 
   const pairName = useMemo(() => {
     const base = assetOptions.find((a) => a.slug === baseAsset)?.label ?? baseAsset.toUpperCase();
@@ -84,21 +129,30 @@ export function CreatePairModal({
       setError("Base and Quote must be different.");
       return;
     }
-    const thesis = thesisRef.current?.innerHTML ?? "";
-    const entry: WatchlistEntry = {
-      id: `wl-${Date.now()}`,
-      weeklyCalendarId: calendarId,
-      assetSlug: currentAssetSlug,
-      baseAsset,
-      quoteAsset,
+    const baseAssetId = assetOptions.find((a) => a.slug === baseAsset)?.id;
+    const quoteAssetId = assetOptions.find((a) => a.slug === quoteAsset)?.id;
+    if (!baseAssetId || !quoteAssetId) {
+      setError("Select valid base and quote assets.");
+      return;
+    }
+    const thesisNotes = thesisRef.current?.innerHTML ?? "";
+    const dto: CreateWatchItemDto = {
+      watchlistId: calendarId,
+      baseAssetId,
+      quoteAssetId,
       pairName,
-      thesis,
-      chartImages: [],
-      createdAt: Date.now(),
       bias,
+      thesis:
+        thesisNotes || thesisImages.length
+          ? {
+              notes: thesisNotes,
+              images: thesisImages.map((img) => img.path),
+            }
+          : undefined,
     };
-    onCreated(entry);
+    onSubmit(dto);
     setThesisHtml("");
+    setThesisImages([]);
     setBaseAsset(currentAssetSlug);
     setQuoteAsset(currentAssetSlug === "usd" ? "eur" : "usd");
     onOpenChange(false);
@@ -106,6 +160,10 @@ export function CreatePairModal({
 
   const handleDiscard = () => {
     setThesisHtml("");
+    thesisImages.forEach((img) => {
+      deleteStoredImage(img.path).catch(() => undefined);
+    });
+    setThesisImages([]);
     setError("");
     onOpenChange(false);
   };
@@ -123,13 +181,15 @@ export function CreatePairModal({
           <div className="space-y-6 min-w-0 overflow-x-hidden p-6">
           <div>
             <span className="text-xs font-semibold uppercase tracking-wider text-dashboard-foreground/60">
-              New entry
+              {mode === "edit" ? "Edit entry" : "New entry"}
             </span>
             <h3 className="text-xl font-semibold text-dashboard-foreground mt-1">
-              Weekly Watchlist Creator
+              {mode === "edit" ? "Edit Watchlist Pair" : "Weekly Watchlist Creator"}
             </h3>
             <p className="text-sm text-dashboard-foreground/70 mt-0.5">
-              Define your trading pairs and document your fundamental thesis for the upcoming session.
+              {mode === "edit"
+                ? "Update your trading pair and thesis."
+                : "Define your trading pairs and document your fundamental thesis for the upcoming session."}
             </p>
           </div>
 
@@ -146,7 +206,8 @@ export function CreatePairModal({
               <option value="">Select a watchlist...</option>
               {assetCalendars.map((cal) => (
                 <option key={cal.id} value={cal.id}>
-                  {cal.startDate} → {cal.endDate}
+                  {new Date(cal.startDate).toISOString().slice(0, 10)} →{" "}
+                  {new Date(cal.endDate).toISOString().slice(0, 10)}
                 </option>
               ))}
             </select>
@@ -277,6 +338,37 @@ export function CreatePairModal({
               className="min-h-[120px] max-h-[280px] w-full overflow-y-auto rounded-lg border border-sidebar-border bg-header-input px-3 py-2.5 text-sm text-dashboard-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary [&:empty::before]:content-[attr(data-placeholder)] [&:empty::before]:text-dashboard-foreground/50 [&_img]:max-w-[50%] [&_img]:max-h-[200px] [&_img]:w-[50%] [&_img]:h-auto [&_img]:object-contain [&_img]:rounded-lg [&_img]:cursor-pointer [&_img]:block [&_img]:my-2 [&_h1]:text-xl [&_h1]:font-bold [&_h2]:text-lg [&_h2]:font-semibold [&_h3]:text-base [&_h3]:font-medium"
               suppressContentEditableWarning
             />
+            {thesisImages.length > 0 && (
+              <div className="mt-3 flex flex-wrap gap-2">
+                {thesisImages.map((img) => (
+                  <div key={img.path} className="relative">
+                    <button
+                      type="button"
+                      onClick={() => setZoomedImageSrc(img.url)}
+                      className="block"
+                    >
+                      <img
+                        src={img.url}
+                        alt="Thesis attachment"
+                        className="h-20 w-28 object-cover rounded-lg border border-sidebar-border hover:border-primary/50 transition-colors"
+                      />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        setThesisImages((prev) => prev.filter((p) => p.path !== img.path));
+                        await deleteStoredImage(img.path).catch(() => undefined);
+                      }}
+                      className="absolute -top-2 -right-2 rounded-full bg-red-500 text-white text-xs w-5 h-5 flex items-center justify-center shadow"
+                      aria-label="Remove image"
+                      title="Remove image"
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {error && (
@@ -298,7 +390,7 @@ export function CreatePairModal({
               disabled={!isValidPair || baseAsset === quoteAsset}
               className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:pointer-events-none"
             >
-              Save to Watchlist
+              {mode === "edit" ? "Save changes" : "Save to Watchlist"}
               <ChevronRight className="h-4 w-4" />
             </button>
           </div>

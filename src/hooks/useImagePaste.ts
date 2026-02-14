@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback } from "react";
-import { compressImage } from "@/lib/compressImage";
+import { compressImageToBlob } from "@/lib/compressImage";
+import { uploadImageBlob } from "@/lib/imageUpload";
 
 /**
  * Inserts an image at the current cursor/selection in a contenteditable element.
@@ -38,14 +39,14 @@ function insertImageAtSelection(container: HTMLElement, src: string) {
 
 export interface UseImagePasteOptions {
   /** Callback when image is converted and ready; if not provided, inserts into editorRef */
-  onImageReady?: (base64: string) => void;
+  onImageReady?: (image: { path: string; url: string }) => void;
   /** Optional contenteditable element ref; used for insert when onImageReady is not provided */
   editorRef?: React.RefObject<HTMLElement | null>;
 }
 
 /**
  * Hook that provides a paste handler to intercept image paste, convert to WebP at full quality
- * (original dimensions preserved), and either call onImageReady(base64) or insert into editorRef.
+ * (original dimensions preserved), and either call onImageReady(image) or insert into editorRef.
  */
 export function useImagePaste(options: UseImagePasteOptions) {
   const { onImageReady, editorRef } = options;
@@ -63,18 +64,25 @@ export function useImagePaste(options: UseImagePasteOptions) {
 
       e.preventDefault();
 
-      const base64 = await compressImage(file);
-      if (!base64) return;
+      const blob = await compressImageToBlob(file);
+      if (!blob) return;
+
+      let uploaded;
+      try {
+        uploaded = await uploadImageBlob(blob);
+      } catch {
+        return;
+      }
 
       if (onImageReady) {
-        onImageReady(base64);
+        onImageReady(uploaded);
         return;
       }
 
       const el = editorRef?.current;
       if (el && typeof el.focus === "function") {
         el.focus();
-        insertImageAtSelection(el, base64);
+        insertImageAtSelection(el, uploaded.url);
       }
     },
     [onImageReady, editorRef]

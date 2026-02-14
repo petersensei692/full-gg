@@ -4,11 +4,12 @@ import { useRef, useState, useCallback } from "react";
 import { Bold, Italic, Underline, PenSquare } from "lucide-react";
 import { useImagePaste } from "@/hooks/useImagePaste";
 import { Dialog, DialogContent } from "@/components/ui/Dialog";
+import { deleteStoredImage } from "@/lib/imageUpload";
 
 interface PostAnalysisInputProps {
   placeholder: string;
   /** Called when user clicks Create with editor HTML and selected analysis type */
-  onCreated?: (contentHtml: string, analysisType: string) => void;
+  onCreated?: (payload: { notes: string; images: string[]; analysisType: string }) => void;
 }
 
 const ANALYSIS_TYPES = [
@@ -23,8 +24,12 @@ export function PostAnalysisInput({ placeholder, onCreated }: PostAnalysisInputP
   const editorRef = useRef<HTMLDivElement>(null);
   const [zoomedImageSrc, setZoomedImageSrc] = useState<string | null>(null);
   const [analysisType, setAnalysisType] = useState<string>("daily");
+  const [images, setImages] = useState<Array<{ path: string; url: string }>>([]);
 
-  const { handlePaste } = useImagePaste({ editorRef });
+  const { handlePaste } = useImagePaste({
+    editorRef,
+    onImageReady: (img) => setImages((prev) => [...prev, img]),
+  });
 
   const applyFormat = useCallback((command: "bold" | "italic" | "underline") => {
     document.execCommand(command, false);
@@ -46,12 +51,17 @@ export function PostAnalysisInput({ placeholder, onCreated }: PostAnalysisInputP
 
   const handleCreate = useCallback(() => {
     const html = editorRef.current?.innerHTML?.trim() ?? "";
-    if (!html) return;
-    onCreated?.(html, analysisType);
+    if (!html && images.length === 0) return;
+    onCreated?.({
+      notes: html,
+      images: images.map((img) => img.path),
+      analysisType,
+    });
     if (editorRef.current) {
       editorRef.current.innerHTML = "";
     }
-  }, [analysisType, onCreated]);
+    setImages([]);
+  }, [analysisType, onCreated, images]);
 
   return (
     <div className="rounded-xl border border-sidebar-border bg-sidebar/50 p-3 mt-6">
@@ -147,6 +157,38 @@ export function PostAnalysisInput({ placeholder, onCreated }: PostAnalysisInputP
           </button>
         </div>
       </div>
+
+      {images.length > 0 && (
+        <div className="mt-3 flex flex-wrap gap-2">
+          {images.map((img) => (
+            <div key={img.path} className="relative">
+              <button
+                type="button"
+                onClick={() => setZoomedImageSrc(img.url)}
+                className="block"
+              >
+                <img
+                  src={img.url}
+                  alt="Attached"
+                  className="h-20 w-28 object-cover rounded-lg border border-sidebar-border hover:border-primary/50 transition-colors"
+                />
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  setImages((prev) => prev.filter((p) => p.path !== img.path));
+                  await deleteStoredImage(img.path).catch(() => undefined);
+                }}
+                className="absolute -top-2 -right-2 rounded-full bg-red-500 text-white text-xs w-5 h-5 flex items-center justify-center shadow"
+                aria-label="Remove image"
+                title="Remove image"
+              >
+                ×
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
 
       {zoomedImageSrc && (
         <Dialog open={!!zoomedImageSrc} onOpenChange={(open) => !open && setZoomedImageSrc(null)}>

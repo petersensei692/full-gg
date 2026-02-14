@@ -2,6 +2,10 @@
 
 import { useState, useCallback, useMemo, useRef, useEffect } from "react";
 import type { AssetConfig, StreamEntry } from "@/types/asset";
+import type { Analysis } from "@/types/api";
+import { analysisService } from "@/lib/api";
+import { deleteStoredImage } from "@/lib/imageUpload";
+import { EditAnalysisModal } from "./analysis/EditAnalysisModal";
 import { AssetHeader } from "./analysis/AssetHeader";
 import { StreamTabs } from "./analysis/StreamTabs";
 import { StreamEntry as StreamEntryComponent } from "./analysis/StreamEntry";
@@ -9,7 +13,10 @@ import { PostAnalysisInput } from "./analysis/PostAnalysisInput";
 import { EconomicEventsView } from "./analysis/EconomicEventsView";
 import { PairWatchlistView } from "./analysis/PairWatchlistView";
 
-const ANALYSIS_TYPE_TO_TAG: Record<string, { tag: StreamEntry["tag"]; tagColor: StreamEntry["tagColor"] }> = {
+const ANALYSIS_TYPE_TO_TAG: Record<
+  string,
+  { tag: StreamEntry["tag"]; tagColor: StreamEntry["tagColor"] }
+> = {
   daily: { tag: "INTRADAY UPDATE", tagColor: "orange" },
   weekly: { tag: "WEEKLY OUTLOOK", tagColor: "green" },
   monthly: { tag: "POLICY NOTE", tagColor: "blue" },
@@ -19,6 +26,17 @@ const ANALYSIS_TYPE_TO_TAG: Record<string, { tag: StreamEntry["tag"]; tagColor: 
 
 function formatTime(date: Date): string {
   return date.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true });
+}
+
+function addAnalysisTypeMarker(notes: string, analysisType: string): string {
+  return `<!--analysis-type:${analysisType}-->${notes}`;
+}
+
+function extractAnalysisType(notes: string): { cleanedNotes: string; analysisType: string } {
+  const match = notes.match(/<!--analysis-type:([^>]*)-->/);
+  const analysisType = match?.[1]?.trim() || "daily";
+  const cleanedNotes = notes.replace(/<!--analysis-type:[^>]*-->/, "").trim();
+  return { cleanedNotes, analysisType };
 }
 
 const ANALYSIS_FILTER_OPTIONS = [
@@ -62,37 +80,89 @@ interface AssetAnalysisViewProps {
 
 export function AssetAnalysisView({ asset }: AssetAnalysisViewProps) {
   const [activeTab, setActiveTab] = useState<"stream" | "events" | "watchlist">("stream");
-  const [entries, setEntries] = useState<StreamEntry[]>([]);
+  const [analyses, setAnalyses] = useState<Analysis[]>([]);
   const [analysisFilter, setAnalysisFilter] = useState<string>("all");
+  const [editingAnalysis, setEditingAnalysis] = useState<Analysis | null>(null);
+  const [editingAnalysisType, setEditingAnalysisType] = useState<string>("daily");
+  const [editModalOpen, setEditModalOpen] = useState(false);
 
-  const handleCreate = useCallback(
-    (contentHtml: string, analysisType: string) => {
-      const now = Date.now();
-      const { tag, tagColor } = ANALYSIS_TYPE_TO_TAG[analysisType] ?? { tag: "MARKET PULSE" as const, tagColor: "blue" as const };
-      const entry: StreamEntry = {
-        id: `entry-${now}`,
-        author: "You",
-        time: formatTime(new Date(now)),
-        tag,
-        tagColor,
-        content: contentHtml,
-        createdAt: now,
-        analysisType: analysisType,
-      };
-      setEntries((prev) => [...prev, entry]);
+  const handleCreate = useCallback(async (payload: { notes: string; images: string[]; analysisType: string }) => {
+    const notesWithMarker = addAnalysisTypeMarker(payload.notes, payload.analysisType);
+    const created = await analysisService.create({
+      notes: notesWithMarker,
+      images: payload.images,
+    });
+    setAnalyses((prev) => [...prev, created]);
+  }, []);
+
+  const handleDeleteAnalysis = useCallback(
+    async (analysisId: string, images: string[]) => {
+      await analysisService.delete(analysisId);
+      await Promise.all(images.map((path) => deleteStoredImage(path).catch(() => undefined)));
+      setAnalyses((prev) => prev.filter((a) => a.id !== analysisId));
     },
     []
   );
 
+  const handleDeleteImage = useCallback(
+    async (analysisId: string, imagePath: string) => {
+      const target = analyses.find((a) => a.id === analysisId);
+      if (!target) return;
+      const nextImages = (target.images ?? []).filter((p) => p !== imagePath);
+      const updated = await analysisService.update(analysisId, { images: nextImages });
+      await deleteStoredImage(imagePath).catch(() => undefined);
+      setAnalyses((prev) => prev.map((a) => (a.id === analysisId ? updated : a)));
+    },
+    [analyses]
+  );
+
+  const handleEditAnalysis = useCallback((analysis: Analysis) => {
+    const { analysisType } = extractAnalysisType(analysis.notes);
+    setEditingAnalysis(analysis);
+    setEditingAnalysisType(analysisType);
+    setEditModalOpen(true);
+  }, []);
+
   const streamScrollRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     streamScrollRef.current?.scrollTo({ top: streamScrollRef.current.scrollHeight, behavior: "smooth" });
-  }, [entries.length]);
+  }, [analyses.length]);
+
+  useEffect(() => {
+    analysisService
+      .getAll()
+      .then((list) => setAnalyses(list))
+      .catch(() => setAnalyses([]));
+  }, []);
+
+  const mappedEntries = useMemo(() => {
+    return analyses
+      .map((analysis) => {
+        const createdAt = new Date(analysis.createdAt).getTime();
+        const { cleanedNotes, analysisType } = extractAnalysisType(analysis.notes);
+        const { tag, tagColor } =
+          ANALYSIS_TYPE_TO_TAG[analysisType] ??
+          ({ tag: "MARKET PULSE" as const, tagColor: "blue" as const });
+        const entry: StreamEntry = {
+          id: analysis.id,
+          author: "You",
+          time: formatTime(new Date(analysis.createdAt)),
+          tag,
+          tagColor,
+          content: cleanedNotes,
+          createdAt,
+          analysisType,
+          images: analysis.images ?? [],
+        };
+        return entry;
+      })
+      .sort((a, b) => (a.createdAt ?? 0) - (b.createdAt ?? 0));
+  }, [analyses]);
 
   const filteredEntries = useMemo(() => {
-    if (analysisFilter === "all") return entries;
-    return entries.filter((e) => (e.analysisType ?? "daily") === analysisFilter);
-  }, [entries, analysisFilter]);
+    if (analysisFilter === "all") return mappedEntries;
+    return mappedEntries.filter((e) => (e.analysisType ?? "daily") === analysisFilter);
+  }, [mappedEntries, analysisFilter]);
 
   const entriesWithGroups = useMemo(() => {
     let lastWeekKey: string | undefined;
@@ -126,7 +196,8 @@ export function AssetAnalysisView({ asset }: AssetAnalysisViewProps) {
       : displayTitle;
 
   return (
-    <div className="flex h-full min-h-0 flex-col overflow-auto">
+    <>
+      <div className="flex h-full min-h-0 flex-col overflow-auto">
         <div className="px-6 pt-3 pb-0">
           <AssetHeader title={fullTitle} />
           <div className="mt-2">
@@ -158,6 +229,12 @@ export function AssetAnalysisView({ asset }: AssetAnalysisViewProps) {
                   separatorType={separatorType}
                   weekGroup={weekGroup}
                   dateGroup={dateGroup}
+                  onDelete={() => handleDeleteAnalysis(entry.id, entry.images ?? [])}
+                  onDeleteImage={(path) => handleDeleteImage(entry.id, path)}
+                  onEdit={() => {
+                    const analysis = analyses.find((a) => a.id === entry.id);
+                    if (analysis) handleEditAnalysis(analysis);
+                  }}
                 />
               ))}
             </div>
@@ -170,6 +247,26 @@ export function AssetAnalysisView({ asset }: AssetAnalysisViewProps) {
         {activeTab === "events" && <EconomicEventsView asset={asset} />}
 
         {activeTab === "watchlist" && <PairWatchlistView asset={asset} />}
-    </div>
+      </div>
+      {editingAnalysis && (
+        <EditAnalysisModal
+          open={editModalOpen}
+          onOpenChange={setEditModalOpen}
+          initialNotes={extractAnalysisType(editingAnalysis.notes).cleanedNotes}
+          initialImages={editingAnalysis.images ?? []}
+          onSubmit={async ({ notes, images }) => {
+            if (!editingAnalysis) return;
+            const notesWithMarker = addAnalysisTypeMarker(notes, editingAnalysisType);
+            const updated = await analysisService.update(editingAnalysis.id, {
+              notes: notesWithMarker,
+              images,
+            });
+            setAnalyses((prev) => prev.map((a) => (a.id === updated.id ? updated : a)));
+            setEditModalOpen(false);
+            setEditingAnalysis(null);
+          }}
+        />
+      )}
+    </>
   );
 }

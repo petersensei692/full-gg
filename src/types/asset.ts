@@ -8,6 +8,7 @@ export interface StreamEntry {
   tag: StreamEntryTag;
   tagColor: "green" | "orange" | "blue" | "purple";
   content: string; // plain text or HTML from editor
+  images?: string[]; // stored image paths
   bullets?: string[];
   chartData?: { label: string; value: number }[];
   quote?: { text: string; source: string };

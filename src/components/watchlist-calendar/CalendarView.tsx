@@ -1,9 +1,12 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { Calendar, ChevronDown } from "lucide-react";
+import { Calendar, ChevronDown, Trash2 } from "lucide-react";
 import { useWatchlistCalendar } from "@/context/WatchlistCalendarContext";
-import type { WeeklyCalendar, EconomicEvent, EventImpact } from "@/types/calendar";
+import { CreateEventModal } from "@/components/analysis/CreateEventModal";
+import type { WeeklyCalendar, Event } from "@/types/api";
+import type { EventImpact } from "@/types/calendar";
+import { WeeklyCalendarModal } from "@/components/analysis/WeeklyCalendarModal";
 
 const DISPLAY_OPTIONS = [
   { value: "1", label: "Latest" },
@@ -21,12 +24,12 @@ const IMPACT_DOTS: Record<EventImpact, string> = {
 };
 
 function formatDateRange(start: string, end: string): string {
-  const s = new Date(start + "T12:00:00").toLocaleDateString("en-US", {
+  const s = new Date(start).toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
     year: "numeric",
   });
-  const e = new Date(end + "T12:00:00").toLocaleDateString("en-US", {
+  const e = new Date(end).toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
     year: "numeric",
@@ -34,15 +37,42 @@ function formatDateRange(start: string, end: string): string {
   return `${s} → ${e}`;
 }
 
+function getDateForDay(calendar: WeeklyCalendar, day: string): string | null {
+  const start = new Date(calendar.startDate);
+  const end = new Date(calendar.endDate);
+  for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+    const label = d.toLocaleDateString("en-US", { weekday: "long" });
+    if (label.toLowerCase() === day.toLowerCase()) {
+      return d.toISOString().slice(0, 10);
+    }
+  }
+  return null;
+}
+
 export function CalendarView() {
-  const { calendars, economicEvents } = useWatchlistCalendar();
+  const {
+    weeklyCalendars,
+    events,
+    deleteEvent,
+    deleteWeeklyCalendar,
+    updateWeeklyCalendar,
+    updateEvent,
+  } = useWatchlistCalendar();
 
   const [displayCount, setDisplayCount] = useState<string>("4");
   const [displayDropdownOpen, setDisplayDropdownOpen] = useState(false);
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [editingCalendar, setEditingCalendar] = useState<WeeklyCalendar | null>(null);
+  const [editEventOpen, setEditEventOpen] = useState(false);
+  const [editingEvent, setEditingEvent] = useState<Event | null>(null);
 
   const sortedCalendars = useMemo(
-    () => [...calendars].sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0)),
-    [calendars]
+    () =>
+      [...weeklyCalendars].sort(
+        (a, b) =>
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      ),
+    [weeklyCalendars]
   );
 
   const displayedCalendars = useMemo(() => {
@@ -52,26 +82,24 @@ export function CalendarView() {
   }, [sortedCalendars, displayCount]);
 
   const eventsByCalendarId = useMemo(() => {
-    const map: Record<string, EconomicEvent[]> = {};
-    economicEvents.forEach((ev) => {
-      if (!map[ev.weeklyCalendarId]) map[ev.weeklyCalendarId] = [];
-      map[ev.weeklyCalendarId].push(ev);
+    const map: Record<string, Event[]> = {};
+    events.forEach((ev) => {
+      const id = ev.calendar.id;
+      if (!map[id]) map[id] = [];
+      map[id].push(ev);
     });
     Object.keys(map).forEach((id) => {
-      map[id].sort((a, b) => {
-        const dateCompare = a.date.localeCompare(b.date);
-        if (dateCompare !== 0) return dateCompare;
-        return (a.time || "00:00").localeCompare(b.time || "00:00");
-      });
+      map[id].sort((a, b) => (a.time || "00:00").localeCompare(b.time || "00:00"));
     });
     return map;
-  }, [economicEvents]);
+  }, [events]);
 
   const displayLabel =
     DISPLAY_OPTIONS.find((o) => o.value === displayCount)?.label ?? "Last 4";
 
   return (
-    <div className="flex h-full min-h-0 flex-col overflow-auto">
+    <>
+      <div className="flex h-full min-h-0 flex-col overflow-auto">
       <div className="p-6 pt-4 flex flex-col min-h-0 flex-1">
         <h1 className="text-xl font-semibold text-dashboard-foreground mb-4">
           Economic Calendar
@@ -130,19 +158,46 @@ export function CalendarView() {
             </div>
           ) : (
             displayedCalendars.map((cal: WeeklyCalendar) => {
-              const events = eventsByCalendarId[cal.id] ?? [];
+              const events = [...(eventsByCalendarId[cal.id] ?? [])].sort((a, b) => {
+                const aDate = getDateForDay(cal, a.day) ?? "";
+                const bDate = getDateForDay(cal, b.day) ?? "";
+                const dateCompare = aDate.localeCompare(bDate);
+                if (dateCompare !== 0) return dateCompare;
+                return (a.time || "00:00").localeCompare(b.time || "00:00");
+              });
               return (
                 <div
                   key={cal.id}
                   className="rounded-xl border border-sidebar-border bg-sidebar/50 overflow-hidden shadow-sm"
                 >
-                  <div className="px-5 py-4 border-b border-sidebar-border bg-sidebar/80">
+                  <div className="px-5 py-4 border-b border-sidebar-border bg-sidebar/80 flex items-center justify-between gap-3">
                     <div className="flex items-center gap-2">
                       <Calendar className="h-5 w-5 text-primary/80" />
                       <h2 className="text-lg font-semibold text-dashboard-foreground">
                         {formatDateRange(cal.startDate, cal.endDate)}
                       </h2>
                     </div>
+                    <button
+                      type="button"
+                      onClick={() => deleteWeeklyCalendar(cal.id)}
+                      className="text-dashboard-foreground/50 hover:text-red-400 transition-colors"
+                      aria-label="Delete calendar"
+                      title="Delete calendar"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditingCalendar(cal);
+                        setEditModalOpen(true);
+                      }}
+                      className="text-dashboard-foreground/50 hover:text-primary transition-colors"
+                      aria-label="Edit calendar"
+                      title="Edit calendar"
+                    >
+                      ✎
+                    </button>
                   </div>
                   <div className="p-5">
                     {events.length === 0 ? (
@@ -159,17 +214,19 @@ export function CalendarView() {
                               <th className="w-16 py-2.5 px-3 text-center">CUR</th>
                               <th className="w-16 py-2.5 px-3 text-center">IMPACT</th>
                               <th className="flex-1 min-w-0 py-2.5 px-3 text-left">EVENT</th>
+                              <th className="w-10 py-2.5 px-3 text-center">DEL</th>
                             </tr>
                           </thead>
                           <tbody>
                             {events.map((ev, i) => {
-                              const dateLabel = new Date(
-                                ev.date + "T12:00:00"
-                              ).toLocaleDateString("en-US", {
-                                weekday: "short",
-                                month: "short",
-                                day: "numeric",
-                              });
+                              const date = getDateForDay(cal, ev.day);
+                              const dateLabel = date
+                                ? new Date(date + "T12:00:00").toLocaleDateString("en-US", {
+                                    weekday: "short",
+                                    month: "short",
+                                    day: "numeric",
+                                  })
+                                : ev.day;
                               return (
                                 <tr
                                   key={ev.id}
@@ -184,7 +241,7 @@ export function CalendarView() {
                                     {ev.time || "—"}
                                   </td>
                                   <td className="py-2.5 px-3 text-dashboard-foreground font-medium text-center">
-                                    {ev.currency || "—"}
+                                    {ev.asset?.name ?? "—"}
                                   </td>
                                   <td className="py-2.5 px-3 text-center">
                                     <span
@@ -192,18 +249,41 @@ export function CalendarView() {
                                       title={ev.impact}
                                     >
                                       <span
-                                        className={`w-1.5 h-1.5 shrink-0 rounded-full ${IMPACT_DOTS[ev.impact]}`}
+                                        className={`w-1.5 h-1.5 shrink-0 rounded-full ${IMPACT_DOTS[ev.impact.toLowerCase() as EventImpact]}`}
                                       />
                                       <span
-                                        className={`w-1.5 h-1.5 shrink-0 rounded-full ${IMPACT_DOTS[ev.impact]}`}
+                                        className={`w-1.5 h-1.5 shrink-0 rounded-full ${IMPACT_DOTS[ev.impact.toLowerCase() as EventImpact]}`}
                                       />
                                       <span
-                                        className={`w-1.5 h-1.5 shrink-0 rounded-full ${IMPACT_DOTS[ev.impact]}`}
+                                        className={`w-1.5 h-1.5 shrink-0 rounded-full ${IMPACT_DOTS[ev.impact.toLowerCase() as EventImpact]}`}
                                       />
                                     </span>
                                   </td>
                                   <td className="py-2.5 px-3 text-dashboard-foreground text-left truncate" title={ev.name}>
                                     {ev.name}
+                                  </td>
+                                  <td className="py-2.5 px-3 text-center">
+                                    <button
+                                      type="button"
+                                      onClick={() => deleteEvent(ev.id)}
+                                      className="text-dashboard-foreground/50 hover:text-red-400 transition-colors"
+                                      aria-label="Delete event"
+                                      title="Delete event"
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setEditingEvent(ev);
+                                        setEditEventOpen(true);
+                                      }}
+                                      className="ml-2 text-dashboard-foreground/50 hover:text-primary transition-colors"
+                                      aria-label="Edit event"
+                                      title="Edit event"
+                                    >
+                                      ✎
+                                    </button>
                                   </td>
                                 </tr>
                               );
@@ -220,5 +300,34 @@ export function CalendarView() {
         </div>
       </div>
     </div>
+    <WeeklyCalendarModal
+      open={editModalOpen}
+      onOpenChange={setEditModalOpen}
+      mode="edit"
+      initialStartDate={editingCalendar?.startDate}
+      initialEndDate={editingCalendar?.endDate}
+      onSubmit={async (dto) => {
+        if (!editingCalendar) return;
+        await updateWeeklyCalendar(editingCalendar.id, dto);
+        setEditModalOpen(false);
+        setEditingCalendar(null);
+      }}
+    />
+    <CreateEventModal
+      open={editEventOpen}
+      onOpenChange={setEditEventOpen}
+      calendars={weeklyCalendars}
+      selectedCalendarId={editingEvent?.calendar.id ?? null}
+      defaultCurrency={editingEvent?.asset.name ?? ""}
+      mode="edit"
+      initialEvent={editingEvent ?? undefined}
+      onSubmit={async (dto) => {
+        if (!editingEvent) return;
+        await updateEvent(editingEvent.id, dto);
+        setEditEventOpen(false);
+        setEditingEvent(null);
+      }}
+    />
+    </>
   );
 }

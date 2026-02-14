@@ -1,13 +1,27 @@
 import type { StreamEntry as StreamEntryType } from "@/types/asset";
+import { Trash2, X } from "lucide-react";
+import { AnalysisImage } from "@/components/ui/AnalysisImage";
+import { getImageUrl } from "@/lib/imageUrls";
 
 interface StreamEntryProps {
   entry: StreamEntryType;
   separatorType: "same-day" | "new-day" | "new-week" | "first";
   weekGroup?: string;
   dateGroup?: string;
+  onDelete?: () => void;
+  onDeleteImage?: (path: string) => void;
+  onEdit?: () => void;
 }
 
-export function StreamEntry({ entry, separatorType, weekGroup, dateGroup }: StreamEntryProps) {
+export function StreamEntry({
+  entry,
+  separatorType,
+  weekGroup,
+  dateGroup,
+  onDelete,
+  onDeleteImage,
+  onEdit,
+}: StreamEntryProps) {
   const separatorTop =
     separatorType === "first" ? null : separatorType === "new-week" ? (
       <div className="pt-6 mt-6 border-t-2 border-primary/30">
@@ -33,10 +47,62 @@ export function StreamEntry({ entry, separatorType, weekGroup, dateGroup }: Stre
     <article className="pb-6 last:pb-0">
       {separatorTop}
       <div className="min-w-0">
+        <div className="flex items-center justify-between gap-2 mb-2">
+          <div className="text-xs font-semibold uppercase tracking-wider text-dashboard-foreground/60">
+            {entry.tag}
+          </div>
+          <div className="flex items-center gap-2">
+            {onEdit && (
+              <button
+                type="button"
+                onClick={onEdit}
+                className="text-dashboard-foreground/50 hover:text-primary transition-colors"
+                aria-label="Edit analysis"
+                title="Edit analysis"
+              >
+                ✎
+              </button>
+            )}
+            {onDelete && (
+              <button
+                type="button"
+                onClick={onDelete}
+                className="text-dashboard-foreground/50 hover:text-red-400 transition-colors"
+                aria-label="Delete analysis"
+                title="Delete analysis"
+              >
+                <Trash2 className="h-4 w-4" />
+              </button>
+            )}
+          </div>
+        </div>
         <div
           className="stream-entry-content text-sm text-dashboard-foreground/90 leading-relaxed mb-2 [&_img]:max-w-full [&_img]:max-h-[300px] [&_img]:rounded-lg [&_img]:my-2 [&_img]:cursor-pointer [&_h1]:text-xl [&_h1]:font-bold [&_h2]:text-lg [&_h2]:font-semibold [&_h3]:text-base [&_h3]:font-medium"
           dangerouslySetInnerHTML={{ __html: entry.content }}
         />
+        {entry.images && entry.images.length > 0 && (
+          <div className="flex flex-wrap gap-2 mb-3">
+            {entry.images.map((path) => {
+              const url = getImageUrl(path);
+              return (
+                <div key={path} className="relative">
+                  <AnalysisImage src={url} alt="Analysis attachment" unoptimized />
+                  {onDeleteImage && (
+                    <button
+                      type="button"
+                      onClick={() => onDeleteImage(path)}
+                      className="absolute -top-2 -right-2 rounded-full bg-red-500 text-white w-6 h-6 flex items-center justify-center shadow"
+                      aria-label="Delete image"
+                      title="Delete image"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
           {entry.bullets && entry.bullets.length > 0 && (
             <ul className="list-disc list-inside text-sm text-dashboard-foreground/80 space-y-0.5 mb-3">
               {entry.bullets.map((b, i) => (
