@@ -1,23 +1,35 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import * as path from 'path';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { FondamentalModule } from './fondamental/fondamental.module';
 
+// Load root .env when running from project root or from src/server
+const cwd = process.cwd();
+const rootEnv = path.resolve(cwd, cwd.replace(/[/\\]+$/, '').endsWith('server') ? '..' : '.', '.env');
+
 @Module({
   imports: [
-    ConfigModule.forRoot({ isGlobal: true }),
-    TypeOrmModule.forRoot({
-      type: 'postgres',
-      host: process.env.DB_HOST || 'localhost',
-      port: parseInt(process.env.DB_PORT || '5432', 10),
-      username: process.env.DB_USERNAME || 'postgres',
-      password: process.env.DB_PASSWORD || '',
-      database: process.env.DB_DATABASE || 'gg',
-      entities: [__dirname + '/**/*.entity{.ts,.js}'],
-      synchronize: process.env.DB_SYNCHRONIZE === 'true',
-      migrations: [__dirname + '/database/migrations/*{.ts,.js}'],
+    ConfigModule.forRoot({ isGlobal: true, envFilePath: rootEnv }),
+    TypeOrmModule.forRootAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => {
+        const password = config.get<string>('DB_PASSWORD') ?? process.env.DB_PASSWORD;
+        return {
+          type: 'postgres',
+          host: config.get<string>('DB_HOST') ?? process.env.DB_HOST ?? 'localhost',
+          port: parseInt(config.get<string>('DB_PORT') ?? process.env.DB_PORT ?? '5432', 10),
+          username: config.get<string>('DB_USERNAME') ?? process.env.DB_USERNAME ?? 'postgres',
+          password: String(password ?? process.env.DB_PASSWORD ?? ''),
+          database: config.get<string>('DB_DATABASE') ?? 'gg',
+          entities: [__dirname + '/**/*.entity{.ts,.js}'],
+          synchronize: config.get<string>('DB_SYNCHRONIZE') === 'true',
+          migrations: [__dirname + '/database/migrations/*{.ts,.js}'],
+        };
+      },
     }),
     FondamentalModule,
   ],

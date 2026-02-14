@@ -1,3 +1,10 @@
+import { config } from 'dotenv';
+import * as path from 'path';
+
+// Load .env from project root (main.ts lives in src/server/src or dist)
+const rootEnv = path.resolve(__dirname, '../../..', '.env');
+config({ path: rootEnv });
+
 import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
