@@ -1,3 +1,5 @@
+const apiBase = typeof window !== "undefined" ? (process.env.NEXT_PUBLIC_API_URL ?? "") : "";
+
 export function getImageUrl(storedPath: string): string {
-  return `/api/images?path=${encodeURIComponent(storedPath)}`;
+  return `${apiBase}/api/images?path=${encodeURIComponent(storedPath)}`;
 }

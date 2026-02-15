@@ -8,6 +8,7 @@ const Dialog = DialogPrimitive.Root;
 const DialogTrigger = DialogPrimitive.Trigger;
 const DialogPortal = DialogPrimitive.Portal;
 const DialogClose = DialogPrimitive.Close;
+const DialogTitle = DialogPrimitive.Title;
 
 const SIDEBAR_WIDTH = "260px";
 
@@ -47,6 +48,7 @@ const DialogContent = React.forwardRef<
       } ${className}`}
       {...props}
     >
+      <DialogTitle className="sr-only">Dialog</DialogTitle>
       {showClose && (
         <DialogPrimitive.Close
           className="absolute right-0 top-4 rounded-lg p-2 text-white/80 hover:bg-white/10 hover:text-white transition-colors z-10"
@@ -61,4 +63,4 @@ const DialogContent = React.forwardRef<
 ));
 DialogContent.displayName = DialogPrimitive.Content.displayName;
 
-export { Dialog, DialogPortal, DialogOverlay, DialogTrigger, DialogClose, DialogContent };
+export { Dialog, DialogPortal, DialogOverlay, DialogTrigger, DialogClose, DialogContent, DialogTitle };

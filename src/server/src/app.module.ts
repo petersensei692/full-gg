@@ -5,6 +5,7 @@ import * as path from 'path';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { FondamentalModule } from './fondamental/fondamental.module';
+import { ImagesModule } from './images/images.module';
 
 // Load root .env when running from project root or from src/server
 const cwd = process.cwd();
@@ -32,6 +33,7 @@ const rootEnv = path.resolve(cwd, cwd.replace(/[/\\]+$/, '').endsWith('server') 
       },
     }),
     FondamentalModule,
+    ImagesModule,
   ],
   controllers: [AppController],
   providers: [AppService],

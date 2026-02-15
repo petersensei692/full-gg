@@ -4,6 +4,11 @@ import { AssetAnalysisView } from "@/components/AssetAnalysisView";
 import { assetsApi } from "@/lib/api";
 import { assetToConfig, ASSET_CONFIGS } from "@/types/asset";
 
+/** Required for "output: export" (static export) — pre-defines asset paths at build time */
+export function generateStaticParams() {
+  return Object.keys(ASSET_CONFIGS).map((asset) => ({ asset }));
+}
+
 interface AssetPageProps {
   params: Promise<{ asset: string }>;
 }

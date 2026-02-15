@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Dialog, DialogContent } from "@/components/ui/Dialog";
 import { useImagePaste } from "@/hooks/useImagePaste";
+import { getImageUrl } from "@/lib/imageUrls";
 import { deleteStoredImage } from "@/lib/imageUpload";
 
 interface EditAnalysisModalProps {
@@ -66,7 +67,7 @@ export function EditAnalysisModal({
                 {images.map((path) => (
                   <div key={path} className="relative">
                     <img
-                      src={`/api/images?path=${encodeURIComponent(path)}`}
+                      src={getImageUrl(path)}
                       alt="Analysis attachment"
                       className="h-20 w-28 object-cover rounded-lg border border-sidebar-border"
                     />

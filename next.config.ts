@@ -10,6 +10,8 @@ const tailwindcssPostcssPath = path.join(projectNodeModules, "@tailwindcss", "po
 
 const nextConfig: NextConfig = {
   reactCompiler: true,
+  // Static export for Electron production build (output in ./out)
+  output: "export",
   turbopack: {
     // Force this directory as root (Next otherwise infers root from lockfiles in parent dirs, e.g. GG2 or user home)
     root: projectRoot,
