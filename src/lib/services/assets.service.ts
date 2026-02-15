@@ -11,7 +11,7 @@ export const assetsService = {
   },
 
   async getOne(id: string): Promise<Asset> {
-    const url = `${BASE_URL}/fondamental/assets/${id}`;
+    const url = `${BASE_URL}/fondamental/assets/by-id/${id}`;
     const res = await fetch(url, {
       headers: { "Content-Type": "application/json" },
     });
@@ -29,7 +29,7 @@ export const assetsService = {
   },
 
   async update(id: string, dto: UpdateAssetDto): Promise<Asset> {
-    const url = `${BASE_URL}/fondamental/assets/${id}`;
+    const url = `${BASE_URL}/fondamental/assets/by-id/${id}`;
     const res = await fetch(url, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -39,7 +39,7 @@ export const assetsService = {
   },
 
   async delete(id: string): Promise<void> {
-    const url = `${BASE_URL}/fondamental/assets/${id}`;
+    const url = `${BASE_URL}/fondamental/assets/by-id/${id}`;
     const res = await fetch(url, {
       method: "DELETE",
     });

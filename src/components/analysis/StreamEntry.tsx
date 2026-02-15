@@ -77,7 +77,7 @@ export function StreamEntry({
           </div>
         </div>
         <div
-          className="stream-entry-content text-sm text-dashboard-foreground/90 leading-relaxed mb-2 [&_img]:max-w-full [&_img]:max-h-[300px] [&_img]:rounded-lg [&_img]:my-2 [&_img]:cursor-pointer [&_h1]:text-xl [&_h1]:font-bold [&_h2]:text-lg [&_h2]:font-semibold [&_h3]:text-base [&_h3]:font-medium"
+          className="stream-entry-content text-sm text-dashboard-foreground/90 leading-relaxed mb-2 [&_img]:max-w-[50%] [&_img]:w-[50%] [&_img]:max-h-[300px] [&_img]:h-auto [&_img]:object-contain [&_img]:rounded-lg [&_img]:my-2 [&_img]:cursor-pointer [&_h1]:text-xl [&_h1]:font-bold [&_h2]:text-lg [&_h2]:font-semibold [&_h3]:text-base [&_h3]:font-medium"
           dangerouslySetInnerHTML={{ __html: entry.content }}
         />
         {entry.images && entry.images.length > 0 && (
@@ -85,7 +85,7 @@ export function StreamEntry({
             {entry.images.map((path) => {
               const url = getImageUrl(path);
               return (
-                <div key={path} className="relative">
+                <div key={path} className="relative max-w-[50%] min-w-0">
                   <AnalysisImage src={url} alt="Analysis attachment" unoptimized />
                   {onDeleteImage && (
                     <button

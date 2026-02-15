@@ -83,6 +83,7 @@ export function WatchListView() {
     DISPLAY_OPTIONS.find((o) => o.value === displayCount)?.label ?? "Last 4";
 
   return (
+    <>
     <div className="flex h-full min-h-0 flex-col overflow-auto">
       <div className="p-6 pt-4 flex flex-col min-h-0 flex-1">
         <h1 className="text-xl font-semibold text-dashboard-foreground mb-4">
@@ -244,5 +245,6 @@ export function WatchListView() {
         }}
       />
     )}
+    </>
   );
 }

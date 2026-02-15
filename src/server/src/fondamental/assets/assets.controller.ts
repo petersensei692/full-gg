@@ -41,7 +41,7 @@ export class AssetsController {
     return this.assetsService.findAll();
   }
 
-  @Get(':id')
+  @Get('by-id/:id')
   @ApiOperation({ summary: 'Get one asset by ID' })
   @ApiParam({ name: 'id', description: 'UUID of the asset', example: '123e4567-e89b-12d3-a456-426614174000' })
   @ApiResponse({ status: 200, description: 'Asset found.' })
@@ -51,7 +51,7 @@ export class AssetsController {
     return this.assetsService.findOne(id);
   }
 
-  @Patch(':id')
+  @Patch('by-id/:id')
   @ApiOperation({ summary: 'Update an asset (partial)' })
   @ApiParam({ name: 'id', description: 'UUID of the asset' })
   @ApiBody({ type: UpdateAssetDto })
@@ -62,7 +62,7 @@ export class AssetsController {
     return this.assetsService.update(id, updateAssetDto);
   }
 
-  @Delete(':id')
+  @Delete('by-id/:id')
   @ApiOperation({ summary: 'Delete an asset' })
   @ApiParam({ name: 'id', description: 'UUID of the asset' })
   @ApiResponse({ status: 200, description: 'Asset deleted successfully.' })
