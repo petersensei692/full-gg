@@ -4,12 +4,22 @@ import {
   Column,
   CreateDateColumn,
   UpdateDateColumn,
+  ManyToOne,
+  JoinColumn,
 } from 'typeorm';
+import { Asset } from '../../entities/asset.entity';
 
 @Entity('analysis')
 export class Analysis {
   @PrimaryGeneratedColumn('uuid')
   id: string;
+
+  @Column({ type: 'uuid', name: 'asset_id', nullable: true })
+  assetId: string | null;
+
+  @ManyToOne(() => Asset, { onDelete: 'CASCADE', nullable: true })
+  @JoinColumn({ name: 'asset_id' })
+  asset: Asset | null;
 
   @Column({ type: 'text' })
   notes: string;

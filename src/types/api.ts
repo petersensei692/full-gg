@@ -132,6 +132,8 @@ export interface UpdateWatchItemDto {
 /** Single analysis returned by the API */
 export interface Analysis {
   id: string;
+  assetId: string;
+  asset?: Asset;
   notes: string;
   images: string[] | null;
   createdAt: string;
@@ -140,12 +142,35 @@ export interface Analysis {
 
 /** Body for creating an analysis */
 export interface CreateAnalysisDto {
+  assetId: string;
   notes: string;
   images?: string[];
 }
 
 /** Body for updating an analysis */
 export interface UpdateAnalysisDto {
+  assetId?: string;
   notes?: string;
   images?: string[] | null;
+}
+
+/** Single note returned by the API */
+export interface Note {
+  id: string;
+  title: string;
+  note: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** Body for creating a note */
+export interface CreateNoteDto {
+  title: string;
+  note: string;
+}
+
+/** Body for updating a note */
+export interface UpdateNoteDto {
+  title?: string;
+  note?: string;
 }

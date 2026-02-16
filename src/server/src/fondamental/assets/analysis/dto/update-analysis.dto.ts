@@ -1,7 +1,12 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsOptional, IsString, IsArray } from 'class-validator';
+import { IsOptional, IsString, IsArray, IsUUID } from 'class-validator';
 
 export class UpdateAnalysisDto {
+  @ApiPropertyOptional({ description: 'Asset UUID (change which asset this analysis belongs to)' })
+  @IsOptional()
+  @IsUUID()
+  assetId?: string;
+
   @ApiPropertyOptional({ description: 'Analysis notes' })
   @IsOptional()
   @IsString()

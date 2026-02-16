@@ -6,6 +6,7 @@ import {
   Patch,
   Param,
   Delete,
+  Query,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -13,6 +14,7 @@ import {
   ApiResponse,
   ApiParam,
   ApiBody,
+  ApiQuery,
 } from '@nestjs/swagger';
 import { AnalysisService } from './analysis.service';
 import { CreateAnalysisDto } from './dto/create-analysis.dto';
@@ -24,7 +26,7 @@ export class AnalysisController {
   constructor(private readonly analysisService: AnalysisService) {}
 
   @Post()
-  @ApiOperation({ summary: 'Create a new analysis' })
+  @ApiOperation({ summary: 'Create a new analysis for an asset' })
   @ApiBody({ type: CreateAnalysisDto })
   @ApiResponse({ status: 201, description: 'Analysis created successfully.' })
   @ApiResponse({ status: 400, description: 'Invalid request body.' })
@@ -33,10 +35,11 @@ export class AnalysisController {
   }
 
   @Get()
-  @ApiOperation({ summary: 'Get all analyses' })
-  @ApiResponse({ status: 200, description: 'List of all analyses.' })
-  findAll() {
-    return this.analysisService.findAll();
+  @ApiOperation({ summary: 'Get analyses, optionally filtered by assetId' })
+  @ApiQuery({ name: 'assetId', required: false, description: 'Filter by asset UUID' })
+  @ApiResponse({ status: 200, description: 'List of analyses (for the asset if assetId provided).' })
+  findAll(@Query('assetId') assetId?: string) {
+    return this.analysisService.findAll(assetId);
   }
 
   @Get(':id')

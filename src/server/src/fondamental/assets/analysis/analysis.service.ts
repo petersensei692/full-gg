@@ -14,21 +14,26 @@ export class AnalysisService {
 
   async create(createDto: CreateAnalysisDto): Promise<Analysis> {
     const analysis = this.analysisRepository.create({
+      assetId: createDto.assetId,
       notes: createDto.notes,
       images: createDto.images || null,
     });
     return this.analysisRepository.save(analysis);
   }
 
-  async findAll(): Promise<Analysis[]> {
+  async findAll(assetId?: string): Promise<Analysis[]> {
+    const where = assetId ? { assetId } : {};
     return this.analysisRepository.find({
+      where,
       order: { createdAt: 'DESC' },
+      relations: ['asset'],
     });
   }
 
   async findOne(id: string): Promise<Analysis> {
     const analysis = await this.analysisRepository.findOne({
       where: { id },
+      relations: ['asset'],
     });
     if (!analysis) {
       throw new NotFoundException(`Analysis with id ${id} not found`);
@@ -38,7 +43,10 @@ export class AnalysisService {
 
   async update(id: string, updateDto: UpdateAnalysisDto): Promise<Analysis> {
     const analysis = await this.findOne(id);
-    
+
+    if (updateDto.assetId !== undefined) {
+      analysis.assetId = updateDto.assetId;
+    }
     if (updateDto.notes !== undefined) {
       analysis.notes = updateDto.notes;
     }

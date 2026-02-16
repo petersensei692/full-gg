@@ -41,6 +41,11 @@ export function PostAnalysisInput({ placeholder, onCreated }: PostAnalysisInputP
     editorRef.current?.focus();
   }, []);
 
+  /** Keep editor focus/selection when clicking toolbar so format applies to selection */
+  const preventFocusLoss = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+  }, []);
+
   const handleEditorClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     const target = e.target as HTMLElement;
     if (target.tagName === "IMG" && target instanceof HTMLImageElement) {
@@ -74,13 +79,14 @@ export function PostAnalysisInput({ placeholder, onCreated }: PostAnalysisInputP
         aria-placeholder={placeholder}
         onPaste={handlePaste}
         onClick={handleEditorClick}
-        className="min-h-[82px] w-full rounded-lg border border-sidebar-border bg-header-input px-3 py-2.5 text-sm text-dashboard-foreground placeholder:text-dashboard-foreground/50 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary [&:empty::before]:content-[attr(data-placeholder)] [&:empty::before]:text-dashboard-foreground/50 [&_img]:max-w-[50%] [&_img]:w-[50%] [&_img]:h-auto [&_img]:object-contain [&_img]:rounded-lg [&_img]:cursor-pointer [&_img]:block [&_img]:my-2 [&_h1]:text-xl [&_h1]:font-bold [&_h2]:text-lg [&_h2]:font-semibold [&_h3]:text-base [&_h3]:font-medium"
+        className="min-h-[82px] w-full rounded-lg border border-sidebar-border bg-header-input px-3 py-2.5 text-sm text-dashboard-foreground placeholder:text-dashboard-foreground/50 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary [&:empty::before]:content-[attr(data-placeholder)] [&:empty::before]:text-dashboard-foreground/50 [&_img]:max-w-[50%] [&_img]:w-[50%] [&_img]:h-auto [&_img]:object-contain [&_img]:rounded-lg [&_img]:cursor-pointer [&_img]:block [&_img]:my-2 [&_h1]:text-xl [&_h1]:font-bold [&_h2]:text-lg [&_h2]:font-semibold [&_h3]:text-base [&_h3]:font-medium [&_u]:underline"
         suppressContentEditableWarning
       />
       <div className="flex items-center justify-between mt-2">
         <div className="flex items-center gap-1">
           <button
             type="button"
+            onMouseDown={preventFocusLoss}
             onClick={() => applyFormat("bold")}
             className="rounded p-1.5 text-dashboard-foreground/60 hover:bg-sidebar-hover hover:text-dashboard-foreground transition-colors"
             aria-label="Bold"
@@ -90,6 +96,7 @@ export function PostAnalysisInput({ placeholder, onCreated }: PostAnalysisInputP
           </button>
           <button
             type="button"
+            onMouseDown={preventFocusLoss}
             onClick={() => applyFormat("italic")}
             className="rounded p-1.5 text-dashboard-foreground/60 hover:bg-sidebar-hover hover:text-dashboard-foreground transition-colors"
             aria-label="Italic"
@@ -99,6 +106,7 @@ export function PostAnalysisInput({ placeholder, onCreated }: PostAnalysisInputP
           </button>
           <button
             type="button"
+            onMouseDown={preventFocusLoss}
             onClick={() => applyFormat("underline")}
             className="rounded p-1.5 text-dashboard-foreground/60 hover:bg-sidebar-hover hover:text-dashboard-foreground transition-colors"
             aria-label="Underline"
@@ -108,6 +116,7 @@ export function PostAnalysisInput({ placeholder, onCreated }: PostAnalysisInputP
           </button>
           <button
             type="button"
+            onMouseDown={preventFocusLoss}
             onClick={() => applyHeading("h1")}
             className="rounded p-1.5 text-dashboard-foreground/60 hover:bg-sidebar-hover hover:text-dashboard-foreground transition-colors text-xs font-bold"
             aria-label="Heading 1"
@@ -117,6 +126,7 @@ export function PostAnalysisInput({ placeholder, onCreated }: PostAnalysisInputP
           </button>
           <button
             type="button"
+            onMouseDown={preventFocusLoss}
             onClick={() => applyHeading("h2")}
             className="rounded p-1.5 text-dashboard-foreground/60 hover:bg-sidebar-hover hover:text-dashboard-foreground transition-colors text-xs font-semibold"
             aria-label="Heading 2"
@@ -126,6 +136,7 @@ export function PostAnalysisInput({ placeholder, onCreated }: PostAnalysisInputP
           </button>
           <button
             type="button"
+            onMouseDown={preventFocusLoss}
             onClick={() => applyHeading("h3")}
             className="rounded p-1.5 text-dashboard-foreground/60 hover:bg-sidebar-hover hover:text-dashboard-foreground transition-colors text-xs font-medium"
             aria-label="Heading 3"

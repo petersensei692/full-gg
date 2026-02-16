@@ -184,21 +184,6 @@ export function Sidebar() {
           })}
         </ul>
       </nav>
-
-      {/* User profile */}
-      <div className="border-t border-sidebar-border p-3">
-        <div className="flex items-center gap-3 rounded-lg bg-sidebar-hover/50 px-3 py-2.5">
-          <div className="h-9 w-9 shrink-0 rounded-full bg-primary/30 flex items-center justify-center text-primary text-sm font-semibold">
-            AS
-          </div>
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-medium text-sidebar-foreground">
-              Alex Sterling
-            </p>
-            <p className="text-[10px] text-sidebar-muted">Premium Member</p>
-          </div>
-        </div>
-      </div>
     </aside>
   );
 }

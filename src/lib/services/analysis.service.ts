@@ -2,8 +2,10 @@ import { BASE_URL, handleResponse } from "@/lib/api-client";
 import type { Analysis, CreateAnalysisDto, UpdateAnalysisDto } from "@/types/api";
 
 export const analysisService = {
-  async getAll(): Promise<Analysis[]> {
-    const url = `${BASE_URL}/fondamental/assets/analysis`;
+  /** Get all analyses, or only those for an asset when assetId is provided. */
+  async getAll(assetId?: string): Promise<Analysis[]> {
+    const params = assetId ? `?assetId=${encodeURIComponent(assetId)}` : "";
+    const url = `${BASE_URL}/fondamental/assets/analysis${params}`;
     const res = await fetch(url, {
       headers: { "Content-Type": "application/json" },
     });

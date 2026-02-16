@@ -89,11 +89,12 @@ export function AssetAnalysisView({ asset }: AssetAnalysisViewProps) {
   const handleCreate = useCallback(async (payload: { notes: string; images: string[]; analysisType: string }) => {
     const notesWithMarker = addAnalysisTypeMarker(payload.notes, payload.analysisType);
     const created = await analysisService.create({
+      assetId: asset.id,
       notes: notesWithMarker,
       images: payload.images,
     });
     setAnalyses((prev) => [...prev, created]);
-  }, []);
+  }, [asset.id]);
 
   const handleDeleteAnalysis = useCallback(
     async (analysisId: string, images: string[]) => {
@@ -130,10 +131,10 @@ export function AssetAnalysisView({ asset }: AssetAnalysisViewProps) {
 
   useEffect(() => {
     analysisService
-      .getAll()
+      .getAll(asset.id)
       .then((list) => setAnalyses(list))
       .catch(() => setAnalyses([]));
-  }, []);
+  }, [asset.id]);
 
   const mappedEntries = useMemo(() => {
     return analyses
