@@ -12,6 +12,7 @@ import { StreamEntry as StreamEntryComponent } from "./analysis/StreamEntry";
 import { PostAnalysisInput } from "./analysis/PostAnalysisInput";
 import { EconomicEventsView } from "./analysis/EconomicEventsView";
 import { PairWatchlistView } from "./analysis/PairWatchlistView";
+import { DateRangePicker, type DateRange } from "./analysis/DateRangePicker";
 
 const ANALYSIS_TYPE_TO_TAG: Record<
   string,
@@ -82,6 +83,7 @@ export function AssetAnalysisView({ asset }: AssetAnalysisViewProps) {
   const [activeTab, setActiveTab] = useState<"stream" | "events" | "watchlist">("stream");
   const [analyses, setAnalyses] = useState<Analysis[]>([]);
   const [analysisFilter, setAnalysisFilter] = useState<string>("all");
+  const [dateRange, setDateRange] = useState<DateRange>(null);
   const [editingAnalysis, setEditingAnalysis] = useState<Analysis | null>(null);
   const [editingAnalysisType, setEditingAnalysisType] = useState<string>("daily");
   const [editModalOpen, setEditModalOpen] = useState(false);
@@ -109,9 +111,31 @@ export function AssetAnalysisView({ asset }: AssetAnalysisViewProps) {
     async (analysisId: string, imagePath: string) => {
       const target = analyses.find((a) => a.id === analysisId);
       if (!target) return;
-      const nextImages = (target.images ?? []).filter((p) => p !== imagePath);
-      const updated = await analysisService.update(analysisId, { images: nextImages });
+      const imageList = target.images ?? [];
+      const index = imageList.indexOf(imagePath);
+      const nextImages = imageList.filter((p) => p !== imagePath);
+      const currentNames = target.imageNames ?? [];
+      const nextImageNames = currentNames.filter((_, i) => i !== index);
+      const updated = await analysisService.update(analysisId, {
+        images: nextImages,
+        imageNames: nextImageNames.length > 0 || currentNames.length > 0 ? nextImageNames : undefined,
+      });
       await deleteStoredImage(imagePath).catch(() => undefined);
+      setAnalyses((prev) => prev.map((a) => (a.id === analysisId ? updated : a)));
+    },
+    [analyses]
+  );
+
+  const handleUpdateImageName = useCallback(
+    async (analysisId: string, imagePath: string, name: string) => {
+      const target = analyses.find((a) => a.id === analysisId);
+      if (!target) return;
+      const imageList = target.images ?? [];
+      const index = imageList.indexOf(imagePath);
+      if (index < 0) return;
+      const currentNames = target.imageNames ?? [];
+      const nextImageNames = imageList.map((_, i) => (i === index ? name : (currentNames[i] ?? "")));
+      const updated = await analysisService.update(analysisId, { imageNames: nextImageNames });
       setAnalyses((prev) => prev.map((a) => (a.id === analysisId ? updated : a)));
     },
     [analyses]
@@ -144,6 +168,9 @@ export function AssetAnalysisView({ asset }: AssetAnalysisViewProps) {
         const { tag, tagColor } =
           ANALYSIS_TYPE_TO_TAG[analysisType] ??
           ({ tag: "MARKET PULSE" as const, tagColor: "blue" as const });
+        const imageList = analysis.images ?? [];
+        const names = analysis.imageNames ?? [];
+        const imageNames = imageList.map((_, i) => names[i] ?? "");
         const entry: StreamEntry = {
           id: analysis.id,
           author: "You",
@@ -153,7 +180,8 @@ export function AssetAnalysisView({ asset }: AssetAnalysisViewProps) {
           content: cleanedNotes,
           createdAt,
           analysisType,
-          images: analysis.images ?? [],
+          images: imageList,
+          imageNames,
         };
         return entry;
       })
@@ -161,9 +189,20 @@ export function AssetAnalysisView({ asset }: AssetAnalysisViewProps) {
   }, [analyses]);
 
   const filteredEntries = useMemo(() => {
-    if (analysisFilter === "all") return mappedEntries;
-    return mappedEntries.filter((e) => (e.analysisType ?? "daily") === analysisFilter);
-  }, [mappedEntries, analysisFilter]);
+    let list = mappedEntries;
+    if (analysisFilter !== "all") {
+      list = list.filter((e) => (e.analysisType ?? "daily") === analysisFilter);
+    }
+    if (dateRange) {
+      const startMs = new Date(dateRange.start.getFullYear(), dateRange.start.getMonth(), dateRange.start.getDate()).getTime();
+      const endMs = new Date(dateRange.end.getFullYear(), dateRange.end.getMonth(), dateRange.end.getDate(), 23, 59, 59, 999).getTime();
+      list = list.filter((e) => {
+        const t = e.createdAt ?? 0;
+        return t >= startMs && t <= endMs;
+      });
+    }
+    return list;
+  }, [mappedEntries, analysisFilter, dateRange]);
 
   const entriesWithGroups = useMemo(() => {
     let lastWeekKey: string | undefined;
@@ -207,8 +246,8 @@ export function AssetAnalysisView({ asset }: AssetAnalysisViewProps) {
         </div>
 
         {activeTab === "stream" && (
-          <div ref={streamScrollRef} className="flex-1 p-6 pt-4 overflow-auto w-full flex flex-col min-h-0">
-            <div className="flex flex-wrap items-center gap-3 mb-4">
+          <div className="flex-1 flex flex-col min-h-0 w-full">
+            <div className="flex flex-wrap items-center gap-3 mb-4 px-6 pt-4 shrink-0">
               <span className="text-sm text-dashboard-foreground/70">Filter:</span>
               <select
                 value={analysisFilter}
@@ -221,25 +260,29 @@ export function AssetAnalysisView({ asset }: AssetAnalysisViewProps) {
                   </option>
                 ))}
               </select>
+              <DateRangePicker value={dateRange} onChange={setDateRange} />
             </div>
-            <div className="w-full max-w-full space-y-0 flex-1">
-              {entriesWithGroups.map(({ entry, separatorType, weekGroup, dateGroup }) => (
-                <StreamEntryComponent
-                  key={entry.id}
-                  entry={entry}
-                  separatorType={separatorType}
-                  weekGroup={weekGroup}
-                  dateGroup={dateGroup}
-                  onDelete={() => handleDeleteAnalysis(entry.id, entry.images ?? [])}
-                  onDeleteImage={(path) => handleDeleteImage(entry.id, path)}
-                  onEdit={() => {
-                    const analysis = analyses.find((a) => a.id === entry.id);
-                    if (analysis) handleEditAnalysis(analysis);
-                  }}
-                />
-              ))}
+            <div ref={streamScrollRef} className="flex-1 min-h-0 overflow-auto px-6 w-full">
+              <div className="w-full max-w-full space-y-0 pb-4">
+                {entriesWithGroups.map(({ entry, separatorType, weekGroup, dateGroup }) => (
+                  <StreamEntryComponent
+                    key={entry.id}
+                    entry={entry}
+                    separatorType={separatorType}
+                    weekGroup={weekGroup}
+                    dateGroup={dateGroup}
+                    onDelete={() => handleDeleteAnalysis(entry.id, entry.images ?? [])}
+                    onDeleteImage={(path) => handleDeleteImage(entry.id, path)}
+                    onUpdateImageName={(path, name) => handleUpdateImageName(entry.id, path, name)}
+                    onEdit={() => {
+                      const analysis = analyses.find((a) => a.id === entry.id);
+                      if (analysis) handleEditAnalysis(analysis);
+                    }}
+                  />
+                ))}
+              </div>
             </div>
-            <div className="w-full max-w-full mt-6">
+            <div className="shrink-0 w-full px-6 pb-6 pt-3 border-t border-sidebar-border/50 bg-dashboard-bg">
               <PostAnalysisInput placeholder={asset.placeholder} onCreated={handleCreate} />
             </div>
           </div>

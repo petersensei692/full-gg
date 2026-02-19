@@ -1,3 +1,4 @@
+import { useState } from "react";
 import type { StreamEntry as StreamEntryType } from "@/types/asset";
 import { Trash2, X } from "lucide-react";
 import { AnalysisImage } from "@/components/ui/AnalysisImage";
@@ -10,6 +11,7 @@ interface StreamEntryProps {
   dateGroup?: string;
   onDelete?: () => void;
   onDeleteImage?: (path: string) => void;
+  onUpdateImageName?: (path: string, name: string) => void;
   onEdit?: () => void;
 }
 
@@ -20,8 +22,11 @@ export function StreamEntry({
   dateGroup,
   onDelete,
   onDeleteImage,
+  onUpdateImageName,
   onEdit,
 }: StreamEntryProps) {
+  const [draftNames, setDraftNames] = useState<Record<string, string>>({});
+
   const separatorTop =
     separatorType === "first" ? null : separatorType === "new-week" ? (
       <div className="pt-6 mt-6 border-t-2 border-primary/30">
@@ -82,22 +87,42 @@ export function StreamEntry({
         />
         {entry.images && entry.images.length > 0 && (
           <div className="flex flex-wrap gap-2 mb-3">
-            {entry.images.map((path) => {
+            {entry.images.map((path, index) => {
               const url = getImageUrl(path);
+              const savedName = entry.imageNames?.[index] ?? "";
+              const displayName = path in draftNames ? draftNames[path] : savedName;
               return (
-                <div key={path} className="relative max-w-[50%] min-w-0">
-                  <AnalysisImage src={url} alt="Analysis attachment" unoptimized />
-                  {onDeleteImage && (
-                    <button
-                      type="button"
-                      onClick={() => onDeleteImage(path)}
-                      className="absolute -top-2 -right-2 rounded-full bg-red-500 text-white w-6 h-6 flex items-center justify-center shadow"
-                      aria-label="Delete image"
-                      title="Delete image"
-                    >
-                      <X className="h-3.5 w-3.5" />
-                    </button>
-                  )}
+                <div key={path} className="relative max-w-[50%] min-w-0 flex flex-col gap-1.5">
+                  <input
+                    type="text"
+                    value={displayName}
+                    onChange={(e) => setDraftNames((prev) => ({ ...prev, [path]: e.target.value }))}
+                    onBlur={(e) => {
+                      const value = (e.target.value || "").trim();
+                      onUpdateImageName?.(path, value);
+                      setDraftNames((prev) => {
+                        const next = { ...prev };
+                        delete next[path];
+                        return next;
+                      });
+                    }}
+                    placeholder="Name for this image"
+                    className="rounded-lg border border-sidebar-border bg-sidebar px-3 py-2 text-sm text-dashboard-foreground placeholder:text-dashboard-foreground/50 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary w-full min-w-0"
+                  />
+                  <div className="relative">
+                    <AnalysisImage src={url} alt={displayName || "Analysis attachment"} unoptimized />
+                    {onDeleteImage && (
+                      <button
+                        type="button"
+                        onClick={() => onDeleteImage(path)}
+                        className="absolute -top-2 -right-2 rounded-full bg-red-500 text-white w-6 h-6 flex items-center justify-center shadow"
+                        aria-label="Delete image"
+                        title="Delete image"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                  </div>
                 </div>
               );
             })}

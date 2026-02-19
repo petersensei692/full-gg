@@ -53,6 +53,9 @@ export class AnalysisService {
     if (updateDto.images !== undefined) {
       analysis.images = updateDto.images;
     }
+    if (updateDto.imageNames !== undefined) {
+      analysis.imageNames = updateDto.imageNames;
+    }
 
     return this.analysisRepository.save(analysis);
   }

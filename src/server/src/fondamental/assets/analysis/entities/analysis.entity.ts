@@ -27,6 +27,9 @@ export class Analysis {
   @Column({ type: 'text', array: true, nullable: true })
   images: string[] | null;
 
+  @Column({ type: 'text', array: true, nullable: true, name: 'image_names' })
+  imageNames: string[] | null;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 

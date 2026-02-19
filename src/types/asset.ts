@@ -9,6 +9,8 @@ export interface StreamEntry {
   tagColor: "green" | "orange" | "blue" | "purple";
   content: string; // plain text or HTML from editor
   images?: string[]; // stored image paths
+  /** Display names for each image (same order as images); optional. */
+  imageNames?: string[];
   bullets?: string[];
   chartData?: { label: string; value: number }[];
   quote?: { text: string; source: string };

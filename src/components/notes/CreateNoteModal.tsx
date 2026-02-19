@@ -127,10 +127,11 @@ export function CreateNoteModal({
       <DialogContent
         showClose
         containToMain
-        className="!max-w-[min(92vw,56rem)] w-full min-h-[min(80dvh,36rem)] max-h-[90dvh] flex flex-col overflow-hidden bg-sidebar border border-sidebar-border rounded-xl p-0"
+        className="!w-[min(92vw,56rem)] !max-w-[min(92vw,56rem)] !min-w-0 min-h-[min(80dvh,36rem)] max-h-[90dvh] flex flex-col items-stretch overflow-hidden bg-sidebar border border-sidebar-border rounded-xl p-0 box-border"
       >
-        <div className="scrollbar-modal flex flex-col min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden p-6 space-y-5">
-          <div className="min-w-0">
+        <div className="w-full flex flex-col flex-1 min-h-0 min-w-0 overflow-hidden">
+          <div className="scrollbar-modal flex flex-col min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden w-full max-w-full p-6 space-y-5">
+          <div className="min-w-0 w-full">
             <span className="text-xs font-semibold uppercase tracking-wider text-dashboard-foreground/60">
               {mode === "edit" ? "Edit note" : "New note"}
             </span>
@@ -139,7 +140,7 @@ export function CreateNoteModal({
             </h3>
           </div>
 
-          <div className="min-w-0">
+          <div className="min-w-0 w-full">
             <label htmlFor="note-title-input" className="block text-sm font-medium text-dashboard-foreground/80 mb-2 whitespace-nowrap">
               Title
             </label>
@@ -154,7 +155,7 @@ export function CreateNoteModal({
             />
           </div>
 
-          <div className="min-w-0 flex flex-col flex-1 min-h-0">
+          <div className="min-w-0 w-full flex flex-col flex-1 min-h-0">
             <label className="block text-sm font-medium text-dashboard-foreground/80 mb-2 whitespace-nowrap">
               Note
             </label>
@@ -220,9 +221,9 @@ export function CreateNoteModal({
               {error}
             </p>
           )}
-        </div>
+          </div>
 
-        <div className="shrink-0 px-6 py-4 border-t border-sidebar-border flex justify-end gap-2">
+          <div className="shrink-0 w-full px-6 py-4 border-t border-sidebar-border flex justify-end gap-2">
           <button
             type="button"
             onClick={() => onOpenChange(false)}
@@ -238,6 +239,7 @@ export function CreateNoteModal({
           >
             {submitting ? "Saving…" : mode === "edit" ? "Save" : "Create"}
           </button>
+          </div>
         </div>
       </DialogContent>
     </Dialog>

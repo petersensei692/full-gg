@@ -136,6 +136,7 @@ export interface Analysis {
   asset?: Asset;
   notes: string;
   images: string[] | null;
+  imageNames?: string[] | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -152,6 +153,7 @@ export interface UpdateAnalysisDto {
   assetId?: string;
   notes?: string;
   images?: string[] | null;
+  imageNames?: string[] | null;
 }
 
 /** Single note returned by the API */
