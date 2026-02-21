@@ -9,12 +9,16 @@ interface AnalysisImageProps {
   alt: string;
   /** Use when src is a data URL (base64) - Next Image requires remote domains */
   unoptimized?: boolean;
+  className?: string;
 }
 
-export function AnalysisImage({ src, alt, unoptimized = false }: AnalysisImageProps) {
+const defaultImgClass = "max-w-full h-auto rounded-lg cursor-pointer border border-sidebar-border hover:border-primary/50 transition-colors object-contain";
+
+export function AnalysisImage({ src, alt, unoptimized = false, className }: AnalysisImageProps) {
   const [open, setOpen] = useState(false);
 
   const isDataUrl = src.startsWith("data:");
+  const imgClass = className ? `${defaultImgClass} ${className}` : defaultImgClass;
 
   return (
     <>
@@ -22,7 +26,7 @@ export function AnalysisImage({ src, alt, unoptimized = false }: AnalysisImagePr
         <img
           src={src}
           alt={alt}
-          className="max-w-full rounded-lg cursor-pointer border border-sidebar-border hover:border-primary/50 transition-colors"
+          className={imgClass}
           onClick={() => setOpen(true)}
           role="button"
           tabIndex={0}
@@ -39,7 +43,7 @@ export function AnalysisImage({ src, alt, unoptimized = false }: AnalysisImagePr
           alt={alt}
           width={800}
           height={600}
-          className="max-w-full h-auto rounded-lg cursor-pointer border border-sidebar-border hover:border-primary/50 transition-colors object-contain"
+          className={imgClass}
           onClick={() => setOpen(true)}
           role="button"
           tabIndex={0}

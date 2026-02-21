@@ -2,25 +2,35 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from 'fs';
 import * as path from 'path';
+import { SettingsService } from '../settings/settings.service';
 
 @Injectable()
 export class ImagesService {
-  constructor(private readonly config: ConfigService) {}
-
-  private getImagesFolderPath(): string {
-    const envPath = this.config.get<string>('IMAGES_FOLDER_PATH');
-    if (!envPath?.trim()) {
-      throw new Error('IMAGES_FOLDER_PATH is not set');
-    }
-    const trimmed = envPath.trim().replace(/^["']|["']$/g, '');
-    return path.normalize(trimmed);
-  }
+  constructor(
+    private readonly config: ConfigService,
+    private readonly settings: SettingsService,
+  ) {}
 
   private resolveImagesDir(): string {
-    const folderPath = this.getImagesFolderPath();
-    return path.isAbsolute(folderPath)
-      ? folderPath
-      : path.join(process.cwd(), folderPath);
+    let fromSettings = this.settings.getImagesPath();
+    if (fromSettings) {
+      fromSettings = fromSettings.replace(/^["']+|["']+$/g, '').trim();
+      if (fromSettings) return path.normalize(fromSettings);
+    }
+    const envPath = this.config.get<string>('IMAGES_FOLDER_PATH');
+    if (!envPath?.trim()) {
+      throw new Error('IMAGES_FOLDER_PATH is not set. Set it in .env or choose a directory in Settings.');
+    }
+    const trimmed = envPath.trim().replace(/^["']|["']$/g, '');
+    const normalized = path.normalize(trimmed);
+    return path.isAbsolute(normalized) ? normalized : path.join(process.cwd(), normalized);
+  }
+
+  private getImagesFolderPath(): string {
+    if (this.settings.getImagesPath()) return '';
+    const envPath = this.config.get<string>('IMAGES_FOLDER_PATH');
+    if (!envPath?.trim()) return '';
+    return envPath.trim().replace(/^["']|["']$/g, '');
   }
 
   private toForwardSlashes(input: string): string {
@@ -45,14 +55,9 @@ export class ImagesService {
   }
 
   saveImageBuffer(buffer: Buffer, prefix = 'chart'): string {
-    const folderPath = this.getImagesFolderPath();
     const imagesDir = this.resolveImagesDir();
     if (!existsSync(imagesDir)) {
       mkdirSync(imagesDir, { recursive: true });
-    }
-    const stat = existsSync(imagesDir);
-    if (!stat) {
-      throw new Error(`IMAGES_FOLDER_PATH is not a directory: ${imagesDir}`);
     }
     const filename = `${prefix}-${Date.now()}.webp`;
     const filePath = path.join(imagesDir, filename);
@@ -61,7 +66,8 @@ export class ImagesService {
       mkdirSync(dir, { recursive: true });
     }
     writeFileSync(filePath, buffer);
-    const storedPath = path.join(folderPath, filename);
+    const folderPath = this.getImagesFolderPath();
+    const storedPath = folderPath ? path.join(folderPath, filename) : filename;
     return this.toForwardSlashes(storedPath);
   }
 

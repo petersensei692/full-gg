@@ -70,7 +70,7 @@ export function WatchlistEntryCard({ entry, onEdit }: WatchlistEntryCardProps) {
         </div>
         {entry.thesis?.notes && (
           <div
-            className="text-sm text-dashboard-foreground/90 leading-relaxed mb-3 prose prose-invert prose-sm max-w-none [&_h1]:text-xl [&_h1]:font-bold [&_h2]:text-lg [&_h2]:font-semibold [&_h3]:text-base [&_h3]:font-medium [&_img]:max-w-[50%] [&_img]:rounded-lg [&_img]:cursor-pointer [&_img]:my-2"
+            className="min-w-0 break-words break-all text-sm text-dashboard-foreground/90 leading-relaxed mb-3 prose prose-invert prose-sm max-w-none [&_h1]:text-xl [&_h1]:font-bold [&_h2]:text-lg [&_h2]:font-semibold [&_h3]:text-base [&_h3]:font-medium [&_*]:break-words [&_img]:max-w-[50%] [&_img]:rounded-lg [&_img]:cursor-pointer [&_img]:my-2"
             dangerouslySetInnerHTML={{ __html: entry.thesis.notes }}
             onClick={(e) => {
               const target = e.target as HTMLElement;

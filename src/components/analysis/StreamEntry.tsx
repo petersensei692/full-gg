@@ -82,19 +82,18 @@ export function StreamEntry({
           </div>
         </div>
         <div
-          className="stream-entry-content text-sm text-dashboard-foreground/90 leading-relaxed mb-2 [&_img]:max-w-[50%] [&_img]:w-[50%] [&_img]:max-h-[300px] [&_img]:h-auto [&_img]:object-contain [&_img]:rounded-lg [&_img]:my-2 [&_img]:cursor-pointer [&_h1]:text-xl [&_h1]:font-bold [&_h2]:text-lg [&_h2]:font-semibold [&_h3]:text-base [&_h3]:font-medium"
+          className="stream-entry-content min-w-0 break-words break-all text-sm text-dashboard-foreground/90 leading-relaxed mb-2 [&_*]:break-words [&_img]:max-w-[50%] [&_img]:w-[50%] [&_img]:max-h-[300px] [&_img]:h-auto [&_img]:object-contain [&_img]:rounded-lg [&_img]:my-2 [&_img]:cursor-pointer [&_h1]:text-xl [&_h1]:font-bold [&_h2]:text-lg [&_h2]:font-semibold [&_h3]:text-base [&_h3]:font-medium"
           dangerouslySetInnerHTML={{ __html: entry.content }}
         />
         {entry.images && entry.images.length > 0 && (
-          <div className="flex flex-wrap gap-2 mb-3">
+          <div className="grid grid-cols-3 gap-3 mb-3">
             {entry.images.map((path, index) => {
               const url = getImageUrl(path);
               const savedName = entry.imageNames?.[index] ?? "";
               const displayName = path in draftNames ? draftNames[path] : savedName;
               return (
-                <div key={path} className="relative max-w-[50%] min-w-0 flex flex-col gap-1.5">
-                  <input
-                    type="text"
+                <div key={path} className="relative min-w-0 flex flex-col gap-1.5">
+                  <textarea
                     value={displayName}
                     onChange={(e) => setDraftNames((prev) => ({ ...prev, [path]: e.target.value }))}
                     onBlur={(e) => {
@@ -107,19 +106,25 @@ export function StreamEntry({
                       });
                     }}
                     placeholder="Name for this image"
-                    className="rounded-lg border border-sidebar-border bg-sidebar px-3 py-2 text-sm text-dashboard-foreground placeholder:text-dashboard-foreground/50 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary w-full min-w-0"
+                    rows={2}
+                    className="resize-none rounded-lg border border-sidebar-border bg-sidebar px-2 py-1.5 text-xs text-dashboard-foreground placeholder:text-dashboard-foreground/50 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary w-full min-w-0 break-words overflow-auto"
                   />
-                  <div className="relative">
-                    <AnalysisImage src={url} alt={displayName || "Analysis attachment"} unoptimized />
+                  <div className="relative w-full aspect-[4/3] max-h-[220px] bg-sidebar/50 rounded-lg overflow-hidden">
+                    <AnalysisImage
+                      src={url}
+                      alt={displayName || "Analysis attachment"}
+                      unoptimized
+                      className="w-full h-full object-contain"
+                    />
                     {onDeleteImage && (
                       <button
                         type="button"
                         onClick={() => onDeleteImage(path)}
-                        className="absolute -top-2 -right-2 rounded-full bg-red-500 text-white w-6 h-6 flex items-center justify-center shadow"
+                        className="absolute top-0.5 right-0.5 rounded-full bg-red-500 text-white w-5 h-5 flex items-center justify-center shadow"
                         aria-label="Delete image"
                         title="Delete image"
                       >
-                        <X className="h-3.5 w-3.5" />
+                        <X className="h-3 w-3" />
                       </button>
                     )}
                   </div>

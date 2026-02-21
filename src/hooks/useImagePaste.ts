@@ -4,6 +4,8 @@ import { useCallback } from "react";
 import { compressImageToBlob } from "@/lib/compressImage";
 import { uploadImageBlob } from "@/lib/imageUpload";
 
+const MAX_PASTE_FILE_BYTES = 25 * 1024 * 1024; // 25MB
+
 /**
  * Inserts an image at the current cursor/selection in a contenteditable element.
  */
@@ -61,10 +63,16 @@ export function useImagePaste(options: UseImagePasteOptions) {
       )?.getAsFile();
 
       if (!file) return;
+      if (file.size > MAX_PASTE_FILE_BYTES) return;
 
       e.preventDefault();
 
-      const blob = await compressImageToBlob(file);
+      let blob;
+      try {
+        blob = await compressImageToBlob(file);
+      } catch {
+        return;
+      }
       if (!blob) return;
 
       let uploaded;

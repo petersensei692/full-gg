@@ -20,7 +20,7 @@
     "test:server:cov": "cd src/server && jest --coverage",
     "test:server:debug": "cd src/server && node --inspect-brk -r tsconfig-paths/register -r ts-node/register ../../node_modules/.bin/jest --runInBand",
     "test:server:e2e": "cd src/server && jest --config ./test/jest-e2e.json",
-    "typeorm:server": "cd src/server && ts-node -r tsconfig-paths/register ../../node_modules/typeorm/cli.js",
+    "typeorm:server": "cd src/server && ts-node --project tsconfig.json -r reflect-metadata -r tsconfig-paths/register ../../node_modules/typeorm/cli.js",
     "migration:run": "npm run typeorm:server -- migration:run -d src/database/data-source.ts",
     "migration:revert": "npm run typeorm:server -- migration:revert -d src/database/data-source.ts",
     "seed:run": "cd src/server && ts-node -r tsconfig-paths/register src/database/seeds/run-seed.ts",
@@ -34,40 +34,66 @@
   "build": {
     "appId": "com.fullgg.app",
     "productName": "TradeJournal Pro",
-    "directories": { "output": "dist-electron" },
-    "files": ["electron/**/*", "out/**/*", "node_modules/**/*"],
-    "extraResources": [{ "from": "out", "to": "out", "filter": ["**/*"] }],
-    "win": { "target": ["nsis", "portable"] },
-    "mac": { "target": ["dmg", "zip"], "category": "public.app-category.finance" },
-    "linux": { "target": ["AppImage", "deb"] }
+    "directories": {
+      "output": "dist-electron"
+    },
+    "files": [
+      "electron/**/*",
+      "out/**/*",
+      "node_modules/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "out",
+        "to": "out",
+        "filter": [
+          "**/*"
+        ]
+      }
+    ],
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ]
+    },
+    "mac": {
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "category": "public.app-category.finance"
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ]
+    }
   },
   "dependencies": {
-    "@radix-ui/react-dialog": "^1.1.15",
     "@nestjs/common": "^11.0.1",
     "@nestjs/config": "^4.0.3",
     "@nestjs/core": "^11.0.1",
     "@nestjs/platform-express": "^11.0.1",
     "@nestjs/swagger": "^11.0.0",
     "@nestjs/typeorm": "^11.0.0",
+    "@radix-ui/react-dialog": "^1.1.15",
+    "better-sqlite3": "^11.10.0",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.1",
     "dotenv": "^16.4.5",
+    "electron": "^33.2.0",
+    "electron-is-dev": "^2.0.0",
     "lucide-react": "^0.563.0",
     "next": "16.1.6",
-    "pg": "^8.18.0",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
-    "typeorm": "^0.3.28",
-    "electron": "^33.2.0",
-    "electron-is-dev": "^2.0.0"
+    "typeorm": "^0.3.28"
   },
   "devDependencies": {
-    "concurrently": "^9.1.0",
-    "cross-env": "^7.0.3",
-    "electron-builder": "^25.1.8",
-    "wait-on": "^8.0.1",
     "@eslint/eslintrc": "^3.2.0",
     "@eslint/js": "^9.18.0",
     "@nestjs/cli": "^11.0.0",
@@ -81,6 +107,9 @@
     "@types/react-dom": "^19",
     "@types/supertest": "^6.0.2",
     "babel-plugin-react-compiler": "1.0.0",
+    "concurrently": "^9.1.0",
+    "cross-env": "^7.0.3",
+    "electron-builder": "^25.1.8",
     "eslint": "^9.18.0",
     "eslint-config-next": "16.1.6",
     "eslint-config-prettier": "^10.0.1",
@@ -96,6 +125,7 @@
     "ts-node": "^10.9.2",
     "tsconfig-paths": "^4.2.0",
     "typescript": "^5.7.3",
-    "typescript-eslint": "^8.20.0"
+    "typescript-eslint": "^8.20.0",
+    "wait-on": "^8.0.1"
   }
 }

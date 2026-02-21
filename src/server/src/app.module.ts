@@ -1,13 +1,14 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule, ConfigService } from '@nestjs/config';
+import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import * as path from 'path';
+import { readAppConfig, resolveDatabasePath } from './database/app-config';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { FondamentalModule } from './fondamental/fondamental.module';
 import { ImagesModule } from './images/images.module';
+import { SettingsModule } from './settings/settings.module';
 
-// Load root .env when running from project root or from src/server
 const cwd = process.cwd();
 const rootEnv = path.resolve(cwd, cwd.replace(/[/\\]+$/, '').endsWith('server') ? '..' : '.', '.env');
 
@@ -16,22 +17,18 @@ const rootEnv = path.resolve(cwd, cwd.replace(/[/\\]+$/, '').endsWith('server') 
     ConfigModule.forRoot({ isGlobal: true, envFilePath: rootEnv }),
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
-      inject: [ConfigService],
-      useFactory: (config: ConfigService) => {
-        const password = config.get<string>('DB_PASSWORD') ?? process.env.DB_PASSWORD;
+      useFactory: () => {
+        const appConfig = readAppConfig();
+        const databasePath = resolveDatabasePath(appConfig);
         return {
-          type: 'postgres',
-          host: config.get<string>('DB_HOST') ?? process.env.DB_HOST ?? 'localhost',
-          port: parseInt(config.get<string>('DB_PORT') ?? process.env.DB_PORT ?? '5432', 10),
-          username: config.get<string>('DB_USERNAME') ?? process.env.DB_USERNAME ?? 'postgres',
-          password: String(password ?? process.env.DB_PASSWORD ?? ''),
-          database: config.get<string>('DB_DATABASE') ?? 'gg',
+          type: 'better-sqlite3',
+          database: databasePath,
           entities: [__dirname + '/**/*.entity{.ts,.js}'],
-          synchronize: config.get<string>('DB_SYNCHRONIZE') === 'true',
-          migrations: [__dirname + '/database/migrations/*{.ts,.js}'],
+          synchronize: true,
         };
       },
     }),
+    SettingsModule,
     FondamentalModule,
     ImagesModule,
   ],

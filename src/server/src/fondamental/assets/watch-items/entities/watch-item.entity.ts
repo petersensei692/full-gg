@@ -38,7 +38,14 @@ export class WatchItem {
   @Column({ type: 'varchar', length: 100 })
   bias: string;
 
-  @Column({ type: 'jsonb', nullable: true })
+  @Column({
+    type: 'text',
+    nullable: true,
+    transformer: {
+      to: (v: Thesis | null) => (v == null ? null : JSON.stringify(v)),
+      from: (v: string | null) => (v == null ? null : (JSON.parse(v) as Thesis)),
+    },
+  })
   thesis: Thesis | null;
 
   @CreateDateColumn({ name: 'created_at' })

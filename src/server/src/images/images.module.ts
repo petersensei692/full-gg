@@ -4,10 +4,12 @@ import { MulterModule } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 import { ImagesController } from './images.controller';
 import { ImagesService } from './images.service';
+import { SettingsModule } from '../settings/settings.module';
 
 @Module({
   imports: [
     ConfigModule,
+    SettingsModule,
     MulterModule.register({ storage: memoryStorage() }),
   ],
   controllers: [ImagesController],

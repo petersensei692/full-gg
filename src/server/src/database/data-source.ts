@@ -1,19 +1,37 @@
 import { DataSource } from 'typeorm';
-import { config } from 'dotenv';
+import { existsSync, readFileSync } from 'fs';
 import * as path from 'path';
 
-// Root .env: when cwd is src/server, go up one level
-const cwd = process.cwd();
-config({ path: path.resolve(cwd, cwd.replace(/[/\\]+$/, '').endsWith('server') ? '../.env' : '.env') });
+/** Resolve project root (used when CLI runs from src/server). */
+function getProjectRoot(): string {
+  const cwd = process.cwd();
+  const normalized = cwd.replace(/[/\\]+$/, '');
+  if (normalized.endsWith('server') || normalized.endsWith('src\\server')) {
+    return path.resolve(cwd, '..', '..');
+  }
+  return cwd;
+}
+
+function getDatabasePath(): string {
+  const root = getProjectRoot();
+  const configPath = path.join(root, 'app-config.json');
+  if (!existsSync(configPath)) {
+    return path.join(root, 'full-gg.db');
+  }
+  try {
+    const raw = readFileSync(configPath, 'utf-8');
+    const parsed = JSON.parse(raw) as { databasePath?: string };
+    const p = (parsed.databasePath || 'full-gg.db').trim();
+    return path.isAbsolute(p) ? path.normalize(p) : path.join(root, p);
+  } catch {
+    return path.join(root, 'full-gg.db');
+  }
+}
 
 export default new DataSource({
-  type: 'postgres',
-  host: process.env.DB_HOST || 'localhost',
-  port: parseInt(process.env.DB_PORT || '5432', 10),
-  username: process.env.DB_USERNAME || 'postgres',
-  password: process.env.DB_PASSWORD != null ? String(process.env.DB_PASSWORD) : '',
-  database: process.env.DB_DATABASE || 'gg',
+  type: 'better-sqlite3',
+  database: getDatabasePath(),
   entities: [__dirname + '/../**/*.entity{.ts,.js}'],
-  migrations: [__dirname + '/migrations/*{.ts,.js}'],
+  migrations: [],
   synchronize: false,
 });

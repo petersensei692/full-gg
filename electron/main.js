@@ -1,6 +1,25 @@
-const { app, BrowserWindow } = require("electron");
+const { app, BrowserWindow, ipcMain, dialog } = require("electron");
 const path = require("path");
 const isDev = require("electron-is-dev");
+
+ipcMain.handle("settings:choose-directory", async () => {
+  const result = await dialog.showOpenDialog({
+    properties: ["openDirectory"],
+    title: "Choose images directory",
+  });
+  if (result.canceled || !result.filePaths?.length) return null;
+  return result.filePaths[0];
+});
+
+ipcMain.handle("settings:choose-database-file", async () => {
+  const result = await dialog.showOpenDialog({
+    properties: ["openFile"],
+    title: "Choose SQLite database file",
+    filters: [{ name: "SQLite database", extensions: ["db", "sqlite", "sqlite3"] }],
+  });
+  if (result.canceled || !result.filePaths?.length) return null;
+  return result.filePaths[0];
+});
 
 function createWindow() {
   const mainWindow = new BrowserWindow({
@@ -10,6 +29,7 @@ function createWindow() {
       nodeIntegration: false,
       contextIsolation: true,
       webSecurity: true,
+      preload: path.join(__dirname, "preload.js"),
     },
     show: false,
   });

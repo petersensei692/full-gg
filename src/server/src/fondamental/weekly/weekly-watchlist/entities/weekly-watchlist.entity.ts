@@ -11,10 +11,10 @@ export class WeeklyWatchlist {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column({ type: 'timestamp with time zone', name: 'start_date' })
+  @Column({ type: 'datetime', name: 'start_date' })
   startDate: Date;
 
-  @Column({ type: 'timestamp with time zone', name: 'end_date' })
+  @Column({ type: 'datetime', name: 'end_date' })
   endDate: Date;
 
   @CreateDateColumn({ name: 'created_at' })
