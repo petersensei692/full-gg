@@ -23,7 +23,8 @@ export function NoteFocusDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         showClose
-        className="bg-sidebar border border-sidebar-border rounded-xl max-w-2xl max-h-[85dvh] flex flex-col overflow-hidden p-0 min-w-0"
+        containToMain
+        className="bg-sidebar border border-sidebar-border rounded-xl !w-[min(56rem,calc(100vw-280px))] !max-w-[min(56rem,calc(100vw-280px))] max-h-[85dvh] flex flex-col overflow-hidden p-0 min-w-0"
       >
         {note && (
         <>
@@ -56,9 +57,9 @@ export function NoteFocusDialog({
             )}
           </div>
         </div>
-        <div className="flex-1 min-h-0 min-w-0 overflow-x-hidden overflow-y-auto p-5">
+        <div className="flex-1 min-h-0 min-w-0 overflow-x-hidden overflow-y-auto p-6">
           <div
-            className="min-w-0 max-w-full columns-1 break-words break-all text-sm text-dashboard-foreground/90 leading-relaxed prose prose-invert prose-sm [&_h1]:text-xl [&_h1]:font-bold [&_h2]:text-lg [&_h2]:font-semibold [&_h3]:text-base [&_h3]:font-medium [&_u]:underline [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:list-decimal [&_ol]:pl-6 [&_li]:my-0.5 [&_*]:break-words [&_*]:min-w-0 [&_*]:max-w-full [&_*]:columns-1"
+            className="min-w-0 max-w-full columns-1 break-words break-all text-sm text-dashboard-foreground/90 leading-relaxed prose prose-invert prose-sm px-3 [&_h1]:text-xl [&_h1]:font-bold [&_h2]:text-lg [&_h2]:font-semibold [&_h3]:text-base [&_h3]:font-medium [&_u]:underline [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:list-decimal [&_ol]:pl-6 [&_li]:my-0.5 [&_*]:break-words [&_*]:min-w-0 [&_*]:max-w-full [&_*]:columns-1"
             style={{ wordBreak: 'break-word' } as React.CSSProperties}
             dangerouslySetInnerHTML={{ __html: note.note }}
           />
