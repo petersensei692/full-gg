@@ -9,7 +9,9 @@ import { json, urlencoded } from 'express';
 import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { DataSource } from 'typeorm';
 import { AppModule } from './app.module';
+import { seedAssets } from './database/seeds/asset.seed';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -43,6 +45,13 @@ async function bootstrap() {
     await app.listen(port, host);
   } else {
     await app.listen(port);
+  }
+
+  try {
+    const dataSource = app.get(DataSource);
+    await seedAssets(dataSource);
+  } catch (err) {
+    console.error('Asset seed failed:', err);
   }
 }
 bootstrap();
