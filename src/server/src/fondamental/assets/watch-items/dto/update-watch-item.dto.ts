@@ -13,6 +13,12 @@ class ThesisDto {
   @IsArray()
   @IsString({ each: true })
   images?: string[];
+
+  @ApiPropertyOptional({ description: 'Image display names', type: [String] })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  imageNames?: string[];
 }
 
 export class UpdateWatchItemDto {

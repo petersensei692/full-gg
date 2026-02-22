@@ -4,5 +4,7 @@ export { analysisService } from "./services/analysis.service";
 export { eventsService } from "./services/events.service";
 export { watchItemsService } from "./services/watch-items.service";
 export { weeklyCalendarService } from "./services/weekly-calendar.service";
+export { assetCalendarService } from "./services/asset-calendar.service";
+export { assetWatchlistService } from "./services/asset-watchlist.service";
 export { weeklyWatchlistService } from "./services/weekly-watchlist.service";
 export { notesService } from "./services/notes.service";

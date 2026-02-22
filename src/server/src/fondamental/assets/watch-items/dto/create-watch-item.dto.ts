@@ -13,13 +13,35 @@ class ThesisDto {
   @IsArray()
   @IsString({ each: true })
   images?: string[];
+
+  @ApiPropertyOptional({ description: 'Image display names', type: [String] })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  imageNames?: string[];
 }
 
 export class CreateWatchItemDto {
-  @ApiProperty({ description: 'UUID of the weekly watchlist', example: '123e4567-e89b-12d3-a456-426614174000' })
+  @ApiPropertyOptional({
+    description: 'UUID of the base asset watchlist (required with quoteAssetWatchlistId)',
+    example: '123e4567-e89b-12d3-a456-426614174000',
+  })
+  @IsOptional()
   @IsUUID()
-  @IsNotEmpty()
-  watchlistId: string;
+  baseAssetWatchlistId?: string;
+
+  @ApiPropertyOptional({
+    description: 'UUID of the quote asset watchlist (required with baseAssetWatchlistId)',
+    example: '123e4567-e89b-12d3-a456-426614174000',
+  })
+  @IsOptional()
+  @IsUUID()
+  quoteAssetWatchlistId?: string;
+
+  @ApiPropertyOptional({ description: 'UUID of the weekly watchlist (legacy, use base/quoteAssetWatchlistId)' })
+  @IsOptional()
+  @IsUUID()
+  watchlistId?: string;
 
   @ApiProperty({ description: 'UUID of the base asset', example: '123e4567-e89b-12d3-a456-426614174000' })
   @IsUUID()

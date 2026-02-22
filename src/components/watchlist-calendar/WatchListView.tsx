@@ -36,6 +36,7 @@ export function WatchListView() {
   const {
     weeklyWatchlists,
     watchItems,
+    createWeeklyWatchlist,
     deleteWeeklyWatchlist,
     updateWeeklyWatchlist,
     updateWatchItem,
@@ -48,6 +49,7 @@ export function WatchListView() {
   const [editingWatchlist, setEditingWatchlist] = useState<WeeklyWatchlist | null>(null);
   const [editItemOpen, setEditItemOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<WatchItem | null>(null);
+  const [createWatchlistModalOpen, setCreateWatchlistModalOpen] = useState(false);
 
   const sortedCalendars = useMemo(
     () =>
@@ -67,9 +69,13 @@ export function WatchListView() {
   const pairsByCalendarId = useMemo(() => {
     const map: Record<string, WatchItem[]> = {};
     watchItems.forEach((e) => {
-      const id = e.watchlist.id;
-      if (!map[id]) map[id] = [];
-      map[id].push(e);
+      const wlId =
+        e.baseAssetWatchlist?.weeklyWatchlist?.id ??
+        e.quoteAssetWatchlist?.weeklyWatchlist?.id ??
+        e.watchlist?.id;
+      if (!wlId) return;
+      if (!map[wlId]) map[wlId] = [];
+      map[wlId].push(e);
     });
     Object.keys(map).forEach((id) =>
       map[id].sort(
@@ -94,6 +100,14 @@ export function WatchListView() {
         </p>
 
         <div className="flex flex-wrap items-center gap-3 mb-6">
+          <button
+            type="button"
+            onClick={() => setCreateWatchlistModalOpen(true)}
+            className="flex items-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
+          >
+            <Calendar className="h-4 w-4" />
+            Create watchlist
+          </button>
           <div className="relative">
             <button
               type="button"
@@ -139,7 +153,14 @@ export function WatchListView() {
             <div className="flex flex-col items-center justify-center min-h-[280px] text-dashboard-foreground/60 text-sm rounded-xl border border-sidebar-border bg-sidebar/30">
               <Calendar className="h-12 w-12 mb-3 opacity-50" />
               <p>No weekly watchlists yet.</p>
-              <p className="text-xs mt-1">Create one from an asset&apos;s Pair Watchlist tab.</p>
+              <p className="text-xs mt-1 mb-3">Create a watchlist to get started.</p>
+              <button
+                type="button"
+                onClick={() => setCreateWatchlistModalOpen(true)}
+                className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
+              >
+                Create watchlist
+              </button>
             </div>
           ) : (
             displayedCalendars.map((cal: WeeklyWatchlist) => {
@@ -187,7 +208,7 @@ export function WatchListView() {
                         No pairs in this watchlist yet.
                       </p>
                     ) : (
-                      <div className="space-y-6">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                         {pairs.map((entry) => (
                           <WatchlistEntryCard
                             key={entry.id}
@@ -209,6 +230,16 @@ export function WatchListView() {
       </div>
     </div>
     <WeeklyCalendarModal
+      open={createWatchlistModalOpen}
+      onOpenChange={setCreateWatchlistModalOpen}
+      mode="create"
+      variant="watchlist"
+      onSubmit={async (dto) => {
+        await createWeeklyWatchlist(dto);
+        setCreateWatchlistModalOpen(false);
+      }}
+    />
+    <WeeklyCalendarModal
       open={editModalOpen}
       onOpenChange={setEditModalOpen}
       mode="edit"
@@ -227,7 +258,12 @@ export function WatchListView() {
         open={editItemOpen}
         onOpenChange={setEditItemOpen}
         calendars={weeklyWatchlists}
-        selectedCalendarId={editingItem.watchlist.id}
+        selectedCalendarId={
+          editingItem.watchlist?.id ??
+          editingItem.baseAssetWatchlist?.weeklyWatchlist?.id ??
+          editingItem.quoteAssetWatchlist?.weeklyWatchlist?.id ??
+          null
+        }
         currentAssetSlug={
           assets.find((a) => a.label === editingItem.baseAsset.name)?.slug ??
           editingItem.baseAsset.name.toLowerCase()
@@ -239,7 +275,18 @@ export function WatchListView() {
         mode="edit"
         initialItem={editingItem}
         onSubmit={async (dto) => {
-          await updateWatchItem(editingItem.id, dto);
+          await updateWatchItem(editingItem.id, {
+            pairName: dto.pairName,
+            bias: dto.bias,
+            thesis: dto.thesis
+              ? {
+                  notes: dto.thesis.notes,
+                  images: dto.thesis.images,
+                  imageNames:
+                    dto.thesis.imageNames ?? editingItem.thesis?.imageNames,
+                }
+              : undefined,
+          });
           setEditItemOpen(false);
           setEditingItem(null);
         }}

@@ -3,18 +3,26 @@
 import { useState, useRef, useCallback, useMemo, useEffect } from "react";
 import { Wrench, PenLine, ChevronRight } from "lucide-react";
 import { Dialog, DialogContent } from "@/components/ui/Dialog";
-import type { WeeklyWatchlist, CreateWatchItemDto, WatchItem } from "@/types/api";
+import type {
+  WeeklyWatchlist,
+  AssetWatchlist,
+  CreateWatchItemDto,
+  WatchItem,
+} from "@/types/api";
 import type { WatchlistBias } from "@/types/calendar";
 import { useImagePaste } from "@/hooks/useImagePaste";
 import { deleteStoredImage } from "@/lib/imageUpload";
 import { getImageUrl } from "@/lib/imageUrls";
 import { useAssets } from "@/context/AssetsContext";
+import { assetWatchlistService } from "@/lib/api";
 
 interface CreatePairModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  calendars: WeeklyWatchlist[];
-  selectedCalendarId: string | null;
+  calendars?: WeeklyWatchlist[];
+  selectedCalendarId?: string | null;
+  assetWatchlists?: AssetWatchlist[];
+  selectedAssetWatchlistId?: string | null;
   currentAssetSlug: string;
   currentAssetLabel: string;
   mode?: "create" | "edit";
@@ -25,8 +33,10 @@ interface CreatePairModalProps {
 export function CreatePairModal({
   open,
   onOpenChange,
-  calendars,
-  selectedCalendarId,
+  calendars = [],
+  selectedCalendarId = null,
+  assetWatchlists = [],
+  selectedAssetWatchlistId = null,
   currentAssetSlug,
   currentAssetLabel,
   mode = "create",
@@ -34,7 +44,11 @@ export function CreatePairModal({
   onSubmit,
 }: CreatePairModalProps) {
   const { assets: assetOptions } = useAssets();
+  const useAssetWatchlistMode = assetWatchlists.length > 0;
   const [calendarId, setCalendarId] = useState(selectedCalendarId || "");
+  const [allAssetWatchlistsForWeek, setAllAssetWatchlistsForWeek] = useState<
+    AssetWatchlist[]
+  >([]);
   const [baseAsset, setBaseAsset] = useState(currentAssetSlug);
   const [quoteAsset, setQuoteAsset] = useState(
     currentAssetSlug === "usd" ? "eur" : "usd"
@@ -46,6 +60,21 @@ export function CreatePairModal({
   const [error, setError] = useState("");
   const thesisRef = useRef<HTMLDivElement>(null);
 
+  const selectedAssetWatchlist = assetWatchlists.find(
+    (aw) => aw.id === selectedAssetWatchlistId
+  );
+
+  useEffect(() => {
+    if (open && useAssetWatchlistMode && selectedAssetWatchlist) {
+      assetWatchlistService
+        .getByWeeklyWatchlist(selectedAssetWatchlist.weeklyWatchlist.id)
+        .then(setAllAssetWatchlistsForWeek)
+        .catch(() => setAllAssetWatchlistsForWeek([]));
+    } else {
+      setAllAssetWatchlistsForWeek([]);
+    }
+  }, [open, useAssetWatchlistMode, selectedAssetWatchlist?.id]);
+
   useEffect(() => {
     if (open) {
       if (mode === "edit" && initialItem) {
@@ -55,7 +84,11 @@ export function CreatePairModal({
         const quoteSlug =
           assetOptions.find((a) => a.label === initialItem.quoteAsset.name)?.slug ??
           initialItem.quoteAsset.name.toLowerCase();
-        setCalendarId(initialItem.watchlist.id);
+        const wlId =
+          initialItem.baseAssetWatchlist?.weeklyWatchlist?.id ??
+          initialItem.quoteAssetWatchlist?.weeklyWatchlist?.id ??
+          initialItem.watchlist?.id;
+        setCalendarId(wlId ?? "");
         setBaseAsset(baseSlug);
         setQuoteAsset(quoteSlug);
         setThesisHtml(initialItem.thesis?.notes ?? "");
@@ -70,9 +103,12 @@ export function CreatePairModal({
           thesisRef.current.innerHTML = initialItem.thesis?.notes ?? "";
         }
       } else {
-        setCalendarId((selectedCalendarId || calendars[0]?.id) ?? "");
+        setCalendarId(
+          (selectedCalendarId ?? calendars[0]?.id) ?? ""
+        );
         setBaseAsset(currentAssetSlug);
-        const other = assetOptions.find((a) => a.slug !== currentAssetSlug)?.slug ?? "usd";
+        const other =
+          assetOptions.find((a) => a.slug !== currentAssetSlug)?.slug ?? "usd";
         setQuoteAsset(other);
         setThesisHtml("");
         setBias("bullish");
@@ -87,6 +123,8 @@ export function CreatePairModal({
     open,
     selectedCalendarId,
     calendars,
+    useAssetWatchlistMode,
+    selectedAssetWatchlist?.id,
     currentAssetSlug,
     assetOptions,
     mode,
@@ -122,10 +160,6 @@ export function CreatePairModal({
 
   const handleSave = () => {
     setError("");
-    if (!calendarId) {
-      setError("Select a weekly watchlist.");
-      return;
-    }
     if (!isValidPair) {
       setError(`Either Base or Quote must be ${currentAssetLabel} (current asset).`);
       return;
@@ -141,20 +175,63 @@ export function CreatePairModal({
       return;
     }
     const thesisNotes = thesisRef.current?.innerHTML ?? "";
-    const dto: CreateWatchItemDto = {
-      watchlistId: calendarId,
-      baseAssetId,
-      quoteAssetId,
-      pairName,
-      bias,
-      thesis:
+
+    let dto: CreateWatchItemDto;
+    if (useAssetWatchlistMode && allAssetWatchlistsForWeek.length > 0) {
+      const baseAW = allAssetWatchlistsForWeek.find(
+        (aw) => aw.asset.id === baseAssetId
+      );
+      const quoteAW = allAssetWatchlistsForWeek.find(
+        (aw) => aw.asset.id === quoteAssetId
+      );
+      if (!baseAW || !quoteAW) {
+        setError("Could not find asset watchlists for the selected pair.");
+        return;
+      }
+      const thesisPayload =
         thesisNotes || thesisImages.length
           ? {
               notes: thesisNotes,
               images: thesisImages.map((img) => img.path),
+              imageNames:
+                mode === "edit" && initialItem?.thesis?.imageNames
+                  ? initialItem.thesis.imageNames
+                  : undefined,
             }
-          : undefined,
-    };
+          : undefined;
+      dto = {
+        baseAssetWatchlistId: baseAW.id,
+        quoteAssetWatchlistId: quoteAW.id,
+        baseAssetId,
+        quoteAssetId,
+        pairName,
+        bias,
+        thesis: thesisPayload,
+      };
+    } else if (calendarId) {
+      const thesisPayload =
+        thesisNotes || thesisImages.length
+          ? {
+              notes: thesisNotes,
+              images: thesisImages.map((img) => img.path),
+              imageNames:
+                mode === "edit" && initialItem?.thesis?.imageNames
+                  ? initialItem.thesis.imageNames
+                  : undefined,
+            }
+          : undefined;
+      dto = {
+        watchlistId: calendarId,
+        baseAssetId,
+        quoteAssetId,
+        pairName,
+        bias,
+        thesis: thesisPayload,
+      };
+    } else {
+      setError("Select a watchlist.");
+      return;
+    }
     onSubmit(dto);
     setThesisHtml("");
     setThesisImages([]);
@@ -173,7 +250,6 @@ export function CreatePairModal({
     onOpenChange(false);
   };
 
-  const assetCalendars = calendars;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -198,25 +274,39 @@ export function CreatePairModal({
             </p>
           </div>
 
-          {/* Weekly watchlist */}
-          <div>
-            <label className="block text-sm font-medium text-dashboard-foreground/80 mb-2">
-              Weekly watchlist
-            </label>
-            <select
-              value={calendarId}
-              onChange={(e) => setCalendarId(e.target.value)}
-              className="w-full rounded-lg border border-sidebar-border bg-header-input px-3 py-2 text-sm text-dashboard-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-            >
-              <option value="">Select a watchlist...</option>
-              {assetCalendars.map((cal) => (
-                <option key={cal.id} value={cal.id}>
-                  {new Date(cal.startDate).toISOString().slice(0, 10)} →{" "}
-                  {new Date(cal.endDate).toISOString().slice(0, 10)}
-                </option>
-              ))}
-            </select>
-          </div>
+          {useAssetWatchlistMode ? (
+            <div>
+              <label className="block text-sm font-medium text-dashboard-foreground/80 mb-2">
+                Watchlist
+              </label>
+              <p className="text-sm text-dashboard-foreground/70 py-2">
+                {selectedAssetWatchlist
+                  ? `${new Date(selectedAssetWatchlist.startDate).toISOString().slice(0, 10)} → ${new Date(
+                      selectedAssetWatchlist.endDate
+                    ).toISOString().slice(0, 10)}`
+                  : "No watchlist selected"}
+              </p>
+            </div>
+          ) : (
+            <div>
+              <label className="block text-sm font-medium text-dashboard-foreground/80 mb-2">
+                Weekly watchlist
+              </label>
+              <select
+                value={calendarId}
+                onChange={(e) => setCalendarId(e.target.value)}
+                className="w-full rounded-lg border border-sidebar-border bg-header-input px-3 py-2 text-sm text-dashboard-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+              >
+                <option value="">Select a watchlist...</option>
+                {calendars.map((cal) => (
+                  <option key={cal.id} value={cal.id}>
+                    {new Date(cal.startDate).toISOString().slice(0, 10)} →{" "}
+                    {new Date(cal.endDate).toISOString().slice(0, 10)}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           {/* Asset Selection */}
           <div>

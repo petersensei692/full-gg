@@ -8,11 +8,13 @@ import {
   JoinColumn,
 } from 'typeorm';
 import { WeeklyWatchlist } from '../../../weekly/weekly-watchlist/entities/weekly-watchlist.entity';
+import { AssetWatchlist } from '../../../weekly/weekly-watchlist/asset-watchlist/entities/asset-watchlist.entity';
 import { Asset } from '../../entities/asset.entity';
 
 export interface Thesis {
   notes: string;
   images?: string[];
+  imageNames?: string[];
 }
 
 @Entity('watch_items')
@@ -20,9 +22,17 @@ export class WatchItem {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @ManyToOne(() => WeeklyWatchlist, { onDelete: 'CASCADE' })
+  @ManyToOne(() => WeeklyWatchlist, { onDelete: 'CASCADE', nullable: true })
   @JoinColumn({ name: 'watchlist_id' })
-  watchlist: WeeklyWatchlist;
+  watchlist: WeeklyWatchlist | null;
+
+  @ManyToOne(() => AssetWatchlist, { onDelete: 'CASCADE', nullable: true })
+  @JoinColumn({ name: 'base_asset_watchlist_id' })
+  baseAssetWatchlist: AssetWatchlist | null;
+
+  @ManyToOne(() => AssetWatchlist, { onDelete: 'CASCADE', nullable: true })
+  @JoinColumn({ name: 'quote_asset_watchlist_id' })
+  quoteAssetWatchlist: AssetWatchlist | null;
 
   @ManyToOne(() => Asset)
   @JoinColumn({ name: 'base_asset_id' })

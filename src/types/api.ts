@@ -25,6 +25,17 @@ export interface WeeklyCalendar {
   updatedAt: string;
 }
 
+/** Asset calendar - links a weekly calendar to a specific asset */
+export interface AssetCalendar {
+  id: string;
+  startDate: string;
+  endDate: string;
+  weeklyCalendar: WeeklyCalendar;
+  asset: Asset;
+  createdAt: string;
+  updatedAt: string;
+}
+
 /** Weekly watchlist entry */
 export interface WeeklyWatchlist {
   id: string;
@@ -46,6 +57,17 @@ export interface UpdateWeeklyCalendarDto {
   endDate?: string;
 }
 
+/** Asset watchlist - links a weekly watchlist to a specific asset */
+export interface AssetWatchlist {
+  id: string;
+  startDate: string;
+  endDate: string;
+  weeklyWatchlist: WeeklyWatchlist;
+  asset: Asset;
+  createdAt: string;
+  updatedAt: string;
+}
+
 /** Body for creating a weekly watchlist */
 export interface CreateWeeklyWatchlistDto {
   startDate: string;
@@ -61,7 +83,8 @@ export interface UpdateWeeklyWatchlistDto {
 /** Single event returned by the API */
 export interface Event {
   id: string;
-  calendar: WeeklyCalendar;
+  calendar: WeeklyCalendar | null;
+  assetCalendar: AssetCalendar | null;
   day: string;
   time: string;
   asset: Asset;
@@ -73,10 +96,11 @@ export interface Event {
 
 /** Body for creating an event */
 export interface CreateEventDto {
-  calendarId: string;
+  assetCalendarId?: string;
+  calendarId?: string;
   day: string;
   time: string;
-  assetId: string;
+  assetId?: string;
   name: string;
   impact: string;
 }
@@ -94,12 +118,15 @@ export interface UpdateEventDto {
 export interface Thesis {
   notes: string;
   images?: string[];
+  imageNames?: string[];
 }
 
 /** Single watch item returned by the API */
 export interface WatchItem {
   id: string;
-  watchlist: WeeklyWatchlist;
+  watchlist: WeeklyWatchlist | null;
+  baseAssetWatchlist: AssetWatchlist | null;
+  quoteAssetWatchlist: AssetWatchlist | null;
   baseAsset: Asset;
   quoteAsset: Asset;
   pairName: string;
@@ -111,7 +138,9 @@ export interface WatchItem {
 
 /** Body for creating a watch item */
 export interface CreateWatchItemDto {
-  watchlistId: string;
+  baseAssetWatchlistId?: string;
+  quoteAssetWatchlistId?: string;
+  watchlistId?: string;
   baseAssetId: string;
   quoteAssetId: string;
   pairName: string;

@@ -1,16 +1,24 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Dialog, DialogContent } from "@/components/ui/Dialog";
-import type { WeeklyCalendar, CreateEventDto, Event } from "@/types/api";
+import type {
+  WeeklyCalendar,
+  AssetCalendar,
+  CreateEventDto,
+  Event,
+} from "@/types/api";
 import type { EventImpact } from "@/types/calendar";
 import { useAssets } from "@/context/AssetsContext";
 
 interface CreateEventModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  calendars: WeeklyCalendar[];
-  selectedCalendarId: string | null;
+  calendars?: WeeklyCalendar[];
+  selectedCalendarId?: string | null;
+  /** When provided, uses asset calendar mode (no asset selector, submits assetCalendarId) */
+  assetCalendars?: AssetCalendar[];
+  selectedAssetCalendarId?: string | null;
   defaultCurrency?: string; // e.g. asset label "GBP"
   mode?: "create" | "edit";
   initialEvent?: Event;
@@ -22,6 +30,16 @@ const IMPACT_OPTIONS: { value: EventImpact; label: string }[] = [
   { value: "medium", label: "Medium" },
   { value: "high", label: "High" },
 ];
+
+/** Normalize time to HH:mm for type="time" input */
+function normalizeTime(value: string | undefined): string {
+  if (!value || typeof value !== "string") return "";
+  const m = value.trim().match(/^(\d{1,2}):(\d{1,2})/);
+  if (m) {
+    return `${m[1].padStart(2, "0")}:${m[2].padStart(2, "0")}`;
+  }
+  return "";
+}
 
 function getDaysInRange(start: string, end: string): string[] {
   const days: string[] = [];
@@ -37,40 +55,71 @@ function getDaysInRange(start: string, end: string): string[] {
 export function CreateEventModal({
   open,
   onOpenChange,
-  calendars,
-  selectedCalendarId,
+  calendars = [],
+  selectedCalendarId = null,
+  assetCalendars = [],
+  selectedAssetCalendarId = null,
   defaultCurrency = "",
   mode = "create",
   initialEvent,
   onSubmit,
 }: CreateEventModalProps) {
+  const useAssetCalendarMode = assetCalendars.length > 0;
+  const [assetCalendarId, setAssetCalendarId] = useState(
+    selectedAssetCalendarId || ""
+  );
   const [calendarId, setCalendarId] = useState(selectedCalendarId || "");
   const [name, setName] = useState("");
   const [impact, setImpact] = useState<EventImpact>("medium");
   const [date, setDate] = useState("");
   const [time, setTime] = useState("");
+  const timeInputRef = useRef<HTMLInputElement>(null);
   const { assets } = useAssets();
   const [assetId, setAssetId] = useState("");
 
+  const activeCalendar = useAssetCalendarMode
+    ? assetCalendars.find((ac) => ac.id === assetCalendarId)
+    : null;
+  const activeWeeklyCalendar = useAssetCalendarMode
+    ? activeCalendar?.weeklyCalendar
+    : calendars.find((c) => c.id === calendarId);
+  const dayOptions = activeWeeklyCalendar
+    ? getDaysInRange(activeWeeklyCalendar.startDate, activeWeeklyCalendar.endDate)
+    : [];
+
   useEffect(() => {
     if (open) {
-      const calendarIdValue =
-        initialEvent?.calendar.id ?? selectedCalendarId ?? calendars[0]?.id ?? "";
-      setCalendarId(calendarIdValue);
+      if (useAssetCalendarMode) {
+        const acId =
+          initialEvent?.assetCalendar?.id ??
+          selectedAssetCalendarId ??
+          assetCalendars[0]?.id ??
+          "";
+        setAssetCalendarId(acId);
+      } else {
+        const calId =
+          initialEvent?.assetCalendar?.weeklyCalendar?.id ??
+          initialEvent?.calendar?.id ??
+          selectedCalendarId ??
+          calendars[0]?.id ??
+          "";
+        setCalendarId(calId);
+      }
 
       if (initialEvent) {
-        const calendar = calendars.find((c) => c.id === calendarIdValue);
-        const dayOptions = calendar
-          ? getDaysInRange(calendar.startDate, calendar.endDate)
+        const cal =
+          initialEvent.assetCalendar?.weeklyCalendar ?? initialEvent.calendar ?? null;
+        const dayOpts = cal
+          ? getDaysInRange(cal.startDate, cal.endDate)
           : [];
-        const match = dayOptions.find(
+        const match = dayOpts.find(
           (d) =>
             new Date(d + "T12:00:00").toLocaleDateString("en-US", {
               weekday: "long",
             }) === initialEvent.day
         );
         setDate(match ?? "");
-        setTime(initialEvent.time ?? "");
+        setTime(normalizeTime(initialEvent.time) || "");
         const matchAssetId =
           assets.find((a) => a.label === initialEvent.asset.name)?.id ??
           assets[0]?.id ??
@@ -82,34 +131,52 @@ export function CreateEventModal({
         setDate("");
         setTime("");
         const defaultAsset =
-          assets.find((a) => a.label === defaultCurrency)?.id ?? assets[0]?.id ?? "";
+          assets.find((a) => a.label === defaultCurrency)?.id ??
+          assets[0]?.id ??
+          "";
         setAssetId(defaultAsset);
         setName("");
         setImpact("medium");
       }
     }
-  }, [open, selectedCalendarId, calendars, defaultCurrency, assets, initialEvent]);
-
-  const selectedCalendar = calendars.find((c) => c.id === calendarId);
-  const dayOptions = selectedCalendar
-    ? getDaysInRange(selectedCalendar.startDate, selectedCalendar.endDate)
-    : [];
+  }, [
+    open,
+    selectedCalendarId,
+    selectedAssetCalendarId,
+    calendars,
+    assetCalendars,
+    useAssetCalendarMode,
+    defaultCurrency,
+    assets,
+    initialEvent,
+  ]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!calendarId || !name.trim() || !date || !assetId) return;
+    if (!name.trim() || !date) return;
     const dayLabel = new Date(date + "T12:00:00").toLocaleDateString("en-US", {
       weekday: "long",
     });
-    const dto: CreateEventDto = {
-      calendarId,
-      day: dayLabel,
-      time: time || "00:00",
-      assetId,
-      name: name.trim(),
-      impact,
-    };
-    onSubmit(dto);
+    const timeValue =
+      timeInputRef.current?.value || time || "00:00";
+    if (useAssetCalendarMode && assetCalendarId) {
+      onSubmit({
+        assetCalendarId,
+        day: dayLabel,
+        time: timeValue,
+        name: name.trim(),
+        impact,
+      });
+    } else if (calendarId && assetId) {
+      onSubmit({
+        calendarId,
+        day: dayLabel,
+        time: timeValue,
+        assetId,
+        name: name.trim(),
+        impact,
+      });
+    } else return;
     setName("");
     setImpact("medium");
     setDate("");
@@ -128,32 +195,61 @@ export function CreateEventModal({
           {mode === "edit" ? "Edit Event" : "Create Event"}
         </h3>
         <form onSubmit={handleSubmit} className="space-y-4 min-w-0">
-          <div>
-            <label
-              htmlFor="event-calendar"
-              className="block text-sm font-medium text-dashboard-foreground/80 mb-1"
-            >
-              Weekly calendar
-            </label>
-            <select
-              id="event-calendar"
-              value={calendarId}
-              onChange={(e) => {
-                setCalendarId(e.target.value);
-                setDate("");
-              }}
-              required
-              className="w-full rounded-lg border border-sidebar-border bg-header-input px-3 py-2 text-sm text-dashboard-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-            >
-              <option value="">Select a calendar...</option>
-              {calendars.map((cal) => (
-                <option key={cal.id} value={cal.id}>
-                  {new Date(cal.startDate).toISOString().slice(0, 10)} →{" "}
-                  {new Date(cal.endDate).toISOString().slice(0, 10)}
-                </option>
-              ))}
-            </select>
-          </div>
+          {useAssetCalendarMode ? (
+            <div>
+              <label
+                htmlFor="event-asset-calendar"
+                className="block text-sm font-medium text-dashboard-foreground/80 mb-1"
+              >
+                Calendar
+              </label>
+              <select
+                id="event-asset-calendar"
+                value={assetCalendarId}
+                onChange={(e) => {
+                  setAssetCalendarId(e.target.value);
+                  setDate("");
+                }}
+                required
+                className="w-full rounded-lg border border-sidebar-border bg-header-input px-3 py-2 text-sm text-dashboard-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+              >
+                <option value="">Select a calendar...</option>
+                {assetCalendars.map((ac) => (
+                  <option key={ac.id} value={ac.id}>
+                    {new Date(ac.startDate).toISOString().slice(0, 10)} →{" "}
+                    {new Date(ac.endDate).toISOString().slice(0, 10)}
+                  </option>
+                ))}
+              </select>
+            </div>
+          ) : (
+            <div>
+              <label
+                htmlFor="event-calendar"
+                className="block text-sm font-medium text-dashboard-foreground/80 mb-1"
+              >
+                Weekly calendar
+              </label>
+              <select
+                id="event-calendar"
+                value={calendarId}
+                onChange={(e) => {
+                  setCalendarId(e.target.value);
+                  setDate("");
+                }}
+                required
+                className="w-full rounded-lg border border-sidebar-border bg-header-input px-3 py-2 text-sm text-dashboard-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+              >
+                <option value="">Select a calendar...</option>
+                {calendars.map((cal) => (
+                  <option key={cal.id} value={cal.id}>
+                    {new Date(cal.startDate).toISOString().slice(0, 10)} →{" "}
+                    {new Date(cal.endDate).toISOString().slice(0, 10)}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
           <div>
             <label
               htmlFor="event-date"
@@ -166,7 +262,10 @@ export function CreateEventModal({
               value={date}
               onChange={(e) => setDate(e.target.value)}
               required
-              disabled={!calendarId || dayOptions.length === 0}
+              disabled={
+                (useAssetCalendarMode ? !assetCalendarId : !calendarId) ||
+                dayOptions.length === 0
+              }
               className="w-full rounded-lg border border-sidebar-border bg-header-input px-3 py-2 text-sm text-dashboard-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-50"
             >
               <option value="">Select day...</option>
@@ -190,35 +289,38 @@ export function CreateEventModal({
               Time
             </label>
             <input
+              ref={timeInputRef}
               id="event-time"
               type="time"
-              value={time}
-              onChange={(e) => setTime(e.target.value)}
+              key={`event-time-${open}-${date}-${initialEvent?.id ?? "new"}`}
+              defaultValue={time}
               className="w-full rounded-lg border border-sidebar-border bg-header-input px-3 py-2 text-sm text-dashboard-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
             />
           </div>
-          <div>
-            <label
-              htmlFor="event-asset"
-              className="block text-sm font-medium text-dashboard-foreground/80 mb-1"
-            >
-              Asset
-            </label>
-            <select
-              id="event-asset"
-              value={assetId}
-              onChange={(e) => setAssetId(e.target.value)}
-              required
-              className="w-full rounded-lg border border-sidebar-border bg-header-input px-3 py-2 text-sm text-dashboard-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-            >
-              <option value="">Select asset...</option>
-              {assets.map((a) => (
-                <option key={a.id ?? a.slug} value={a.id ?? ""}>
-                  {a.label}
-                </option>
-              ))}
-            </select>
-          </div>
+          {!useAssetCalendarMode && (
+            <div>
+              <label
+                htmlFor="event-asset"
+                className="block text-sm font-medium text-dashboard-foreground/80 mb-1"
+              >
+                Asset
+              </label>
+              <select
+                id="event-asset"
+                value={assetId}
+                onChange={(e) => setAssetId(e.target.value)}
+                required
+                className="w-full rounded-lg border border-sidebar-border bg-header-input px-3 py-2 text-sm text-dashboard-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+              >
+                <option value="">Select asset...</option>
+                {assets.map((a) => (
+                  <option key={a.id ?? a.slug} value={a.id ?? ""}>
+                    {a.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
           <div>
             <label
               htmlFor="event-name"

@@ -53,6 +53,7 @@ export function CalendarView() {
   const {
     weeklyCalendars,
     events,
+    createWeeklyCalendar,
     deleteEvent,
     deleteWeeklyCalendar,
     updateWeeklyCalendar,
@@ -65,6 +66,7 @@ export function CalendarView() {
   const [editingCalendar, setEditingCalendar] = useState<WeeklyCalendar | null>(null);
   const [editEventOpen, setEditEventOpen] = useState(false);
   const [editingEvent, setEditingEvent] = useState<Event | null>(null);
+  const [createCalendarModalOpen, setCreateCalendarModalOpen] = useState(false);
 
   const sortedCalendars = useMemo(
     () =>
@@ -84,9 +86,11 @@ export function CalendarView() {
   const eventsByCalendarId = useMemo(() => {
     const map: Record<string, Event[]> = {};
     events.forEach((ev) => {
-      const id = ev.calendar.id;
-      if (!map[id]) map[id] = [];
-      map[id].push(ev);
+      const calId =
+        ev.assetCalendar?.weeklyCalendar?.id ?? ev.calendar?.id ?? null;
+      if (!calId) return;
+      if (!map[calId]) map[calId] = [];
+      map[calId].push(ev);
     });
     Object.keys(map).forEach((id) => {
       map[id].sort((a, b) => (a.time || "00:00").localeCompare(b.time || "00:00"));
@@ -109,6 +113,14 @@ export function CalendarView() {
         </p>
 
         <div className="flex flex-wrap items-center gap-3 mb-6">
+          <button
+            type="button"
+            onClick={() => setCreateCalendarModalOpen(true)}
+            className="flex items-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
+          >
+            <Calendar className="h-4 w-4" />
+            Create calendar
+          </button>
           <div className="relative">
             <button
               type="button"
@@ -154,7 +166,14 @@ export function CalendarView() {
             <div className="flex flex-col items-center justify-center min-h-[280px] text-dashboard-foreground/60 text-sm rounded-xl border border-sidebar-border bg-sidebar/30">
               <Calendar className="h-12 w-12 mb-3 opacity-50" />
               <p>No weekly calendars yet.</p>
-              <p className="text-xs mt-1">Create one from an asset&apos;s Economic Events tab.</p>
+              <p className="text-xs mt-1 mb-3">Create a calendar to get started.</p>
+              <button
+                type="button"
+                onClick={() => setCreateCalendarModalOpen(true)}
+                className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
+              >
+                Create calendar
+              </button>
             </div>
           ) : (
             displayedCalendars.map((cal: WeeklyCalendar) => {
@@ -207,14 +226,22 @@ export function CalendarView() {
                     ) : (
                       <div className="rounded-lg border border-sidebar-border overflow-hidden">
                         <table className="w-full text-sm table-fixed">
+                          <colgroup>
+                            <col className="w-[14%]" />
+                            <col className="w-[14%]" />
+                            <col className="w-[14%]" />
+                            <col className="w-[14%]" />
+                            <col className="w-[36%]" />
+                            <col className="w-[8%]" />
+                          </colgroup>
                           <thead>
                             <tr className="border-b border-sidebar-border bg-sidebar/80 text-dashboard-foreground/70 font-medium">
-                              <th className="w-24 py-2.5 px-3 text-left">DATE</th>
-                              <th className="w-20 py-2.5 px-3 text-center">TIME</th>
-                              <th className="w-16 py-2.5 px-3 text-center">CUR</th>
-                              <th className="w-16 py-2.5 px-3 text-center">IMPACT</th>
-                              <th className="flex-1 min-w-0 py-2.5 px-3 text-left">EVENT</th>
-                              <th className="w-10 py-2.5 px-3 text-center">DEL</th>
+                              <th className="py-2.5 px-3 text-left">DATE</th>
+                              <th className="py-2.5 px-3 text-center">TIME</th>
+                              <th className="py-2.5 px-3 text-center">CUR</th>
+                              <th className="py-2.5 px-3 text-center">IMPACT</th>
+                              <th className="py-2.5 px-3 text-left">EVENT</th>
+                              <th className="py-2.5 px-3 text-center">DEL</th>
                             </tr>
                           </thead>
                           <tbody>
@@ -259,7 +286,7 @@ export function CalendarView() {
                                       />
                                     </span>
                                   </td>
-                                  <td className="py-2.5 px-3 text-dashboard-foreground text-left truncate" title={ev.name}>
+                                  <td className="py-2.5 px-3 text-dashboard-foreground text-left break-words" title={ev.name}>
                                     {ev.name}
                                   </td>
                                   <td className="py-2.5 px-3 text-center">
@@ -301,6 +328,15 @@ export function CalendarView() {
       </div>
     </div>
     <WeeklyCalendarModal
+      open={createCalendarModalOpen}
+      onOpenChange={setCreateCalendarModalOpen}
+      mode="create"
+      onSubmit={async (dto) => {
+        await createWeeklyCalendar(dto);
+        setCreateCalendarModalOpen(false);
+      }}
+    />
+    <WeeklyCalendarModal
       open={editModalOpen}
       onOpenChange={setEditModalOpen}
       mode="edit"
@@ -317,7 +353,11 @@ export function CalendarView() {
       open={editEventOpen}
       onOpenChange={setEditEventOpen}
       calendars={weeklyCalendars}
-      selectedCalendarId={editingEvent?.calendar.id ?? null}
+      selectedCalendarId={
+        editingEvent?.assetCalendar?.weeklyCalendar?.id ??
+        editingEvent?.calendar?.id ??
+        null
+      }
       defaultCurrency={editingEvent?.asset.name ?? ""}
       mode="edit"
       initialEvent={editingEvent ?? undefined}

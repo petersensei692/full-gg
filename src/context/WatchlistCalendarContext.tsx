@@ -135,7 +135,13 @@ export function WatchlistCalendarProvider({ children }: { children: ReactNode })
   const deleteWeeklyCalendar = useCallback(async (id: string) => {
     await weeklyCalendarService.delete(id);
     setWeeklyCalendars((prev) => prev.filter((c) => c.id !== id));
-    setEvents((prev) => prev.filter((e) => e.calendar.id !== id));
+    setEvents((prev) =>
+      prev.filter(
+        (e) =>
+          e.calendar?.id !== id &&
+          e.assetCalendar?.weeklyCalendar?.id !== id
+      )
+    );
   }, []);
 
   const createWeeklyWatchlist = useCallback(async (dto: CreateWeeklyWatchlistDto) => {
@@ -156,7 +162,14 @@ export function WatchlistCalendarProvider({ children }: { children: ReactNode })
   const deleteWeeklyWatchlist = useCallback(async (id: string) => {
     await weeklyWatchlistService.delete(id);
     setWeeklyWatchlists((prev) => prev.filter((w) => w.id !== id));
-    setWatchItems((prev) => prev.filter((w) => w.watchlist.id !== id));
+    setWatchItems((prev) =>
+      prev.filter(
+        (w) =>
+          w.watchlist?.id !== id &&
+          w.baseAssetWatchlist?.weeklyWatchlist?.id !== id &&
+          w.quoteAssetWatchlist?.weeklyWatchlist?.id !== id
+      )
+    );
   }, []);
 
   const createEvent = useCallback(async (dto: CreateEventDto) => {

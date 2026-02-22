@@ -3,10 +3,10 @@
 import { useState, useMemo, useEffect } from "react";
 import { Calendar, Plus, ChevronDown, Trash2 } from "lucide-react";
 import type { AssetConfig } from "@/types/asset";
-import type { WeeklyCalendar, Event } from "@/types/api";
+import type { AssetCalendar, Event } from "@/types/api";
 import type { EventImpact } from "@/types/calendar";
 import { useWatchlistCalendar } from "@/context/WatchlistCalendarContext";
-import { WeeklyCalendarModal } from "./WeeklyCalendarModal";
+import { assetCalendarService } from "@/lib/api";
 import { CreateEventModal } from "./CreateEventModal";
 
 interface EconomicEventsViewProps {
@@ -45,48 +45,61 @@ function getWeekdayName(date: string): string {
 }
 
 export function EconomicEventsView({ asset }: EconomicEventsViewProps) {
-  const {
-    weeklyCalendars,
-    events,
-    createWeeklyCalendar,
-    updateWeeklyCalendar,
-    createEvent,
-    updateEvent,
-    deleteEvent,
-    deleteWeeklyCalendar,
-  } = useWatchlistCalendar();
+  const { events, createEvent, updateEvent, deleteEvent, refetchAll } =
+    useWatchlistCalendar();
 
-  const [selectedCalendarId, setSelectedCalendarId] = useState<string | null>(null);
-  const [calendarModalOpen, setCalendarModalOpen] = useState(false);
-  const [editingCalendar, setEditingCalendar] = useState<WeeklyCalendar | null>(null);
+  const [assetCalendars, setAssetCalendars] = useState<AssetCalendar[]>([]);
+  const [selectedAssetCalendarId, setSelectedAssetCalendarId] = useState<
+    string | null
+  >(null);
   const [eventModalOpen, setEventModalOpen] = useState(false);
   const [editingEvent, setEditingEvent] = useState<Event | null>(null);
   const [calendarDropdownOpen, setCalendarDropdownOpen] = useState(false);
+  const [loadingCalendars, setLoadingCalendars] = useState(false);
 
-  const selectedCalendar = weeklyCalendars.find((c) => c.id === selectedCalendarId);
+  const selectedAssetCalendar = assetCalendars.find(
+    (ac) => ac.id === selectedAssetCalendarId
+  );
 
   useEffect(() => {
-    if (!selectedCalendarId && weeklyCalendars.length > 0) {
-      setSelectedCalendarId(weeklyCalendars[0].id);
+    if (!asset.id) {
+      setAssetCalendars([]);
+      setSelectedAssetCalendarId(null);
+      return;
     }
-  }, [selectedCalendarId, weeklyCalendars]);
+    setLoadingCalendars(true);
+    assetCalendarService
+      .getByAsset(asset.id)
+      .then((list) => {
+        setAssetCalendars(list);
+        setSelectedAssetCalendarId((prev) => {
+          if (prev && list.some((ac) => ac.id === prev)) return prev;
+          return list[0]?.id ?? null;
+        });
+      })
+      .catch(() => setAssetCalendars([]))
+      .finally(() => setLoadingCalendars(false));
+  }, [asset.id]);
 
   const daysInWeek = useMemo(
     () =>
-      selectedCalendar
-        ? getDaysInRange(selectedCalendar.startDate, selectedCalendar.endDate)
+      selectedAssetCalendar
+        ? getDaysInRange(
+            selectedAssetCalendar.startDate,
+            selectedAssetCalendar.endDate
+          )
         : [],
-    [selectedCalendar]
+    [selectedAssetCalendar]
   );
 
   const eventsByDate = useMemo(() => {
     const map: Record<string, Event[]> = {};
-    if (!selectedCalendar) return map;
+    if (!selectedAssetCalendar) return map;
     const dayToDate = Object.fromEntries(
       daysInWeek.map((d) => [getWeekdayName(d.date), d.date])
     );
     events
-      .filter((e) => e.calendar.id === selectedCalendar.id)
+      .filter((e) => e.assetCalendar?.id === selectedAssetCalendar.id)
       .forEach((e) => {
         const date = dayToDate[e.day];
         if (!date) return;
@@ -97,54 +110,54 @@ export function EconomicEventsView({ asset }: EconomicEventsViewProps) {
       map[d].sort((a, b) => (a.time || "").localeCompare(b.time || ""))
     );
     return map;
-  }, [events, selectedCalendar, daysInWeek]);
-
-  const handleCalendarSubmit = async (dto: { startDate: string; endDate: string }) => {
-    if (editingCalendar) {
-      const updated = await updateWeeklyCalendar(editingCalendar.id, dto);
-      setSelectedCalendarId(updated.id);
-    } else {
-      const created = await createWeeklyCalendar(dto);
-      setSelectedCalendarId(created.id);
-    }
-    setEditingCalendar(null);
-    setCalendarDropdownOpen(false);
-  };
+  }, [events, selectedAssetCalendar, daysInWeek]);
 
   const handleEventSubmit = async (dto: {
-    calendarId: string;
+    assetCalendarId?: string;
+    calendarId?: string;
     day: string;
     time: string;
-    assetId: string;
+    assetId?: string;
     name: string;
     impact: string;
   }) => {
     if (editingEvent) {
-      await updateEvent(editingEvent.id, dto);
+      await updateEvent(editingEvent.id, {
+        day: dto.day,
+        time: dto.time,
+        name: dto.name,
+        impact: dto.impact,
+      });
     } else {
       await createEvent(dto);
     }
-    setSelectedCalendarId(dto.calendarId);
+    if (dto.assetCalendarId) setSelectedAssetCalendarId(dto.assetCalendarId);
     setEditingEvent(null);
     setEventModalOpen(false);
+    refetchAll();
   };
 
   return (
     <div className="flex-1 p-6 pt-4 flex flex-col min-h-0">
-      {/* Top bar: Choose/Create Weekly Calendar + Create Event */}
+      {/* Top bar: Choose calendar + Create Event */}
       <div className="flex flex-wrap items-center gap-3 mb-4">
         <div className="relative">
           <button
             type="button"
             onClick={() => setCalendarDropdownOpen((o) => !o)}
-            className="flex items-center gap-2 rounded-lg border border-sidebar-border bg-sidebar px-3 py-2 text-sm font-medium text-dashboard-foreground hover:bg-sidebar-hover transition-colors"
+            disabled={loadingCalendars || !asset.id}
+            className="flex items-center gap-2 rounded-lg border border-sidebar-border bg-sidebar px-3 py-2 text-sm font-medium text-dashboard-foreground hover:bg-sidebar-hover transition-colors disabled:opacity-50"
           >
             <Calendar className="h-4 w-4" />
-            {selectedCalendar
-              ? `${new Date(selectedCalendar.startDate).toISOString().slice(0, 10)} → ${new Date(
-                  selectedCalendar.endDate
+            {loadingCalendars
+              ? "Loading..."
+              : selectedAssetCalendar
+              ? `${new Date(selectedAssetCalendar.startDate).toISOString().slice(0, 10)} → ${new Date(
+                  selectedAssetCalendar.endDate
                 ).toISOString().slice(0, 10)}`
-              : "Choose or create weekly calendar"}
+              : assetCalendars.length === 0
+              ? "No calendars (create one on Calendar page)"
+              : "Choose calendar"}
             <ChevronDown className="h-4 w-4" />
           </button>
           {calendarDropdownOpen && (
@@ -155,63 +168,31 @@ export function EconomicEventsView({ asset }: EconomicEventsViewProps) {
                 onClick={() => setCalendarDropdownOpen(false)}
               />
               <div className="absolute left-0 top-full mt-1 z-50 min-w-[220px] rounded-lg border border-sidebar-border bg-sidebar py-1 shadow-lg">
-                {weeklyCalendars.length === 0 ? (
+                {assetCalendars.length === 0 ? (
                   <p className="px-3 py-2 text-sm text-dashboard-foreground/70">
-                    No calendars yet
+                    No calendars yet. Create one from the Calendar page.
                   </p>
                 ) : (
-                  weeklyCalendars.map((cal) => (
-                    <div key={cal.id} className="flex items-center gap-2 px-3 py-2">
+                  assetCalendars.map((ac) => (
+                    <div key={ac.id} className="flex items-center gap-2 px-3 py-2">
                       <button
                         type="button"
                         onClick={() => {
-                          setSelectedCalendarId(cal.id);
+                          setSelectedAssetCalendarId(ac.id);
                           setCalendarDropdownOpen(false);
                         }}
                         className={`flex-1 text-left text-sm hover:text-primary transition-colors ${
-                          selectedCalendarId === cal.id
+                          selectedAssetCalendarId === ac.id
                             ? "text-primary font-medium"
                             : "text-dashboard-foreground"
                         }`}
                       >
-                        {new Date(cal.startDate).toISOString().slice(0, 10)} →{" "}
-                        {new Date(cal.endDate).toISOString().slice(0, 10)}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => deleteWeeklyCalendar(cal.id)}
-                        className="text-dashboard-foreground/50 hover:text-red-400 transition-colors"
-                        aria-label="Delete calendar"
-                        title="Delete calendar"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setEditingCalendar(cal);
-                          setCalendarModalOpen(true);
-                        }}
-                        className="text-dashboard-foreground/50 hover:text-primary transition-colors"
-                        aria-label="Edit calendar"
-                        title="Edit calendar"
-                      >
-                        ✎
+                        {new Date(ac.startDate).toISOString().slice(0, 10)} →{" "}
+                        {new Date(ac.endDate).toISOString().slice(0, 10)}
                       </button>
                     </div>
                   ))
                 )}
-                <button
-                  type="button"
-                  onClick={() => {
-                    setCalendarDropdownOpen(false);
-                    setCalendarModalOpen(true);
-                  }}
-                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-primary hover:bg-sidebar-hover transition-colors border-t border-sidebar-border mt-1 pt-2"
-                >
-                  <Plus className="h-4 w-4" />
-                  Create new calendar
-                </button>
               </div>
             </>
           )}
@@ -228,10 +209,14 @@ export function EconomicEventsView({ asset }: EconomicEventsViewProps) {
 
       {/* Weekly calendar view: days and events */}
       <div className="flex-1 min-h-0 overflow-auto rounded-lg border border-sidebar-border bg-sidebar/30">
-        {!selectedCalendar ? (
+        {!selectedAssetCalendar ? (
           <div className="flex flex-col items-center justify-center h-64 text-dashboard-foreground/60 text-sm">
             <Calendar className="h-10 w-10 mb-2 opacity-50" />
-            <p>Select or create a weekly calendar to view events.</p>
+            <p>
+              {asset.id
+                ? "Select a calendar or create one from the Calendar page."
+                : "Asset ID required to load calendars."}
+            </p>
           </div>
         ) : (
           <div className="divide-y divide-sidebar-border">
@@ -255,13 +240,20 @@ export function EconomicEventsView({ asset }: EconomicEventsViewProps) {
                   </div>
                   <div className="rounded-lg border border-sidebar-border overflow-hidden">
                     <table className="w-full text-sm table-fixed">
+                      <colgroup>
+                        <col className="w-[16%]" />
+                        <col className="w-[16%]" />
+                        <col className="w-[16%]" />
+                        <col className="w-[36%]" />
+                        <col className="w-[16%]" />
+                      </colgroup>
                       <thead>
                         <tr className="border-b border-sidebar-border bg-sidebar/80 text-dashboard-foreground/70 font-medium">
-                          <th className="w-20 py-2.5 px-3 text-center">TIME</th>
-                          <th className="w-16 py-2.5 px-3 text-center">CUR</th>
-                          <th className="w-20 py-2.5 px-3 text-center">IMPACT</th>
-                          <th className="w-1/3 max-w-[200px] py-2.5 px-3 text-center">EVENT</th>
-                          <th className="w-10 py-2.5 px-3 text-center">DEL</th>
+                          <th className="py-2.5 px-3 text-center">TIME</th>
+                          <th className="py-2.5 px-3 text-center">CUR</th>
+                          <th className="py-2.5 px-3 text-center">IMPACT</th>
+                          <th className="py-2.5 px-3 text-left">EVENT</th>
+                          <th className="py-2.5 px-3 text-center">DEL</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -298,7 +290,7 @@ export function EconomicEventsView({ asset }: EconomicEventsViewProps) {
                                   <span className={`w-1.5 h-1.5 shrink-0 rounded-full ${IMPACT_DOTS[ev.impact.toLowerCase() as EventImpact]}`} />
                                 </span>
                               </td>
-                              <td className="w-1/3 max-w-[200px] py-2.5 px-3 text-dashboard-foreground text-center truncate" title={ev.name}>
+                              <td className="py-2.5 px-3 text-dashboard-foreground text-left break-words" title={ev.name}>
                                 {ev.name}
                               </td>
                               <td className="py-2.5 px-3 text-center">
@@ -337,19 +329,11 @@ export function EconomicEventsView({ asset }: EconomicEventsViewProps) {
         )}
       </div>
 
-      <WeeklyCalendarModal
-        open={calendarModalOpen}
-        onOpenChange={setCalendarModalOpen}
-        mode={editingCalendar ? "edit" : "create"}
-        initialStartDate={editingCalendar?.startDate}
-        initialEndDate={editingCalendar?.endDate}
-        onSubmit={handleCalendarSubmit}
-      />
       <CreateEventModal
         open={eventModalOpen}
         onOpenChange={setEventModalOpen}
-        calendars={weeklyCalendars}
-        selectedCalendarId={selectedCalendarId}
+        assetCalendars={assetCalendars}
+        selectedAssetCalendarId={selectedAssetCalendarId}
         defaultCurrency={asset.label}
         mode={editingEvent ? "edit" : "create"}
         initialEvent={editingEvent ?? undefined}

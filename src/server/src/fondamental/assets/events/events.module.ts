@@ -5,10 +5,11 @@ import { EventsController } from './events.controller';
 import { Event } from './entities/event.entity';
 import { WeeklyCalendar } from '../../weekly/weekly-calendar/entities/weekly-calendar.entity';
 import { Asset } from '../entities/asset.entity';
+import { AssetCalendar } from '../../weekly/weekly-calendar/asset-calendar/entities/asset-calendar.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Event, WeeklyCalendar, Asset]),
+    TypeOrmModule.forFeature([Event, WeeklyCalendar, Asset, AssetCalendar]),
   ],
   controllers: [EventsController],
   providers: [EventsService],

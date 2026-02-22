@@ -4,12 +4,14 @@ import { Repository } from 'typeorm';
 import { WeeklyWatchlist } from './entities/weekly-watchlist.entity';
 import { CreateWeeklyWatchlistDto } from './dto/create-weekly-watchlist.dto';
 import { UpdateWeeklyWatchlistDto } from './dto/update-weekly-watchlist.dto';
+import { AssetWatchlistService } from './asset-watchlist/asset-watchlist.service';
 
 @Injectable()
 export class WeeklyWatchlistService {
   constructor(
     @InjectRepository(WeeklyWatchlist)
     private readonly weeklyWatchlistRepository: Repository<WeeklyWatchlist>,
+    private readonly assetWatchlistService: AssetWatchlistService,
   ) {}
 
   async create(
@@ -17,7 +19,10 @@ export class WeeklyWatchlistService {
   ): Promise<WeeklyWatchlist> {
     const weeklyWatchlist =
       this.weeklyWatchlistRepository.create(createWeeklyWatchlistDto);
-    return this.weeklyWatchlistRepository.save(weeklyWatchlist);
+    const saved =
+      await this.weeklyWatchlistRepository.save(weeklyWatchlist);
+    await this.assetWatchlistService.createManyForAllAssets(saved);
+    return saved;
   }
 
   async findAll(): Promise<WeeklyWatchlist[]> {
@@ -43,11 +48,31 @@ export class WeeklyWatchlistService {
     updateWeeklyWatchlistDto: UpdateWeeklyWatchlistDto,
   ): Promise<WeeklyWatchlist> {
     const weeklyWatchlist = await this.findOne(id);
+    const prevStart = weeklyWatchlist.startDate;
+    const prevEnd = weeklyWatchlist.endDate;
     Object.assign(weeklyWatchlist, updateWeeklyWatchlistDto);
-    return this.weeklyWatchlistRepository.save(weeklyWatchlist);
+    const saved =
+      await this.weeklyWatchlistRepository.save(weeklyWatchlist);
+    const startChanged =
+      updateWeeklyWatchlistDto.startDate &&
+      new Date(updateWeeklyWatchlistDto.startDate).getTime() !==
+        new Date(prevStart).getTime();
+    const endChanged =
+      updateWeeklyWatchlistDto.endDate &&
+      new Date(updateWeeklyWatchlistDto.endDate).getTime() !==
+        new Date(prevEnd).getTime();
+    if (startChanged || endChanged) {
+      await this.assetWatchlistService.updateDatesByWeeklyWatchlist(
+        id,
+        saved.startDate,
+        saved.endDate,
+      );
+    }
+    return saved;
   }
 
   async remove(id: string): Promise<void> {
+    await this.assetWatchlistService.removeByWeeklyWatchlist(id);
     const weeklyWatchlist = await this.findOne(id);
     await this.weeklyWatchlistRepository.remove(weeklyWatchlist);
   }

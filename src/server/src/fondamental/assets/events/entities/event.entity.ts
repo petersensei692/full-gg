@@ -9,15 +9,20 @@ import {
 } from 'typeorm';
 import { WeeklyCalendar } from '../../../weekly/weekly-calendar/entities/weekly-calendar.entity';
 import { Asset } from '../../entities/asset.entity';
+import { AssetCalendar } from '../../../weekly/weekly-calendar/asset-calendar/entities/asset-calendar.entity';
 
 @Entity('events')
 export class Event {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @ManyToOne(() => WeeklyCalendar, { onDelete: 'CASCADE' })
+  @ManyToOne(() => WeeklyCalendar, { onDelete: 'CASCADE', nullable: true })
   @JoinColumn({ name: 'calendar_id' })
-  calendar: WeeklyCalendar;
+  calendar: WeeklyCalendar | null;
+
+  @ManyToOne(() => AssetCalendar, { onDelete: 'SET NULL', nullable: true })
+  @JoinColumn({ name: 'asset_calendar_id' })
+  assetCalendar: AssetCalendar | null;
 
   @Column({ type: 'varchar', length: 50 })
   day: string;

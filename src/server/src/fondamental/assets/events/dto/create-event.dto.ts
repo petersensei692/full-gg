@@ -1,11 +1,23 @@
-import { ApiProperty } from '@nestjs/swagger';
-import { IsNotEmpty, IsString, IsUUID, MaxLength } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { IsNotEmpty, IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
 
 export class CreateEventDto {
-  @ApiProperty({ description: 'UUID of the weekly calendar', example: '123e4567-e89b-12d3-a456-426614174000' })
+  @ApiPropertyOptional({
+    description:
+      'UUID of the asset calendar (alternative to calendarId+assetId)',
+    example: '123e4567-e89b-12d3-a456-426614174000',
+  })
+  @IsOptional()
   @IsUUID()
-  @IsNotEmpty()
-  calendarId: string;
+  assetCalendarId?: string;
+
+  @ApiPropertyOptional({
+    description: 'UUID of the weekly calendar (required if assetCalendarId not provided)',
+    example: '123e4567-e89b-12d3-a456-426614174000',
+  })
+  @IsOptional()
+  @IsUUID()
+  calendarId?: string;
 
   @ApiProperty({ description: 'Day of the event', example: 'Monday', maxLength: 50 })
   @IsString()
@@ -19,10 +31,13 @@ export class CreateEventDto {
   @MaxLength(50)
   time: string;
 
-  @ApiProperty({ description: 'UUID of the asset', example: '123e4567-e89b-12d3-a456-426614174000' })
+  @ApiPropertyOptional({
+    description: 'UUID of the asset (required if assetCalendarId not provided)',
+    example: '123e4567-e89b-12d3-a456-426614174000',
+  })
+  @IsOptional()
   @IsUUID()
-  @IsNotEmpty()
-  assetId: string;
+  assetId?: string;
 
   @ApiProperty({ description: 'Event name', example: 'FOMC Meeting', maxLength: 255 })
   @IsString()

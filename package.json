@@ -33,7 +33,7 @@
   "main": "electron/main.js",
   "build": {
     "appId": "com.fullgg.app",
-    "productName": "TradeJournal Pro",
+    "productName": "Journal App",
     "directories": {
       "output": "dist-electron"
     },
@@ -53,9 +53,19 @@
     ],
     "win": {
       "target": [
-        "nsis",
-        "portable"
-      ]
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        }
+      ],
+      "icon": "build/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "perMachine": false,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
     },
     "mac": {
       "target": [
