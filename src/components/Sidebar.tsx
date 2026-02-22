@@ -60,7 +60,7 @@ export function Sidebar() {
         </div>
         <div className="flex flex-col">
           <span className="text-sm font-semibold text-sidebar-foreground">
-            TradeJournal Pro
+            JOURNAL APP
           </span>
           <span className="text-[10px] uppercase tracking-wider text-sidebar-muted">
             Professional Trader

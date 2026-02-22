@@ -6,6 +6,7 @@ import {
   useState,
   useCallback,
   useEffect,
+  useMemo,
   type ReactNode,
 } from "react";
 import type {
@@ -206,27 +207,50 @@ export function WatchlistCalendarProvider({ children }: { children: ReactNode })
     setWatchItems((prev) => prev.filter((w) => w.id !== id));
   }, []);
 
-  const value: WatchlistCalendarContextValue = {
-    weeklyCalendars,
-    weeklyWatchlists,
-    events,
-    watchItems,
-    loading,
-    error,
-    refetchAll,
-    createWeeklyCalendar,
-    updateWeeklyCalendar,
-    deleteWeeklyCalendar,
-    createWeeklyWatchlist,
-    updateWeeklyWatchlist,
-    deleteWeeklyWatchlist,
-    createEvent,
-    updateEvent,
-    deleteEvent,
-    createWatchItem,
-    updateWatchItem,
-    deleteWatchItem,
-  };
+  const value = useMemo<WatchlistCalendarContextValue>(
+    () => ({
+      weeklyCalendars,
+      weeklyWatchlists,
+      events,
+      watchItems,
+      loading,
+      error,
+      refetchAll,
+      createWeeklyCalendar,
+      updateWeeklyCalendar,
+      deleteWeeklyCalendar,
+      createWeeklyWatchlist,
+      updateWeeklyWatchlist,
+      deleteWeeklyWatchlist,
+      createEvent,
+      updateEvent,
+      deleteEvent,
+      createWatchItem,
+      updateWatchItem,
+      deleteWatchItem,
+    }),
+    [
+      weeklyCalendars,
+      weeklyWatchlists,
+      events,
+      watchItems,
+      loading,
+      error,
+      refetchAll,
+      createWeeklyCalendar,
+      updateWeeklyCalendar,
+      deleteWeeklyCalendar,
+      createWeeklyWatchlist,
+      updateWeeklyWatchlist,
+      deleteWeeklyWatchlist,
+      createEvent,
+      updateEvent,
+      deleteEvent,
+      createWatchItem,
+      updateWatchItem,
+      deleteWatchItem,
+    ]
+  );
 
   return (
     <WatchlistCalendarContext.Provider value={value}>

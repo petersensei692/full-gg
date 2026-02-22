@@ -28,12 +28,13 @@
     "electron:dev": "concurrently -k -n \"next,server,electron\" -c \"cyan,magenta,green\" \"npm run dev:webpack\" \"npm run dev:server\" \"wait-on http://localhost:3000 http://localhost:5000 -t 90000 && cross-env NODE_ENV=development electron .\"",
     "electron:build": "npm run build && npm run build:server && electron-builder",
     "electron:build:dir": "npm run build && npm run build:server && electron-builder --dir",
-    "electron:start": "cross-env NODE_ENV=production electron ."
+    "electron:start": "cross-env NODE_ENV=production electron .",
+    "electron-pack": "cross-env NEXT_PUBLIC_API_URL=http://127.0.0.1:5000 npm run build && npm run build:server && electron-builder"
   },
   "main": "electron/main.js",
   "build": {
-    "appId": "com.fullgg.app",
-    "productName": "Journal App",
+    "appId": "com.journalapp.app",
+    "productName": "JournalApp",
     "directories": {
       "output": "dist-electron"
     },
@@ -42,13 +43,19 @@
       "out/**/*",
       "node_modules/**/*"
     ],
+    "asarUnpack": [
+      "node_modules/**"
+    ],
     "extraResources": [
       {
         "from": "out",
         "to": "out",
-        "filter": [
-          "**/*"
-        ]
+        "filter": ["**/*"]
+      },
+      {
+        "from": "src/server/dist",
+        "to": "server",
+        "filter": ["**/*"]
       }
     ],
     "win": {
@@ -63,7 +70,9 @@
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
-      "perMachine": false,
+      "perMachine": true,
+      "installDir": "C:\\Program Files\\JournalApp",
+      "shortcutName": "JournalApp",
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true
     },

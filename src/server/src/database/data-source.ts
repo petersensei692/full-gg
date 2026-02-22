@@ -16,15 +16,15 @@ function getDatabasePath(): string {
   const root = getProjectRoot();
   const configPath = path.join(root, 'app-config.json');
   if (!existsSync(configPath)) {
-    return path.join(root, 'full-gg.db');
+    return path.join(root, 'journal-app.db');
   }
   try {
     const raw = readFileSync(configPath, 'utf-8');
     const parsed = JSON.parse(raw) as { databasePath?: string };
-    const p = (parsed.databasePath || 'full-gg.db').trim();
+    const p = (parsed.databasePath || 'journal-app.db').trim();
     return path.isAbsolute(p) ? path.normalize(p) : path.join(root, p);
   } catch {
-    return path.join(root, 'full-gg.db');
+    return path.join(root, 'journal-app.db');
   }
 }
 

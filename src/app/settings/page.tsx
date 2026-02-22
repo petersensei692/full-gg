@@ -208,7 +208,7 @@ export default function SettingsPage() {
                     setDatabasePathInput(e.target.value);
                     setDbValidateResult(null);
                   }}
-                  placeholder="e.g. full-gg.db or C:\Data\full-gg.db"
+                  placeholder="e.g. journal-app.db or C:\Data\journal-app.db"
                   className="flex-1 min-w-[200px] max-w-full rounded-lg border border-sidebar-border bg-header-input px-3 py-2 text-sm text-dashboard-foreground placeholder:text-dashboard-foreground/50 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                 />
                 <button

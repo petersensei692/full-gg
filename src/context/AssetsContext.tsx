@@ -6,6 +6,7 @@ import {
   useState,
   useCallback,
   useEffect,
+  useMemo,
   type ReactNode,
 } from "react";
 import { assetsApi } from "@/lib/api";
@@ -46,12 +47,15 @@ export function AssetsProvider({ children }: { children: ReactNode }) {
     fetchAssets();
   }, [fetchAssets]);
 
-  const value: AssetsContextValue = {
-    assets,
-    loading,
-    error,
-    refetch: fetchAssets,
-  };
+  const value = useMemo<AssetsContextValue>(
+    () => ({
+      assets,
+      loading,
+      error,
+      refetch: fetchAssets,
+    }),
+    [assets, loading, error, fetchAssets]
+  );
 
   return (
     <AssetsContext.Provider value={value}>{children}</AssetsContext.Provider>

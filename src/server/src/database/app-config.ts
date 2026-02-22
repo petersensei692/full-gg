@@ -8,8 +8,12 @@ export interface AppConfig {
 
 const CONFIG_FILENAME = 'app-config.json';
 
-/** When running from project root, cwd is root. When running "cd src/server && nest start", cwd is src/server. */
+/** When APP_DATA_PATH is set (Electron production), use it. Otherwise use project root. */
 export function getProjectRoot(): string {
+  const appData = process.env.APP_DATA_PATH;
+  if (appData) {
+    return path.resolve(appData);
+  }
   const cwd = process.cwd();
   const normalized = cwd.replace(/[/\\]+$/, '');
   if (normalized.endsWith('server') || normalized.endsWith('src\\server')) {
@@ -23,7 +27,7 @@ function getConfigPath(): string {
 }
 
 const DEFAULT_CONFIG: AppConfig = {
-  databasePath: 'full-gg.db',
+  databasePath: 'journal-app.db',
   imagesPath: '',
 };
 
@@ -66,7 +70,7 @@ function stripPathQuotes(s: string): string {
 /** Resolve database path to absolute. If relative, resolve against project root. */
 export function resolveDatabasePath(config: AppConfig): string {
   const root = getProjectRoot();
-  const p = stripPathQuotes(config.databasePath || 'full-gg.db') || 'full-gg.db';
+  const p = stripPathQuotes(config.databasePath || 'journal-app.db') || 'journal-app.db';
   return path.isAbsolute(p) ? path.normalize(p) : path.join(root, p);
 }
 
