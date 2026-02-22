@@ -89,6 +89,9 @@ export function AssetAnalysisView({ asset }: AssetAnalysisViewProps) {
   const [editModalOpen, setEditModalOpen] = useState(false);
 
   const handleCreate = useCallback(async (payload: { notes: string; images: string[]; analysisType: string }) => {
+    if (!asset.id) {
+      throw new Error("Asset ID is required to create analysis. Ensure the API is connected.");
+    }
     const notesWithMarker = addAnalysisTypeMarker(payload.notes, payload.analysisType);
     const created = await analysisService.create({
       assetId: asset.id,
@@ -96,7 +99,7 @@ export function AssetAnalysisView({ asset }: AssetAnalysisViewProps) {
       images: payload.images,
     });
     setAnalyses((prev) => [...prev, created]);
-  }, [asset.id]);
+  }, [asset]);
 
   const handleDeleteAnalysis = useCallback(
     async (analysisId: string, images: string[]) => {

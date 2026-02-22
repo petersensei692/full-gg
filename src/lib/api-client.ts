@@ -32,5 +32,13 @@ export async function handleResponse<T>(res: Response, requestUrl?: string): Pro
   if (res.status === 204 || res.headers.get("content-length") === "0") {
     return undefined as T;
   }
-  return res.json();
+  const text = await res.text();
+  if (!text || !text.trim()) {
+    return undefined as T;
+  }
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    throw new ApiError(`Invalid JSON response${requestUrl ? ` (${requestUrl})` : ""}`, res.status, text);
+  }
 }
