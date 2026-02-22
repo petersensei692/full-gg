@@ -18,8 +18,16 @@ export class NotesService {
   }
 
   async findAll(): Promise<Note[]> {
-    return this.noteRepository.find({
+    const notes = await this.noteRepository.find({
       order: { updatedAt: 'DESC' },
+    });
+    // Sort: tier_1 first, tier_2 second, tier_3 last
+    const tierOrder: Record<string, number> = { tier_1: 0, tier_2: 1, tier_3: 2 };
+    return notes.sort((a, b) => {
+      const orderA = tierOrder[a.tier ?? 'tier_2'] ?? 1;
+      const orderB = tierOrder[b.tier ?? 'tier_2'] ?? 1;
+      if (orderA !== orderB) return orderA - orderB;
+      return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
     });
   }
 

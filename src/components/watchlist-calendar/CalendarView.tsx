@@ -25,11 +25,13 @@ const IMPACT_DOTS: Record<EventImpact, string> = {
 
 function formatDateRange(start: string, end: string): string {
   const s = new Date(start).toLocaleDateString("en-US", {
+    timeZone: "UTC",
     month: "short",
     day: "numeric",
     year: "numeric",
   });
   const e = new Date(end).toLocaleDateString("en-US", {
+    timeZone: "UTC",
     month: "short",
     day: "numeric",
     year: "numeric",
@@ -189,34 +191,36 @@ export function CalendarView() {
                   key={cal.id}
                   className="rounded-xl border border-sidebar-border bg-sidebar/50 overflow-hidden shadow-sm"
                 >
-                  <div className="px-5 py-4 border-b border-sidebar-border bg-sidebar/80 flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-2">
-                      <Calendar className="h-5 w-5 text-primary/80" />
-                      <h2 className="text-lg font-semibold text-dashboard-foreground">
+                  <div className="px-5 py-4 border-b border-sidebar-border bg-sidebar/80 grid grid-cols-[15%_12.5%_12.5%_12.5%_35%_12.5%] items-center gap-0 w-full">
+                    <div className="col-span-5 flex items-center gap-2 min-w-0">
+                      <Calendar className="h-5 w-5 shrink-0 text-primary/80" />
+                      <h2 className="text-lg font-semibold text-dashboard-foreground truncate">
                         {formatDateRange(cal.startDate, cal.endDate)}
                       </h2>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => deleteWeeklyCalendar(cal.id)}
-                      className="text-dashboard-foreground/50 hover:text-red-400 transition-colors"
-                      aria-label="Delete calendar"
-                      title="Delete calendar"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setEditingCalendar(cal);
-                        setEditModalOpen(true);
-                      }}
-                      className="text-dashboard-foreground/50 hover:text-primary transition-colors"
-                      aria-label="Edit calendar"
-                      title="Edit calendar"
-                    >
-                      ✎
-                    </button>
+                    <div className="flex items-center justify-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditingCalendar(cal);
+                          setEditModalOpen(true);
+                        }}
+                        className="text-dashboard-foreground/50 hover:text-primary transition-colors p-1"
+                        aria-label="Edit calendar"
+                        title="Edit calendar"
+                      >
+                        ✎
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => deleteWeeklyCalendar(cal.id)}
+                        className="text-dashboard-foreground/50 hover:text-red-400 transition-colors p-1"
+                        aria-label="Delete calendar"
+                        title="Delete calendar"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
                   </div>
                   <div className="p-5">
                     {events.length === 0 ? (
@@ -227,21 +231,21 @@ export function CalendarView() {
                       <div className="rounded-lg border border-sidebar-border overflow-hidden">
                         <table className="w-full text-sm table-fixed">
                           <colgroup>
-                            <col className="w-[14%]" />
-                            <col className="w-[14%]" />
-                            <col className="w-[14%]" />
-                            <col className="w-[14%]" />
-                            <col className="w-[36%]" />
-                            <col className="w-[8%]" />
+                            <col className="w-[15%]" />
+                            <col className="w-[12.5%]" />
+                            <col className="w-[12.5%]" />
+                            <col className="w-[12.5%]" />
+                            <col className="w-[35%]" />
+                            <col className="w-[12.5%]" />
                           </colgroup>
                           <thead>
                             <tr className="border-b border-sidebar-border bg-sidebar/80 text-dashboard-foreground/70 font-medium">
-                              <th className="py-2.5 px-3 text-left">DATE</th>
-                              <th className="py-2.5 px-3 text-center">TIME</th>
-                              <th className="py-2.5 px-3 text-center">CUR</th>
-                              <th className="py-2.5 px-3 text-center">IMPACT</th>
-                              <th className="py-2.5 px-3 text-left">EVENT</th>
-                              <th className="py-2.5 px-3 text-center">DEL</th>
+                              <th className="py-2.5 px-2 text-left">DATE</th>
+                              <th className="py-2.5 px-2 text-center">TIME</th>
+                              <th className="py-2.5 px-2 text-center">CUR</th>
+                              <th className="py-2.5 px-2 text-center">IMPACT</th>
+                              <th className="py-2.5 px-2 text-left"></th>
+                              <th className="py-2.5 px-2 text-center">DEL</th>
                             </tr>
                           </thead>
                           <tbody>
@@ -261,16 +265,16 @@ export function CalendarView() {
                                     i % 2 === 0 ? "bg-header-input/30" : "bg-sidebar/30"
                                   }`}
                                 >
-                                  <td className="py-2.5 px-3 text-dashboard-foreground/80 text-left">
+                                  <td className="py-2.5 px-2 text-dashboard-foreground/80 text-left">
                                     {dateLabel}
                                   </td>
-                                  <td className="py-2.5 px-3 text-dashboard-foreground/90 tabular-nums text-center">
+                                  <td className="py-2.5 px-2 text-dashboard-foreground/90 tabular-nums text-center">
                                     {ev.time || "—"}
                                   </td>
-                                  <td className="py-2.5 px-3 text-dashboard-foreground font-medium text-center">
+                                  <td className="py-2.5 px-2 text-dashboard-foreground font-medium text-center">
                                     {ev.asset?.name ?? "—"}
                                   </td>
-                                  <td className="py-2.5 px-3 text-center">
+                                  <td className="py-2.5 px-2 text-center">
                                     <span
                                       className="inline-flex gap-0.5 items-center justify-center"
                                       title={ev.impact}
@@ -286,31 +290,33 @@ export function CalendarView() {
                                       />
                                     </span>
                                   </td>
-                                  <td className="py-2.5 px-3 text-dashboard-foreground text-left break-words" title={ev.name}>
+                                  <td className="py-2.5 px-2 text-dashboard-foreground text-left break-words" title={ev.name}>
                                     {ev.name}
                                   </td>
-                                  <td className="py-2.5 px-3 text-center">
-                                    <button
-                                      type="button"
-                                      onClick={() => deleteEvent(ev.id)}
-                                      className="text-dashboard-foreground/50 hover:text-red-400 transition-colors"
-                                      aria-label="Delete event"
-                                      title="Delete event"
-                                    >
-                                      <Trash2 className="h-4 w-4" />
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        setEditingEvent(ev);
-                                        setEditEventOpen(true);
-                                      }}
-                                      className="ml-2 text-dashboard-foreground/50 hover:text-primary transition-colors"
-                                      aria-label="Edit event"
-                                      title="Edit event"
-                                    >
-                                      ✎
-                                    </button>
+                                  <td className="py-2.5 px-2 text-center">
+                                    <span className="inline-flex items-center justify-center gap-1">
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setEditingEvent(ev);
+                                          setEditEventOpen(true);
+                                        }}
+                                        className="text-dashboard-foreground/50 hover:text-primary transition-colors"
+                                        aria-label="Edit event"
+                                        title="Edit event"
+                                      >
+                                        ✎
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => deleteEvent(ev.id)}
+                                        className="text-dashboard-foreground/50 hover:text-red-400 transition-colors"
+                                        aria-label="Delete event"
+                                        title="Delete event"
+                                      >
+                                        <Trash2 className="h-4 w-4" />
+                                      </button>
+                                    </span>
                                   </td>
                                 </tr>
                               );

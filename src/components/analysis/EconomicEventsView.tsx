@@ -238,59 +238,101 @@ export function EconomicEventsView({ asset }: EconomicEventsViewProps) {
                       </span>
                     )}
                   </div>
-                  {dayEvents.length === 0 ? (
-                    <div className="py-8 px-4 text-dashboard-foreground/50 text-center text-sm rounded-lg border border-sidebar-border bg-sidebar/30">
-                      No events
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-2 gap-4">
-                      {dayEvents.map((ev) => (
-                        <div
-                          key={ev.id}
-                          className="flex flex-col gap-0 rounded-lg border border-sidebar-border bg-sidebar/50 overflow-hidden"
-                        >
-                          <div className="flex items-center gap-3 px-3 py-2 border-b border-sidebar-border bg-sidebar/80 text-xs font-semibold uppercase tracking-wider text-dashboard-foreground shrink-0">
-                            <span className="w-12 shrink-0 tabular-nums text-center">{ev.time || "—"}</span>
-                            <span className="w-10 shrink-0 text-center">{ev.asset?.name ?? asset.label}</span>
-                            <span className="w-8 shrink-0 flex justify-center" title={ev.impact}>
-                              <span className="inline-flex gap-0.5">
-                                <span className={`w-1.5 h-1.5 rounded-full ${IMPACT_DOTS[ev.impact.toLowerCase() as EventImpact]}`} />
-                                <span className={`w-1.5 h-1.5 rounded-full ${IMPACT_DOTS[ev.impact.toLowerCase() as EventImpact]}`} />
-                                <span className={`w-1.5 h-1.5 rounded-full ${IMPACT_DOTS[ev.impact.toLowerCase() as EventImpact]}`} />
-                              </span>
-                            </span>
-                            <span className="flex-1 min-w-0" />
-                            <span className="shrink-0 flex items-center gap-1">
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setEditingEvent(ev);
-                                  setEventModalOpen(true);
-                                }}
-                                className="text-dashboard-foreground/50 hover:text-primary transition-colors"
-                                aria-label="Edit event"
-                                title="Edit event"
-                              >
-                                ✎
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => deleteEvent(ev.id)}
-                                className="text-dashboard-foreground/50 hover:text-red-400 transition-colors"
-                                aria-label="Delete event"
-                                title="Delete event"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </button>
-                            </span>
-                          </div>
-                          <div className="px-3 py-2 text-sm text-dashboard-foreground break-words min-w-0">
-                            {ev.name}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
+                  <div className="rounded-lg border border-sidebar-border overflow-hidden">
+                    <table className="w-full text-sm table-fixed">
+                      <colgroup>
+                        <col className="w-[15%]" />
+                        <col className="w-[12.5%]" />
+                        <col className="w-[12.5%]" />
+                        <col className="w-[12.5%]" />
+                        <col className="w-[35%]" />
+                        <col className="w-[12.5%]" />
+                      </colgroup>
+                      <thead>
+                        <tr className="border-b border-sidebar-border bg-sidebar/80 text-dashboard-foreground/70 font-medium">
+                          <th className="py-2.5 px-2 text-left">DATE</th>
+                          <th className="py-2.5 px-2 text-center">TIME</th>
+                          <th className="py-2.5 px-2 text-center">CUR</th>
+                          <th className="py-2.5 px-2 text-center">IMPACT</th>
+                          <th className="py-2.5 px-2 text-left"></th>
+                          <th className="py-2.5 px-2 text-center">DEL</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {dayEvents.length === 0 ? (
+                          <tr>
+                            <td
+                              colSpan={6}
+                              className="py-4 px-2 text-dashboard-foreground/50 text-center"
+                            >
+                              No events
+                            </td>
+                          </tr>
+                        ) : (
+                          dayEvents.map((ev, i) => (
+                            <tr
+                              key={ev.id}
+                              className={`border-b border-sidebar-border/50 last:border-0 ${
+                                i % 2 === 0 ? "bg-header-input/30" : "bg-sidebar/30"
+                              }`}
+                            >
+                              <td className="py-2.5 px-2 text-dashboard-foreground/90 text-left break-words">
+                                {new Date(date + "T12:00:00").toLocaleDateString("en-US", {
+                                  weekday: "short",
+                                  month: "short",
+                                  day: "numeric",
+                                })}
+                              </td>
+                              <td className="py-2.5 px-2 text-dashboard-foreground/90 tabular-nums text-center">
+                                {ev.time || "—"}
+                              </td>
+                              <td className="py-2.5 px-2 text-dashboard-foreground font-medium text-center">
+                                {ev.asset?.name ?? asset.label}
+                              </td>
+                              <td className="py-2.5 px-2 text-center">
+                                <span
+                                  className="inline-flex gap-0.5 items-center justify-center"
+                                  title={ev.impact}
+                                >
+                                  <span className={`w-1.5 h-1.5 shrink-0 rounded-full ${IMPACT_DOTS[ev.impact.toLowerCase() as EventImpact]}`} />
+                                  <span className={`w-1.5 h-1.5 shrink-0 rounded-full ${IMPACT_DOTS[ev.impact.toLowerCase() as EventImpact]}`} />
+                                  <span className={`w-1.5 h-1.5 shrink-0 rounded-full ${IMPACT_DOTS[ev.impact.toLowerCase() as EventImpact]}`} />
+                                </span>
+                              </td>
+                              <td className="py-2.5 px-2 text-dashboard-foreground text-left break-words" title={ev.name}>
+                                {ev.name}
+                              </td>
+                              <td className="py-2.5 px-2 text-center">
+                                <span className="inline-flex items-center justify-center gap-1">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setEditingEvent(ev);
+                                      setEventModalOpen(true);
+                                    }}
+                                    className="text-dashboard-foreground/50 hover:text-primary transition-colors"
+                                    aria-label="Edit event"
+                                    title="Edit event"
+                                  >
+                                    ✎
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => deleteEvent(ev.id)}
+                                    className="text-dashboard-foreground/50 hover:text-red-400 transition-colors"
+                                    aria-label="Delete event"
+                                    title="Delete event"
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </button>
+                                </span>
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               );
             })}

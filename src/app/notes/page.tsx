@@ -60,7 +60,7 @@ export default function NotesPage() {
   );
 
   const handleCreateSubmit = useCallback(
-    async (payload: { title: string; note: string }) => {
+    async (payload: { title: string; note: string; tier: import("@/types/api").NoteTier }) => {
       await notesService.create(payload);
       setCreateOpen(false);
       loadNotes();
@@ -69,7 +69,7 @@ export default function NotesPage() {
   );
 
   const handleEditSubmit = useCallback(
-    async (payload: { title: string; note: string }) => {
+    async (payload: { title: string; note: string; tier: import("@/types/api").NoteTier }) => {
       if (!editingNote) return;
       await notesService.update(editingNote.id, payload);
       setEditModalOpen(false);
@@ -113,8 +113,16 @@ export default function NotesPage() {
             <p className="text-xs mt-1">Create one with the button above.</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {notes.map((note) => (
+          <div className="grid grid-cols-2 gap-4">
+            {[...notes]
+              .sort((a, b) => {
+                const order: Record<string, number> = { tier_1: 0, tier_2: 1, tier_3: 2 };
+                const oa = order[a.tier ?? "tier_2"] ?? 1;
+                const ob = order[b.tier ?? "tier_2"] ?? 1;
+                if (oa !== ob) return oa - ob;
+                return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+              })
+              .map((note) => (
               <NoteCard
                 key={note.id}
                 note={note}

@@ -5,6 +5,7 @@ import * as path from 'path';
 const rootEnv = path.resolve(__dirname, '../../..', '.env');
 config({ path: rootEnv });
 
+import { json, urlencoded } from 'express';
 import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
@@ -12,6 +13,9 @@ import { AppModule } from './app.module';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+  // Increase body size limit for large notes (default ~100kb)
+  app.use(json({ limit: '10mb' }));
+  app.use(urlencoded({ extended: true, limit: '10mb' }));
   app.useGlobalPipes(new ValidationPipe({ whitelist: true }));
 
   const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';

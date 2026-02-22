@@ -3,14 +3,20 @@
 import { useRef, useCallback, useEffect, useState } from "react";
 import { Bold, Italic, Underline } from "lucide-react";
 import { Dialog, DialogContent } from "@/components/ui/Dialog";
-import type { Note } from "@/types/api";
+import type { Note, NoteTier } from "@/types/api";
+
+const TIER_OPTIONS: { value: NoteTier; label: string }[] = [
+  { value: "tier_1", label: "Tier 1" },
+  { value: "tier_2", label: "Tier 2" },
+  { value: "tier_3", label: "Tier 3" },
+];
 
 interface CreateNoteModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   mode: "create" | "edit";
   initialNote?: Note | null;
-  onSubmit: (payload: { title: string; note: string }) => void | Promise<void>;
+  onSubmit: (payload: { title: string; note: string; tier: NoteTier }) => void | Promise<void>;
 }
 
 /** Normalize contenteditable HTML to a non-empty string for API (backend requires note). */
@@ -30,6 +36,7 @@ export function CreateNoteModal({
 }: CreateNoteModalProps) {
   const titleRef = useRef<HTMLInputElement>(null);
   const editorRef = useRef<HTMLDivElement>(null);
+  const [tier, setTier] = useState<NoteTier>("tier_2");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
@@ -41,6 +48,7 @@ export function CreateNoteModal({
     }
     const title = initialNote?.title ?? "";
     const noteHtml = initialNote?.note ?? "";
+    setTier((initialNote?.tier ?? "tier_2") as NoteTier);
     const applyInitial = () => {
       if (titleRef.current) titleRef.current.value = title;
       if (editorRef.current) editorRef.current.innerHTML = noteHtml;
@@ -52,7 +60,7 @@ export function CreateNoteModal({
       clearTimeout(t);
       clearTimeout(t2);
     };
-  }, [open, initialNote?.id, initialNote?.title, initialNote?.note]);
+  }, [open, initialNote?.id, initialNote?.title, initialNote?.note, initialNote?.tier]);
 
   const applyFormat = useCallback((command: "bold" | "italic" | "underline") => {
     document.execCommand(command, false);
@@ -102,6 +110,34 @@ export function CreateNoteModal({
     e.preventDefault();
   }, []);
 
+  /** Paste with preserved formatting (HTML from Word, Docs, web, etc.) */
+  const handlePaste = useCallback((e: React.ClipboardEvent) => {
+    e.preventDefault();
+    const editor = editorRef.current;
+    if (!editor) return;
+    const html = e.clipboardData.getData("text/html");
+    const text = e.clipboardData.getData("text/plain");
+    const data = html || text;
+    if (!data) return;
+    const sel = window.getSelection();
+    if (sel && sel.rangeCount > 0) {
+      const range = sel.getRangeAt(0);
+      range.deleteContents();
+      if (html) {
+        const frag = document.createRange().createContextualFragment(html);
+        range.insertNode(frag);
+      } else {
+        const textNode = document.createTextNode(text);
+        range.insertNode(textNode);
+      }
+      range.collapse(false);
+      sel.removeAllRanges();
+      sel.addRange(range);
+    } else {
+      document.execCommand("insertHTML", false, html || text.replace(/\n/g, "<br>"));
+    }
+  }, []);
+
   const handleSubmit = useCallback(async () => {
     const title = titleRef.current?.value?.trim() ?? "";
     const rawNote = editorRef.current?.innerHTML?.trim() ?? "";
@@ -113,21 +149,21 @@ export function CreateNoteModal({
     }
     setSubmitting(true);
     try {
-      await Promise.resolve(onSubmit({ title, note }));
+      await Promise.resolve(onSubmit({ title, note, tier }));
       onOpenChange(false);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to save note.");
     } finally {
       setSubmitting(false);
     }
-  }, [onSubmit, onOpenChange]);
+  }, [onSubmit, onOpenChange, tier]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         showClose
         containToMain
-        className="!w-[min(92vw,56rem)] !max-w-[min(92vw,56rem)] !min-w-0 min-h-[min(80dvh,36rem)] max-h-[90dvh] flex flex-col items-stretch overflow-hidden bg-sidebar border border-sidebar-border rounded-xl p-0 box-border"
+        className="!w-[min(56rem,calc(100vw-280px))] !max-w-[min(56rem,calc(100vw-280px))] !min-w-0 min-h-[min(80dvh,36rem)] max-h-[90dvh] flex flex-col items-stretch overflow-hidden bg-sidebar border border-sidebar-border rounded-xl p-0 box-border"
       >
         <div className="w-full flex flex-col flex-1 min-h-0 min-w-0 overflow-hidden">
           <div className="scrollbar-modal flex flex-col min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden w-full max-w-full p-6 space-y-5">
@@ -153,6 +189,25 @@ export function CreateNoteModal({
               maxLength={500}
               className="w-full min-w-0 rounded-lg border border-sidebar-border bg-header-input px-3 py-2 text-sm text-dashboard-foreground placeholder:text-dashboard-foreground/50 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary break-words"
             />
+          </div>
+
+          <div className="min-w-0 w-full">
+            <label htmlFor="note-tier-input" className="block text-sm font-medium text-dashboard-foreground/80 mb-2 whitespace-nowrap">
+              Tier <span className="text-red-400">*</span>
+            </label>
+            <select
+              id="note-tier-input"
+              value={tier}
+              onChange={(e) => setTier(e.target.value as NoteTier)}
+              required
+              className="w-full min-w-0 rounded-lg border border-sidebar-border bg-header-input px-3 py-2 text-sm text-dashboard-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+            >
+              {TIER_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
           </div>
 
           <div className="min-w-0 w-full flex flex-col flex-1 min-h-0">
@@ -210,7 +265,8 @@ export function CreateNoteModal({
               data-placeholder="Write your note..."
               role="textbox"
               aria-multiline="true"
-              className="min-h-[200px] min-w-0 max-w-full flex-1 w-full overflow-x-hidden overflow-y-auto break-words rounded-lg border border-sidebar-border bg-header-input px-3 py-2.5 text-sm text-dashboard-foreground placeholder:text-dashboard-foreground/50 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary [&:empty::before]:content-[attr(data-placeholder)] [&:empty::before]:text-dashboard-foreground/50 [&_h1]:text-xl [&_h1]:font-bold [&_h2]:text-lg [&_h2]:font-semibold [&_h3]:text-base [&_h3]:font-medium [&_u]:underline [&_*]:break-words [&_*]:min-w-0 [&_*]:max-w-full"
+              onPaste={handlePaste}
+              className="min-h-[200px] min-w-0 max-w-full flex-1 w-full overflow-x-hidden overflow-y-auto break-words rounded-lg border border-sidebar-border bg-header-input px-3 py-2.5 text-sm text-dashboard-foreground placeholder:text-dashboard-foreground/50 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary [&:empty::before]:content-[attr(data-placeholder)] [&:empty::before]:text-dashboard-foreground/50 [&_h1]:text-xl [&_h1]:font-bold [&_h2]:text-lg [&_h2]:font-semibold [&_h3]:text-base [&_h3]:font-medium [&_u]:underline [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:list-decimal [&_ol]:pl-6 [&_li]:my-0.5 [&_*]:break-words [&_*]:min-w-0 [&_*]:max-w-full"
               style={{ wordBreak: 'break-word' } as React.CSSProperties}
               suppressContentEditableWarning
             />

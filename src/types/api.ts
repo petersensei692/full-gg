@@ -185,11 +185,14 @@ export interface UpdateAnalysisDto {
   imageNames?: string[] | null;
 }
 
+export type NoteTier = "tier_1" | "tier_2" | "tier_3";
+
 /** Single note returned by the API */
 export interface Note {
   id: string;
   title: string;
   note: string;
+  tier?: NoteTier;
   createdAt: string;
   updatedAt: string;
 }
@@ -198,10 +201,12 @@ export interface Note {
 export interface CreateNoteDto {
   title: string;
   note: string;
+  tier: NoteTier;
 }
 
 /** Body for updating a note */
 export interface UpdateNoteDto {
   title?: string;
   note?: string;
+  tier?: NoteTier;
 }

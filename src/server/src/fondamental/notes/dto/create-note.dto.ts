@@ -1,5 +1,8 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsNotEmpty, IsString, MaxLength } from 'class-validator';
+import { IsIn, IsNotEmpty, IsString, MaxLength } from 'class-validator';
+
+export const NOTE_TIERS = ['tier_1', 'tier_2', 'tier_3'] as const;
+export type NoteTier = (typeof NOTE_TIERS)[number];
 
 export class CreateNoteDto {
   @ApiProperty({
@@ -19,4 +22,14 @@ export class CreateNoteDto {
   @IsString()
   @IsNotEmpty()
   note: string;
+
+  @ApiProperty({
+    description: 'Note tier (tier_1, tier_2, tier_3)',
+    enum: NOTE_TIERS,
+    example: 'tier_2',
+  })
+  @IsString()
+  @IsNotEmpty()
+  @IsIn(NOTE_TIERS)
+  tier: string;
 }

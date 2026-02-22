@@ -17,6 +17,9 @@ export class Note {
   @Column({ type: 'text' })
   note: string;
 
+  @Column({ type: 'varchar', length: 10, default: 'tier_2' })
+  tier: string;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 

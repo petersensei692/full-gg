@@ -20,11 +20,13 @@ const DISPLAY_OPTIONS = [
 
 function formatDateRange(start: string, end: string): string {
   const s = new Date(start).toLocaleDateString("en-US", {
+    timeZone: "UTC",
     month: "short",
     day: "numeric",
     year: "numeric",
   });
   const e = new Date(end).toLocaleDateString("en-US", {
+    timeZone: "UTC",
     month: "short",
     day: "numeric",
     year: "numeric",
@@ -180,27 +182,29 @@ export function WatchListView() {
                         {formatDateRange(cal.startDate, cal.endDate)}
                       </h2>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => deleteWeeklyWatchlist(cal.id)}
-                      className="text-dashboard-foreground/50 hover:text-red-400 transition-colors"
-                      aria-label="Delete watchlist"
-                      title="Delete watchlist"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setEditingWatchlist(cal);
-                        setEditModalOpen(true);
-                      }}
-                      className="text-dashboard-foreground/50 hover:text-primary transition-colors"
-                      aria-label="Edit watchlist"
-                      title="Edit watchlist"
-                    >
-                      ✎
-                    </button>
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditingWatchlist(cal);
+                          setEditModalOpen(true);
+                        }}
+                        className="text-dashboard-foreground/50 hover:text-primary transition-colors p-1"
+                        aria-label="Edit watchlist"
+                        title="Edit watchlist"
+                      >
+                        ✎
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => deleteWeeklyWatchlist(cal.id)}
+                        className="text-dashboard-foreground/50 hover:text-red-400 transition-colors p-1"
+                        aria-label="Delete watchlist"
+                        title="Delete watchlist"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
                   </div>
                   <div className="p-5">
                     {pairs.length === 0 ? (
