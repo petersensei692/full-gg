@@ -5,9 +5,12 @@ import { assetsApi } from "@/lib/api";
 import { assetToConfig, ASSET_CONFIGS } from "@/types/asset";
 
 /** Required for "output: export" (static export) — pre-defines asset paths at build time */
-export function generateStaticParams() {
+export async function generateStaticParams() {
   return Object.keys(ASSET_CONFIGS).map((asset) => ({ asset }));
 }
+
+/** Only pre-generated params are valid; unknown params 404 */
+export const dynamicParams = false;
 
 interface AssetPageProps {
   params: Promise<{ asset: string }>;

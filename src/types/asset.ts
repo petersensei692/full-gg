@@ -135,6 +135,18 @@ export const ASSET_CONFIGS: Record<string, AssetConfig> = {
     indexLabel: "NZD INDEX",
     placeholder: "Post a new NZD analysis entry...",
   },
+  xau: {
+    slug: "xau",
+    label: "XAU",
+    indexLabel: "XAU INDEX",
+    placeholder: "Post a new XAU analysis entry...",
+  },
+  xag: {
+    slug: "xag",
+    label: "XAG",
+    indexLabel: "XAG INDEX",
+    placeholder: "Post a new XAG analysis entry...",
+  },
   commodities: {
     slug: "commodities",
     label: "Commodities",
