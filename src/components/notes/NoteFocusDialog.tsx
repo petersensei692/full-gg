@@ -19,14 +19,14 @@ export function NoteFocusDialog({
   onEdit,
   onDelete,
 }: NoteFocusDialogProps) {
-  if (!note) return null;
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         showClose
         className="bg-sidebar border border-sidebar-border rounded-xl max-w-2xl max-h-[85dvh] flex flex-col overflow-hidden p-0 min-w-0"
       >
+        {note && (
+        <>
         <div className="px-5 py-4 border-b border-sidebar-border flex items-center justify-between gap-3 shrink-0">
           <h3 className="text-lg font-semibold text-dashboard-foreground truncate pr-2">
             {note.title}
@@ -63,6 +63,8 @@ export function NoteFocusDialog({
             dangerouslySetInnerHTML={{ __html: note.note }}
           />
         </div>
+        </>
+        )}
       </DialogContent>
     </Dialog>
   );

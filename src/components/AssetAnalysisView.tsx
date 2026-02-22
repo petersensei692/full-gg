@@ -18,11 +18,11 @@ const ANALYSIS_TYPE_TO_TAG: Record<
   string,
   { tag: StreamEntry["tag"]; tagColor: StreamEntry["tagColor"] }
 > = {
-  daily: { tag: "INTRADAY UPDATE", tagColor: "orange" },
-  weekly: { tag: "WEEKLY OUTLOOK", tagColor: "green" },
-  monthly: { tag: "POLICY NOTE", tagColor: "blue" },
-  qoq: { tag: "MARKET PULSE", tagColor: "purple" },
-  yearly: { tag: "POLICY NOTE", tagColor: "blue" },
+  daily: { tag: "INTRADAY UPDATE", tagColor: "red" },
+  weekly: { tag: "WEEKLY OUTLOOK", tagColor: "blue" },
+  monthly: { tag: "MONTHLY OUTLOOK", tagColor: "yellow" },
+  qoq: { tag: "QoQ OUTLOOK", tagColor: "green" },
+  yearly: { tag: "YEARLY OUTLOOK", tagColor: "maroon" },
 };
 
 function formatTime(date: Date): string {
@@ -167,7 +167,7 @@ export function AssetAnalysisView({ asset }: AssetAnalysisViewProps) {
         const { cleanedNotes, analysisType } = extractAnalysisType(analysis.notes);
         const { tag, tagColor } =
           ANALYSIS_TYPE_TO_TAG[analysisType] ??
-          ({ tag: "MARKET PULSE" as const, tagColor: "blue" as const });
+          ({ tag: "INTRADAY UPDATE" as const, tagColor: "red" as const });
         const imageList = analysis.images ?? [];
         const names = analysis.imageNames ?? [];
         const imageNames = imageList.map((_, i) => names[i] ?? "");
@@ -221,8 +221,8 @@ export function AssetAnalysisView({ asset }: AssetAnalysisViewProps) {
         else if (isNewDay) separatorType = "new-day";
         else separatorType = "same-day";
       }
-      const weekGroup = isNewWeek && ts ? formatWeekGroup(ts) : undefined;
-      const dateGroup = isNewDay && ts ? formatDateGroup(ts) : undefined;
+      const weekGroup = (isNewWeek || index === 0) && ts ? formatWeekGroup(ts) : undefined;
+      const dateGroup = (isNewDay || index === 0) && ts ? formatDateGroup(ts) : undefined;
       return { entry, separatorType, weekGroup, dateGroup };
     });
   }, [filteredEntries]);

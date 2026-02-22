@@ -143,12 +143,14 @@ export function CreateEventModal({
     open,
     selectedCalendarId,
     selectedAssetCalendarId,
-    calendars,
-    assetCalendars,
+    calendars?.length,
+    calendars?.[0]?.id,
+    assetCalendars?.length,
+    assetCalendars?.[0]?.id,
     useAssetCalendarMode,
     defaultCurrency,
-    assets,
-    initialEvent,
+    assets?.length,
+    initialEvent?.id,
   ]);
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -185,7 +187,7 @@ export function CreateEventModal({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={onOpenChange} modal={false}>
       <DialogContent
         showClose={true}
         containToMain={true}

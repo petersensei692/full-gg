@@ -1,4 +1,20 @@
-export type StreamEntryTag = "WEEKLY OUTLOOK" | "INTRADAY UPDATE" | "POLICY NOTE" | "MARKET PULSE";
+export type StreamEntryTag =
+  | "INTRADAY UPDATE"
+  | "WEEKLY OUTLOOK"
+  | "MONTHLY OUTLOOK"
+  | "QoQ OUTLOOK"
+  | "YEARLY OUTLOOK"
+  | "POLICY NOTE"
+  | "MARKET PULSE";
+
+export type StreamEntryTagColor =
+  | "red"
+  | "blue"
+  | "yellow"
+  | "green"
+  | "maroon"
+  | "orange"
+  | "purple";
 
 export interface StreamEntry {
   id: string;
@@ -6,7 +22,7 @@ export interface StreamEntry {
   authorAvatar?: string;
   time: string;
   tag: StreamEntryTag;
-  tagColor: "green" | "orange" | "blue" | "purple";
+  tagColor: StreamEntryTagColor;
   content: string; // plain text or HTML from editor
   images?: string[]; // stored image paths
   /** Display names for each image (same order as images); optional. */

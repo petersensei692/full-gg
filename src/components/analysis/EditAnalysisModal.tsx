@@ -25,12 +25,21 @@ export function EditAnalysisModal({
   const [images, setImages] = useState<string[]>([]);
 
   useEffect(() => {
-    if (open) {
-      setImages(initialImages);
+    if (!open) return;
+    setImages(initialImages);
+    const applyInitial = () => {
       if (editorRef.current) {
         editorRef.current.innerHTML = initialNotes;
       }
-    }
+    };
+    applyInitial();
+    // Defer so DialogContent is mounted and refs are set (Radix renders in portal after open)
+    const t = setTimeout(applyInitial, 0);
+    const t2 = setTimeout(applyInitial, 50);
+    return () => {
+      clearTimeout(t);
+      clearTimeout(t2);
+    };
   }, [open, initialNotes, initialImages]);
 
   const { handlePaste } = useImagePaste({

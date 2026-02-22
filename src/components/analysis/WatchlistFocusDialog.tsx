@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { Dialog, DialogContent } from "@/components/ui/Dialog";
 import type { WatchItem } from "@/types/api";
 import { useWatchlistCalendar } from "@/context/WatchlistCalendarContext";
@@ -32,27 +32,37 @@ export function WatchlistFocusDialog({
   const [draftNames, setDraftNames] = useState<Record<string, string>>({});
   const [saveError, setSaveError] = useState<string | null>(null);
   const { deleteWatchItem, updateWatchItem } = useWatchlistCalendar();
+  const [entryToShow, setEntryToShow] = useState<WatchItem | null>(null);
 
-  if (!entry) return null;
+  useEffect(() => {
+    if (entry && open) {
+      setEntryToShow(entry);
+    } else if (!open && entryToShow) {
+      const t = setTimeout(() => setEntryToShow(null), 400);
+      return () => clearTimeout(t);
+    }
+  }, [entry, open, entryToShow?.id]);
 
-  const bias = (entry.bias as "bullish" | "bearish") ?? "bullish";
-  const images = entry.thesis?.images ?? [];
-  const savedNames = entry.thesis?.imageNames ?? [];
+  const displayEntry = open ? (entry ?? entryToShow) : entryToShow ?? entry;
+
+  // Always render Dialog so Radix can manage focus/portal; only show content when we have displayEntry
+  const showContent = !!displayEntry;
 
   const handleUpdateImageName = useCallback(
     async (path: string, name: string) => {
+      if (!displayEntry) return;
       setSaveError(null);
-      const imageList = entry.thesis?.images ?? [];
+      const imageList = displayEntry.thesis?.images ?? [];
       const index = imageList.indexOf(path);
       if (index < 0) return;
-      const currentNames = entry.thesis?.imageNames ?? [];
+      const currentNames = displayEntry.thesis?.imageNames ?? [];
       const nextImageNames = imageList.map((_, i) =>
         i === index ? name : (currentNames[i] ?? "")
       );
       try {
-        await updateWatchItem(entry.id, {
+        await updateWatchItem(displayEntry.id, {
           thesis: {
-            notes: entry.thesis?.notes ?? "",
+            notes: displayEntry.thesis?.notes ?? "",
             images: imageList,
             imageNames: nextImageNames,
           },
@@ -68,21 +78,27 @@ export function WatchlistFocusDialog({
         setSaveError(msg);
       }
     },
-    [entry, updateWatchItem]
+    [displayEntry, updateWatchItem]
   );
 
+  const bias = displayEntry
+    ? ((displayEntry.bias as "bullish" | "bearish") ?? "bullish")
+    : "bullish";
+  const images = displayEntry?.thesis?.images ?? [];
+  const savedNames = displayEntry?.thesis?.imageNames ?? [];
+
   const handleDeleteImage = async (path: string) => {
-    if (!entry.thesis) return;
-    const imageList = entry.thesis.images ?? [];
+    if (!displayEntry?.thesis) return;
+    const imageList = displayEntry.thesis.images ?? [];
     const index = imageList.indexOf(path);
     const nextImages = imageList.filter((p) => p !== path);
-    const currentNames = entry.thesis.imageNames ?? [];
+    const currentNames = displayEntry.thesis.imageNames ?? [];
     const nextImageNames = nextImages.map(
       (_, i) => currentNames[i + (i >= index ? 1 : 0)] ?? ""
     );
-    await updateWatchItem(entry.id, {
+    await updateWatchItem(displayEntry.id, {
       thesis: {
-        notes: entry.thesis.notes,
+        notes: displayEntry.thesis.notes,
         images: nextImages,
         imageNames: nextImageNames.length > 0 ? nextImageNames : undefined,
       },
@@ -91,9 +107,10 @@ export function WatchlistFocusDialog({
   };
 
   const handleDelete = () => {
-    deleteWatchItem(entry.id);
+    if (!displayEntry) return;
+    deleteWatchItem(displayEntry.id);
     onOpenChange(false);
-    onDelete?.(entry);
+    onDelete?.(displayEntry);
   };
 
   return (
@@ -103,10 +120,12 @@ export function WatchlistFocusDialog({
           showClose
           className={`bg-sidebar border border-sidebar-border rounded-xl w-[90vw] max-w-[90vw] max-h-[85dvh] flex flex-col overflow-hidden p-0 min-w-0 ${BORDER_CLASS[bias]}`}
         >
+          {showContent && displayEntry && (
+          <>
           <div className="px-5 py-4 border-b border-sidebar-border flex items-center justify-between gap-3 shrink-0">
             <div className="flex items-center gap-2 min-w-0">
               <h3 className="text-lg font-semibold text-dashboard-foreground truncate pr-2">
-                {entry.pairName}
+                {displayEntry.pairName}
               </h3>
               <span
                 className={`shrink-0 text-xs font-medium px-2 py-0.5 rounded ${
@@ -122,7 +141,7 @@ export function WatchlistFocusDialog({
               {onEdit && (
                 <button
                   type="button"
-                  onClick={() => onEdit(entry)}
+                  onClick={() => onEdit(displayEntry)}
                   className="rounded p-2 text-dashboard-foreground/60 hover:bg-sidebar-hover hover:text-primary transition-colors"
                   aria-label="Edit watch item"
                   title="Edit watch item"
@@ -142,11 +161,11 @@ export function WatchlistFocusDialog({
             </div>
           </div>
           <div className="flex-1 min-h-0 w-full min-w-full overflow-x-hidden overflow-y-auto p-5 space-y-4">
-            {entry.thesis?.notes && (
+            {displayEntry.thesis?.notes && (
               <div
                 className="w-full min-w-full break-words break-all text-sm text-dashboard-foreground/90 leading-relaxed prose prose-invert prose-sm [&_h1]:text-xl [&_h1]:font-bold [&_h2]:text-lg [&_h2]:font-semibold [&_h3]:text-base [&_h3]:font-medium [&_*]:break-words [&_*]:min-w-0 [&_*]:max-w-full [&_img]:max-w-full [&_img]:max-h-[280px] [&_img]:rounded-lg [&_img]:cursor-pointer [&_img]:my-2"
                 style={{ wordBreak: "break-word" } as React.CSSProperties}
-                dangerouslySetInnerHTML={{ __html: entry.thesis.notes }}
+                dangerouslySetInnerHTML={{ __html: displayEntry.thesis.notes }}
                 onClick={(e) => {
                   const target = e.target as HTMLElement;
                   if (
@@ -225,13 +244,15 @@ export function WatchlistFocusDialog({
             {saveError && (
               <p className="text-sm text-red-400">{saveError}</p>
             )}
-            {(!entry.thesis?.notes || entry.thesis.notes.trim() === "") &&
+            {(!displayEntry.thesis?.notes || displayEntry.thesis.notes.trim() === "") &&
               images.length === 0 && (
                 <p className="text-sm text-dashboard-foreground/50 italic">
                   No thesis or images.
                 </p>
               )}
           </div>
+          </>
+          )}
         </DialogContent>
       </Dialog>
 

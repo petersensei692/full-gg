@@ -13,8 +13,8 @@ interface WatchlistEntryCardProps {
 }
 
 const BORDER_CLASS = {
-  bullish: "border-emerald-500",
-  bearish: "border-red-500",
+  bullish: "border-l-4 border-l-emerald-500 border border-sidebar-border",
+  bearish: "border-l-4 border-l-red-500 border border-sidebar-border",
 } as const;
 
 export function WatchlistEntryCard({ entry, onEdit }: WatchlistEntryCardProps) {
@@ -36,7 +36,7 @@ export function WatchlistEntryCard({ entry, onEdit }: WatchlistEntryCardProps) {
             setFocusOpen(true);
           }
         }}
-        className={`rounded-xl border-2 ${BORDER_CLASS[bias]} bg-sidebar/50 overflow-hidden shadow-sm cursor-pointer hover:opacity-90 transition-opacity flex flex-col min-h-[200px]`}
+        className={`rounded-xl ${BORDER_CLASS[bias]} bg-sidebar/50 overflow-hidden shadow-sm cursor-pointer hover:opacity-90 transition-opacity flex flex-col min-h-[200px]`}
       >
         <div className="px-4 py-3 border-b border-sidebar-border flex items-center justify-between gap-2 shrink-0">
           <h4 className="text-base font-semibold text-dashboard-foreground truncate">

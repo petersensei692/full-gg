@@ -208,7 +208,7 @@ export function WatchListView() {
                         No pairs in this watchlist yet.
                       </p>
                     ) : (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                      <div className="grid grid-cols-2 gap-4">
                         {pairs.map((entry) => (
                           <WatchlistEntryCard
                             key={entry.id}
@@ -253,45 +253,53 @@ export function WatchListView() {
         setEditingWatchlist(null);
       }}
     />
-    {editingItem && (
-      <CreatePairModal
-        open={editItemOpen}
-        onOpenChange={setEditItemOpen}
-        calendars={weeklyWatchlists}
-        selectedCalendarId={
-          editingItem.watchlist?.id ??
-          editingItem.baseAssetWatchlist?.weeklyWatchlist?.id ??
-          editingItem.quoteAssetWatchlist?.weeklyWatchlist?.id ??
-          null
-        }
-        currentAssetSlug={
-          assets.find((a) => a.label === editingItem.baseAsset.name)?.slug ??
-          editingItem.baseAsset.name.toLowerCase()
-        }
-        currentAssetLabel={
-          assets.find((a) => a.label === editingItem.baseAsset.name)?.label ??
-          editingItem.baseAsset.name
-        }
-        mode="edit"
-        initialItem={editingItem}
-        onSubmit={async (dto) => {
-          await updateWatchItem(editingItem.id, {
-            pairName: dto.pairName,
-            bias: dto.bias,
-            thesis: dto.thesis
-              ? {
-                  notes: dto.thesis.notes,
-                  images: dto.thesis.images,
-                  imageNames:
-                    dto.thesis.imageNames ?? editingItem.thesis?.imageNames,
-                }
-              : undefined,
-          });
+    <CreatePairModal
+      open={editItemOpen}
+      onOpenChange={(open) => {
+        if (!open) {
           setEditItemOpen(false);
           setEditingItem(null);
-        }}
-      />
-    )}
+        }
+      }}
+      calendars={weeklyWatchlists}
+      selectedCalendarId={
+        editingItem?.watchlist?.id ??
+        editingItem?.baseAssetWatchlist?.weeklyWatchlist?.id ??
+        editingItem?.quoteAssetWatchlist?.weeklyWatchlist?.id ??
+        null
+      }
+      currentAssetSlug={
+        editingItem
+          ? (assets.find((a) => a.label === editingItem.baseAsset.name)?.slug ??
+            editingItem.baseAsset.name.toLowerCase())
+          : "usd"
+      }
+      currentAssetLabel={
+        editingItem
+          ? (assets.find((a) => a.label === editingItem.baseAsset.name)?.label ??
+            editingItem.baseAsset.name)
+          : "USD"
+      }
+      mode="edit"
+      initialItem={editingItem ?? undefined}
+      onSubmit={async (dto) => {
+        if (!editingItem) return;
+        await updateWatchItem(editingItem.id, {
+          pairName: dto.pairName,
+          bias: dto.bias,
+          thesis: dto.thesis
+            ? {
+                notes: dto.thesis.notes,
+                images: dto.thesis.images,
+                imageNames:
+                  dto.thesis.imageNames ?? editingItem.thesis?.imageNames,
+              }
+            : undefined,
+        });
+        setEditItemOpen(false);
+        setEditingItem(null);
+      }}
+    />
     </>
   );
 }

@@ -4,6 +4,26 @@ import { Trash2, X } from "lucide-react";
 import { AnalysisImage } from "@/components/ui/AnalysisImage";
 import { getImageUrl } from "@/lib/imageUrls";
 
+const TAG_COLOR_BORDER: Record<NonNullable<StreamEntryType["tagColor"]>, string> = {
+  red: "border-l-red-500",
+  blue: "border-l-blue-500",
+  yellow: "border-l-amber-400",
+  green: "border-l-emerald-500",
+  maroon: "border-l-rose-800",
+  orange: "border-l-orange-500",
+  purple: "border-l-purple-500",
+};
+
+const TAG_COLOR_TEXT: Record<NonNullable<StreamEntryType["tagColor"]>, string> = {
+  red: "text-red-500",
+  blue: "text-blue-500",
+  yellow: "text-amber-400",
+  green: "text-emerald-500",
+  maroon: "text-rose-800",
+  orange: "text-orange-500",
+  purple: "text-purple-500",
+};
+
 interface StreamEntryProps {
   entry: StreamEntryType;
   separatorType: "same-day" | "new-day" | "new-week" | "first";
@@ -27,22 +47,36 @@ export function StreamEntry({
 }: StreamEntryProps) {
   const [draftNames, setDraftNames] = useState<Record<string, string>>({});
 
+  const tagColor = entry.tagColor ?? "blue";
+  const borderClass = TAG_COLOR_BORDER[tagColor] ?? TAG_COLOR_BORDER.blue;
+  const textColorClass = TAG_COLOR_TEXT[tagColor] ?? TAG_COLOR_TEXT.blue;
+
   const separatorTop =
-    separatorType === "first" ? null : separatorType === "new-week" ? (
-      <div className="pt-6 mt-6 border-t-2 border-primary/30">
-        {weekGroup && (
-          <p className="text-xs font-semibold text-primary/90 uppercase tracking-wider mb-4">
-            {weekGroup}
-          </p>
-        )}
+    separatorType === "first" ? (
+      dateGroup ? (
+        <div className="flex items-center gap-3 pb-4">
+          <div className="flex-1 h-px bg-sidebar-border" />
+          <span className="text-xs font-medium text-dashboard-foreground/70 px-3 py-1 rounded-full bg-sidebar/60 border border-sidebar-border">
+            {dateGroup}
+          </span>
+          <div className="flex-1 h-px bg-sidebar-border" />
+        </div>
+      ) : null
+    ) : separatorType === "new-week" ? (
+      <div className="flex items-center gap-3 py-6">
+        <div className="flex-1 h-px bg-sidebar-border" />
+        <span className="text-xs font-semibold text-dashboard-foreground/70 px-3 py-1 rounded-full bg-sidebar/80 border border-sidebar-border">
+          {weekGroup}
+        </span>
+        <div className="flex-1 h-px bg-sidebar-border" />
       </div>
     ) : separatorType === "new-day" ? (
-      <div className="pt-4 mt-4 border-t border-sidebar-border">
-        {dateGroup && (
-          <p className="text-xs font-medium text-dashboard-foreground/60 uppercase tracking-wider mb-4">
-            {dateGroup}
-          </p>
-        )}
+      <div className="flex items-center gap-3 py-4">
+        <div className="flex-1 h-px bg-sidebar-border" />
+        <span className="text-xs font-medium text-dashboard-foreground/70 px-3 py-1 rounded-full bg-sidebar/60 border border-sidebar-border">
+          {dateGroup}
+        </span>
+        <div className="flex-1 h-px bg-sidebar-border" />
       </div>
     ) : (
       <div className="pt-3 mt-3 border-t border-sidebar-border/50" />
@@ -51,10 +85,12 @@ export function StreamEntry({
   return (
     <article className="pb-6 last:pb-0">
       {separatorTop}
-      <div className="min-w-0">
+      <div
+        className={`min-w-0 rounded-xl border border-sidebar-border border-l-4 ${borderClass} bg-sidebar/50 p-4 shadow-sm`}
+      >
         <div className="flex items-center justify-between gap-2 mb-2">
-          <div className="text-xs font-semibold uppercase tracking-wider text-dashboard-foreground/60">
-            {entry.tag}
+          <div className={`text-xs font-semibold uppercase tracking-wider ${textColorClass}`}>
+            {entry.tag} • {entry.time}
           </div>
           <div className="flex items-center gap-2">
             {onEdit && (
@@ -86,13 +122,17 @@ export function StreamEntry({
           dangerouslySetInnerHTML={{ __html: entry.content }}
         />
         {entry.images && entry.images.length > 0 && (
-          <div className="grid grid-cols-3 gap-3 mb-3">
+          <div className="grid grid-cols-2 gap-4 mb-3">
             {entry.images.map((path, index) => {
               const url = getImageUrl(path);
               const savedName = entry.imageNames?.[index] ?? "";
               const displayName = path in draftNames ? draftNames[path] : savedName;
+              const fallbackLabel = `Chart ${index + 1}`;
               return (
-                <div key={path} className="relative min-w-0 flex flex-col gap-1.5">
+                <div
+                  key={path}
+                  className="relative min-w-0 flex flex-col gap-0 rounded-lg border border-sidebar-border bg-sidebar/50 overflow-hidden"
+                >
                   <textarea
                     value={displayName}
                     onChange={(e) => setDraftNames((prev) => ({ ...prev, [path]: e.target.value }))}
@@ -105,26 +145,26 @@ export function StreamEntry({
                         return next;
                       });
                     }}
-                    placeholder="Name for this image"
-                    rows={2}
-                    className="resize-none rounded-lg border border-sidebar-border bg-sidebar px-2 py-1.5 text-xs text-dashboard-foreground placeholder:text-dashboard-foreground/50 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary w-full min-w-0 break-words overflow-auto"
+                    placeholder={fallbackLabel}
+                    rows={1}
+                    className="resize-none px-3 py-2 border-b border-sidebar-border bg-sidebar/80 text-xs font-semibold uppercase tracking-wider text-dashboard-foreground placeholder:text-dashboard-foreground/50 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary w-full min-w-0 break-words overflow-auto rounded-none"
                   />
-                  <div className="relative w-full aspect-[4/3] max-h-[220px] bg-sidebar/50 rounded-lg overflow-hidden">
+                  <div className="relative w-full min-h-[120px]">
                     <AnalysisImage
                       src={url}
-                      alt={displayName || "Analysis attachment"}
+                      alt={displayName || fallbackLabel}
                       unoptimized
-                      className="w-full h-full object-contain"
+                      className="w-full max-h-[280px] object-contain"
                     />
                     {onDeleteImage && (
                       <button
                         type="button"
                         onClick={() => onDeleteImage(path)}
-                        className="absolute top-0.5 right-0.5 rounded-full bg-red-500 text-white w-5 h-5 flex items-center justify-center shadow"
+                        className="absolute top-2 right-2 rounded-full bg-red-500 text-white w-7 h-7 flex items-center justify-center shadow hover:bg-red-600 transition-colors"
                         aria-label="Delete image"
                         title="Delete image"
                       >
-                        <X className="h-3 w-3" />
+                        <X className="h-4 w-4" />
                       </button>
                     )}
                   </div>

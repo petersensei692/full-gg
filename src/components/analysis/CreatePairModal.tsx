@@ -76,7 +76,11 @@ export function CreatePairModal({
   }, [open, useAssetWatchlistMode, selectedAssetWatchlist?.id]);
 
   useEffect(() => {
-    if (open) {
+    if (!open) {
+      setError("");
+      return;
+    }
+    const applyInitial = () => {
       if (mode === "edit" && initialItem) {
         const baseSlug =
           assetOptions.find((a) => a.label === initialItem.baseAsset.name)?.slug ??
@@ -91,16 +95,16 @@ export function CreatePairModal({
         setCalendarId(wlId ?? "");
         setBaseAsset(baseSlug);
         setQuoteAsset(quoteSlug);
-        setThesisHtml(initialItem.thesis?.notes ?? "");
+        const notes = initialItem.thesis?.notes ?? "";
+        const images = (initialItem.thesis?.images ?? []).map((path) => ({
+          path,
+          url: getImageUrl(path),
+        }));
+        setThesisHtml(notes);
         setBias((initialItem.bias as WatchlistBias) ?? "bullish");
-        setThesisImages(
-          (initialItem.thesis?.images ?? []).map((path) => ({
-            path,
-            url: getImageUrl(path),
-          }))
-        );
+        setThesisImages(images);
         if (thesisRef.current) {
-          thesisRef.current.innerHTML = initialItem.thesis?.notes ?? "";
+          thesisRef.current.innerHTML = notes;
         }
       } else {
         setCalendarId(
@@ -118,17 +122,29 @@ export function CreatePairModal({
         }
       }
       setError("");
-    }
+    };
+    applyInitial();
+    // Defer so DialogContent is mounted and refs are set (Radix renders in portal after open)
+    const t = setTimeout(applyInitial, 0);
+    const t2 = setTimeout(applyInitial, 50);
+    return () => {
+      clearTimeout(t);
+      clearTimeout(t2);
+    };
   }, [
     open,
     selectedCalendarId,
-    calendars,
+    calendars?.length,
+    calendars?.[0]?.id,
     useAssetWatchlistMode,
     selectedAssetWatchlist?.id,
     currentAssetSlug,
     assetOptions,
     mode,
-    initialItem,
+    initialItem?.id,
+    initialItem?.thesis?.notes,
+    initialItem?.thesis?.images?.length,
+    initialItem?.thesis?.images?.[0],
   ]);
 
   const { handlePaste: handleThesisPaste } = useImagePaste({
@@ -168,10 +184,22 @@ export function CreatePairModal({
       setError("Base and Quote must be different.");
       return;
     }
-    const baseAssetId = assetOptions.find((a) => a.slug === baseAsset)?.id;
-    const quoteAssetId = assetOptions.find((a) => a.slug === quoteAsset)?.id;
+    let baseAssetId = assetOptions.find((a) => a.slug === baseAsset)?.id;
+    let quoteAssetId = assetOptions.find((a) => a.slug === quoteAsset)?.id;
+    if (useAssetWatchlistMode && allAssetWatchlistsForWeek.length > 0) {
+      const baseSlug = baseAsset.toLowerCase().replace(/\s/g, "-");
+      const quoteSlug = quoteAsset.toLowerCase().replace(/\s/g, "-");
+      baseAssetId ??= allAssetWatchlistsForWeek.find(
+        (aw) => aw.asset.name.toLowerCase().replace(/\s/g, "-") === baseSlug
+      )?.asset.id;
+      quoteAssetId ??= allAssetWatchlistsForWeek.find(
+        (aw) => aw.asset.name.toLowerCase().replace(/\s/g, "-") === quoteSlug
+      )?.asset.id;
+    }
     if (!baseAssetId || !quoteAssetId) {
-      setError("Select valid base and quote assets.");
+      setError(
+        "Could not resolve asset IDs. Ensure the server is running and assets are loaded, then try again."
+      );
       return;
     }
     const thesisNotes = thesisRef.current?.innerHTML ?? "";
@@ -188,15 +216,20 @@ export function CreatePairModal({
         setError("Could not find asset watchlists for the selected pair.");
         return;
       }
+      const origImages = initialItem?.thesis?.images ?? [];
+      const origNames = initialItem?.thesis?.imageNames ?? [];
+      const imageNames =
+        mode === "edit" && origNames.length > 0
+          ? thesisImages.map(
+              (img) => origNames[origImages.indexOf(img.path)] ?? ""
+            )
+          : undefined;
       const thesisPayload =
         thesisNotes || thesisImages.length
           ? {
               notes: thesisNotes,
               images: thesisImages.map((img) => img.path),
-              imageNames:
-                mode === "edit" && initialItem?.thesis?.imageNames
-                  ? initialItem.thesis.imageNames
-                  : undefined,
+              imageNames,
             }
           : undefined;
       dto = {
@@ -209,15 +242,20 @@ export function CreatePairModal({
         thesis: thesisPayload,
       };
     } else if (calendarId) {
+      const origImages = initialItem?.thesis?.images ?? [];
+      const origNames = initialItem?.thesis?.imageNames ?? [];
+      const imageNames =
+        mode === "edit" && origNames.length > 0
+          ? thesisImages.map(
+              (img) => origNames[origImages.indexOf(img.path)] ?? ""
+            )
+          : undefined;
       const thesisPayload =
         thesisNotes || thesisImages.length
           ? {
               notes: thesisNotes,
               images: thesisImages.map((img) => img.path),
-              imageNames:
-                mode === "edit" && initialItem?.thesis?.imageNames
-                  ? initialItem.thesis.imageNames
-                  : undefined,
+              imageNames,
             }
           : undefined;
       dto = {
