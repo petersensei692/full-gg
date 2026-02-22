@@ -2,7 +2,9 @@ const { app, BrowserWindow, ipcMain, dialog } = require("electron");
 const path = require("path");
 const { fork } = require("child_process");
 const fs = require("fs");
-const isDev = require("electron-is-dev");
+
+/** Dev mode when running unpackaged (e.g. npm run electron) */
+const isDev = !app.isPackaged;
 
 let serverProcess = null;
 
@@ -75,13 +77,10 @@ function startServer() {
     return Promise.resolve();
   }
 
-  const nodeModulesPath = path.join(
-    process.resourcesPath,
-    "app.asar.unpacked",
-    "node_modules"
-  );
+  const nodeModulesPath = path.join(process.resourcesPath, "server", "node_modules");
 
   return new Promise((resolve, reject) => {
+    const stderrChunks = [];
     serverProcess = fork(serverPath, [], {
       env: {
         ...process.env,
@@ -90,12 +89,16 @@ function startServer() {
         PORT: "5000",
         NODE_ENV: "production",
       },
-      stdio: ["ignore", "pipe", "pipe"],
+      stdio: ["ignore", "pipe", "pipe", "ipc"],
       execArgv: [],
     });
 
     serverProcess.stdout?.on("data", (d) => console.log("[Server]", d.toString().trim()));
-    serverProcess.stderr?.on("data", (d) => console.error("[Server]", d.toString().trim()));
+    serverProcess.stderr?.on("data", (d) => {
+      const s = d.toString();
+      stderrChunks.push(s);
+      console.error("[Server]", s.trim());
+    });
     serverProcess.on("error", (err) => {
       console.error("Server spawn error:", err);
       reject(err);
@@ -109,7 +112,11 @@ function startServer() {
 
     waitForServer("http://127.0.0.1:5000/")
       .then(resolve)
-      .catch(reject);
+      .catch(() => {
+        const detail = stderrChunks.length ? stderrChunks.join("").trim().slice(-800) : "";
+        const err = new Error("Server failed to start" + (detail ? `: ${detail}` : ""));
+        reject(err);
+      });
   });
 }
 
@@ -137,6 +144,7 @@ function createWindow(serverError = null) {
   if (isDev) {
     mainWindow.loadURL("http://localhost:3000");
   } else if (serverError) {
+    const escape = (s) => String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/\n/g, "<br>");
     const errorHtml = `
 <!DOCTYPE html>
 <html>
@@ -144,7 +152,7 @@ function createWindow(serverError = null) {
 <body style="font-family:system-ui,sans-serif;margin:2rem;max-width:560px;line-height:1.6;color:#333;">
   <h1 style="color:#c00;">Backend failed to start</h1>
   <p>The API server could not be started. The app cannot load data without it.</p>
-  <p><strong>Error:</strong> ${String(serverError.message || serverError).replace(/</g, "&lt;")}</p>
+  <p><strong>Error:</strong> ${escape(serverError.message || serverError)}</p>
   <p>Try closing and reopening the app. If the problem continues, check the logs or reinstall.</p>
 </body>
 </html>`;
