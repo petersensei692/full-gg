@@ -44,6 +44,23 @@ function getWeekdayName(date: string): string {
   });
 }
 
+/** Resolve weekday (e.g. "Tuesday") to the first matching date in range (same logic as principal calendar). */
+function getDateForWeekdayInRange(
+  startDate: string,
+  endDate: string,
+  weekday: string
+): string | null {
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+  for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+    const label = d.toLocaleDateString("en-US", { weekday: "long" });
+    if (label.toLowerCase() === weekday.toLowerCase()) {
+      return d.toISOString().slice(0, 10);
+    }
+  }
+  return null;
+}
+
 export function EconomicEventsView({ asset }: EconomicEventsViewProps) {
   const { events, createEvent, updateEvent, deleteEvent, refetchAll } =
     useWatchlistCalendar();
@@ -56,6 +73,15 @@ export function EconomicEventsView({ asset }: EconomicEventsViewProps) {
   const [editingEvent, setEditingEvent] = useState<Event | null>(null);
   const [calendarDropdownOpen, setCalendarDropdownOpen] = useState(false);
   const [loadingCalendars, setLoadingCalendars] = useState(false);
+
+  const sortedAssetCalendars = useMemo(
+    () =>
+      [...assetCalendars].sort(
+        (a, b) =>
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      ),
+    [assetCalendars]
+  );
 
   const selectedAssetCalendar = assetCalendars.find(
     (ac) => ac.id === selectedAssetCalendarId
@@ -72,9 +98,13 @@ export function EconomicEventsView({ asset }: EconomicEventsViewProps) {
       .getByAsset(asset.id)
       .then((list) => {
         setAssetCalendars(list);
+        const sorted = [...list].sort(
+          (a, b) =>
+            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        );
         setSelectedAssetCalendarId((prev) => {
           if (prev && list.some((ac) => ac.id === prev)) return prev;
-          return list[0]?.id ?? null;
+          return sorted[0]?.id ?? null;
         });
       })
       .catch(() => setAssetCalendars([]))
@@ -95,13 +125,14 @@ export function EconomicEventsView({ asset }: EconomicEventsViewProps) {
   const eventsByDate = useMemo(() => {
     const map: Record<string, Event[]> = {};
     if (!selectedAssetCalendar) return map;
-    const dayToDate = Object.fromEntries(
-      daysInWeek.map((d) => [getWeekdayName(d.date), d.date])
-    );
     events
       .filter((e) => e.assetCalendar?.id === selectedAssetCalendar.id)
       .forEach((e) => {
-        const date = dayToDate[e.day];
+        const date = getDateForWeekdayInRange(
+          selectedAssetCalendar.startDate,
+          selectedAssetCalendar.endDate,
+          e.day
+        );
         if (!date) return;
         if (!map[date]) map[date] = [];
         map[date].push(e);
@@ -110,7 +141,7 @@ export function EconomicEventsView({ asset }: EconomicEventsViewProps) {
       map[d].sort((a, b) => (a.time || "").localeCompare(b.time || ""))
     );
     return map;
-  }, [events, selectedAssetCalendar, daysInWeek]);
+  }, [events, selectedAssetCalendar]);
 
   const handleEventSubmit = async (dto: {
     assetCalendarId?: string;
@@ -167,13 +198,13 @@ export function EconomicEventsView({ asset }: EconomicEventsViewProps) {
                 aria-hidden
                 onClick={() => setCalendarDropdownOpen(false)}
               />
-              <div className="absolute left-0 top-full mt-1 z-50 min-w-[220px] rounded-lg border border-sidebar-border bg-sidebar py-1 shadow-lg">
+              <div className="absolute left-0 top-full mt-1 z-50 min-w-[220px] max-h-[220px] overflow-y-auto rounded-lg border border-sidebar-border bg-sidebar py-1 shadow-lg">
                 {assetCalendars.length === 0 ? (
                   <p className="px-3 py-2 text-sm text-dashboard-foreground/70">
                     No calendars yet. Create one from the Calendar page.
                   </p>
                 ) : (
-                  assetCalendars.map((ac) => (
+                  sortedAssetCalendars.map((ac) => (
                     <div key={ac.id} className="flex items-center gap-2 px-3 py-2">
                       <button
                         type="button"

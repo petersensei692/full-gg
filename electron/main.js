@@ -1,12 +1,23 @@
-const { app, BrowserWindow, ipcMain, dialog } = require("electron");
+const { app, BrowserWindow, ipcMain, dialog, protocol, net } = require("electron");
 const path = require("path");
+const { pathToFileURL } = require("url");
 const { fork } = require("child_process");
 const fs = require("fs");
+
+protocol.registerSchemesAsPrivileged([
+  { scheme: "app", privileges: { standard: true, secure: true, supportFetchAPI: true } },
+]);
 
 /** Dev mode when running unpackaged (e.g. npm run electron) */
 const isDev = !app.isPackaged;
 
 let serverProcess = null;
+
+function getOutDir() {
+  return app.isPackaged
+    ? path.join(process.resourcesPath, "out")
+    : path.join(__dirname, "..", "out");
+}
 
 ipcMain.handle("settings:choose-directory", async () => {
   const result = await dialog.showOpenDialog({
@@ -158,8 +169,7 @@ function createWindow(serverError = null) {
 </html>`;
     mainWindow.loadURL("data:text/html;charset=utf-8," + encodeURIComponent(errorHtml));
   } else {
-    const basePath = app.isPackaged ? process.resourcesPath : path.join(__dirname, "..");
-    mainWindow.loadFile(path.join(basePath, "out", "index.html"));
+    mainWindow.loadURL("app://localhost/");
   }
 
   mainWindow.on("closed", () => {
@@ -168,6 +178,37 @@ function createWindow(serverError = null) {
 }
 
 app.whenReady().then(() => {
+  if (!isDev) {
+    const outDir = getOutDir();
+    protocol.handle("app", (request) => {
+      const url = new URL(request.url);
+      let filePath = url.pathname.replace(/^\/+/, "");
+      try {
+        filePath = decodeURIComponent(filePath.replace(/%20/g, " "));
+      } catch {
+        filePath = filePath.replace(/%20/g, " ");
+      }
+      if (!filePath) filePath = "index.html";
+      const fullPath = path.resolve(outDir, filePath);
+      const outDirResolved = path.resolve(outDir);
+      if (!fullPath.startsWith(outDirResolved + path.sep) && fullPath !== outDirResolved) {
+        return net.fetch(pathToFileURL(path.join(outDir, "index.html")).href);
+      }
+      if (fs.existsSync(fullPath)) {
+        const stat = fs.statSync(fullPath);
+        if (stat.isFile()) {
+          return net.fetch(pathToFileURL(fullPath).href);
+        }
+        if (stat.isDirectory()) {
+          fullPath = path.join(fullPath, "index.html");
+          if (fs.existsSync(fullPath)) {
+            return net.fetch(pathToFileURL(fullPath).href);
+          }
+        }
+      }
+      return net.fetch(pathToFileURL(path.join(outDir, "index.html")).href);
+    });
+  }
   startServer()
     .then(() => createWindow(null))
     .catch((err) => {

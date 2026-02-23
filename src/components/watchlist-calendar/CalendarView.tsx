@@ -51,6 +51,25 @@ function getDateForDay(calendar: WeeklyCalendar, day: string): string | null {
   return null;
 }
 
+function getDaysInRange(start: string, end: string): { date: string; label: string }[] {
+  const days: { date: string; label: string }[] = [];
+  const d = new Date(start);
+  const endD = new Date(end);
+  while (d <= endD) {
+    const iso = d.toISOString().slice(0, 10);
+    days.push({
+      date: iso,
+      label: new Date(iso + "T12:00:00").toLocaleDateString("en-US", {
+        weekday: "long",
+        month: "short",
+        day: "numeric",
+      }),
+    });
+    d.setDate(d.getDate() + 1);
+  }
+  return days;
+}
+
 export function CalendarView() {
   const {
     weeklyCalendars,
@@ -179,13 +198,18 @@ export function CalendarView() {
             </div>
           ) : (
             displayedCalendars.map((cal: WeeklyCalendar) => {
-              const events = [...(eventsByCalendarId[cal.id] ?? [])].sort((a, b) => {
-                const aDate = getDateForDay(cal, a.day) ?? "";
-                const bDate = getDateForDay(cal, b.day) ?? "";
-                const dateCompare = aDate.localeCompare(bDate);
-                if (dateCompare !== 0) return dateCompare;
-                return (a.time || "00:00").localeCompare(b.time || "00:00");
+              const calEvents = eventsByCalendarId[cal.id] ?? [];
+              const eventsByDate: Record<string, Event[]> = {};
+              calEvents.forEach((ev) => {
+                const date = getDateForDay(cal, ev.day);
+                if (!date) return;
+                if (!eventsByDate[date]) eventsByDate[date] = [];
+                eventsByDate[date].push(ev);
               });
+              Object.keys(eventsByDate).forEach((d) =>
+                eventsByDate[d].sort((a, b) => (a.time || "00:00").localeCompare(b.time || "00:00"))
+              );
+              const daysInRange = getDaysInRange(cal.startDate, cal.endDate);
               return (
                 <div
                   key={cal.id}
@@ -222,108 +246,129 @@ export function CalendarView() {
                       </button>
                     </div>
                   </div>
-                  <div className="p-5">
-                    {events.length === 0 ? (
+                  <div className="p-5 space-y-4">
+                    {daysInRange.length === 0 ? (
                       <p className="text-sm text-dashboard-foreground/50 py-4">
-                        No events in this calendar yet.
+                        No date range.
                       </p>
                     ) : (
-                      <div className="rounded-lg border border-sidebar-border overflow-hidden">
-                        <table className="w-full text-sm table-fixed">
-                          <colgroup>
-                            <col className="w-[15%]" />
-                            <col className="w-[12.5%]" />
-                            <col className="w-[12.5%]" />
-                            <col className="w-[12.5%]" />
-                            <col className="w-[35%]" />
-                            <col className="w-[12.5%]" />
-                          </colgroup>
-                          <thead>
-                            <tr className="border-b border-sidebar-border bg-sidebar/80 text-dashboard-foreground/70 font-medium">
-                              <th className="py-2.5 px-2 text-left">DATE</th>
-                              <th className="py-2.5 px-2 text-center">TIME</th>
-                              <th className="py-2.5 px-2 text-center">CUR</th>
-                              <th className="py-2.5 px-2 text-center">IMPACT</th>
-                              <th className="py-2.5 px-2 text-left"></th>
-                              <th className="py-2.5 px-2 text-center">DEL</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {events.map((ev, i) => {
-                              const date = getDateForDay(cal, ev.day);
-                              const dateLabel = date
-                                ? new Date(date + "T12:00:00").toLocaleDateString("en-US", {
-                                    weekday: "short",
-                                    month: "short",
-                                    day: "numeric",
-                                  })
-                                : ev.day;
-                              return (
-                                <tr
-                                  key={ev.id}
-                                  className={`border-b border-sidebar-border/50 last:border-0 ${
-                                    i % 2 === 0 ? "bg-header-input/30" : "bg-sidebar/30"
-                                  }`}
-                                >
-                                  <td className="py-2.5 px-2 text-dashboard-foreground/80 text-left">
-                                    {dateLabel}
-                                  </td>
-                                  <td className="py-2.5 px-2 text-dashboard-foreground/90 tabular-nums text-center">
-                                    {ev.time || "—"}
-                                  </td>
-                                  <td className="py-2.5 px-2 text-dashboard-foreground font-medium text-center">
-                                    {ev.asset?.name ?? "—"}
-                                  </td>
-                                  <td className="py-2.5 px-2 text-center">
-                                    <span
-                                      className="inline-flex gap-0.5 items-center justify-center"
-                                      title={ev.impact}
-                                    >
-                                      <span
-                                        className={`w-1.5 h-1.5 shrink-0 rounded-full ${IMPACT_DOTS[ev.impact.toLowerCase() as EventImpact]}`}
-                                      />
-                                      <span
-                                        className={`w-1.5 h-1.5 shrink-0 rounded-full ${IMPACT_DOTS[ev.impact.toLowerCase() as EventImpact]}`}
-                                      />
-                                      <span
-                                        className={`w-1.5 h-1.5 shrink-0 rounded-full ${IMPACT_DOTS[ev.impact.toLowerCase() as EventImpact]}`}
-                                      />
-                                    </span>
-                                  </td>
-                                  <td className="py-2.5 px-2 text-dashboard-foreground text-left break-words" title={ev.name}>
-                                    {ev.name}
-                                  </td>
-                                  <td className="py-2.5 px-2 text-center">
-                                    <span className="inline-flex items-center justify-center gap-1">
-                                      <button
-                                        type="button"
-                                        onClick={() => {
-                                          setEditingEvent(ev);
-                                          setEditEventOpen(true);
-                                        }}
-                                        className="text-dashboard-foreground/50 hover:text-primary transition-colors"
-                                        aria-label="Edit event"
-                                        title="Edit event"
+                      daysInRange.map(({ date, label }) => {
+                        const dayEvents = (eventsByDate[date] ?? []).sort((a, b) =>
+                          (a.time || "00:00").localeCompare(b.time || "00:00")
+                        );
+                        const today = new Date().toISOString().slice(0, 10);
+                        const isToday = date === today;
+                        return (
+                          <div key={date} className="rounded-lg border border-sidebar-border bg-sidebar/30 overflow-hidden">
+                            <div className="flex items-center gap-2 px-4 py-3 border-b border-sidebar-border bg-sidebar/50">
+                              <h4 className="text-sm font-semibold text-dashboard-foreground">
+                                {label}
+                              </h4>
+                              {isToday && (
+                                <span className="rounded bg-sidebar-hover px-2 py-0.5 text-xs font-medium text-dashboard-foreground/80">
+                                  TODAY
+                                </span>
+                              )}
+                            </div>
+                            {dayEvents.length === 0 ? (
+                              <p className="text-sm text-dashboard-foreground/50 py-4 px-4">
+                                No events
+                              </p>
+                            ) : (
+                              <div className="overflow-x-auto">
+                                <table className="w-full text-sm table-fixed">
+                                  <colgroup>
+                                    <col className="w-[15%]" />
+                                    <col className="w-[12.5%]" />
+                                    <col className="w-[12.5%]" />
+                                    <col className="w-[12.5%]" />
+                                    <col className="w-[35%]" />
+                                    <col className="w-[12.5%]" />
+                                  </colgroup>
+                                  <thead>
+                                    <tr className="border-b border-sidebar-border bg-sidebar/80 text-dashboard-foreground/70 font-medium">
+                                      <th className="py-2.5 px-2 text-left">DATE</th>
+                                      <th className="py-2.5 px-2 text-center">TIME</th>
+                                      <th className="py-2.5 px-2 text-center">CUR</th>
+                                      <th className="py-2.5 px-2 text-center">IMPACT</th>
+                                      <th className="py-2.5 px-2 text-left"></th>
+                                      <th className="py-2.5 px-2 text-center">DEL</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {dayEvents.map((ev, i) => (
+                                      <tr
+                                        key={ev.id}
+                                        className={`border-b border-sidebar-border/50 last:border-0 ${
+                                          i % 2 === 0 ? "bg-header-input/30" : "bg-sidebar/30"
+                                        }`}
                                       >
-                                        ✎
-                                      </button>
-                                      <button
-                                        type="button"
-                                        onClick={() => deleteEvent(ev.id)}
-                                        className="text-dashboard-foreground/50 hover:text-red-400 transition-colors"
-                                        aria-label="Delete event"
-                                        title="Delete event"
-                                      >
-                                        <Trash2 className="h-4 w-4" />
-                                      </button>
-                                    </span>
-                                  </td>
-                                </tr>
-                              );
-                            })}
-                          </tbody>
-                        </table>
-                      </div>
+                                        <td className="py-2.5 px-2 text-dashboard-foreground/80 text-left">
+                                          {new Date(date + "T12:00:00").toLocaleDateString("en-US", {
+                                            weekday: "short",
+                                            month: "short",
+                                            day: "numeric",
+                                          })}
+                                        </td>
+                                        <td className="py-2.5 px-2 text-dashboard-foreground/90 tabular-nums text-center">
+                                          {ev.time || "—"}
+                                        </td>
+                                        <td className="py-2.5 px-2 text-dashboard-foreground font-medium text-center">
+                                          {ev.asset?.name ?? "—"}
+                                        </td>
+                                        <td className="py-2.5 px-2 text-center">
+                                          <span
+                                            className="inline-flex gap-0.5 items-center justify-center"
+                                            title={ev.impact}
+                                          >
+                                            <span
+                                              className={`w-1.5 h-1.5 shrink-0 rounded-full ${IMPACT_DOTS[ev.impact.toLowerCase() as EventImpact]}`}
+                                            />
+                                            <span
+                                              className={`w-1.5 h-1.5 shrink-0 rounded-full ${IMPACT_DOTS[ev.impact.toLowerCase() as EventImpact]}`}
+                                            />
+                                            <span
+                                              className={`w-1.5 h-1.5 shrink-0 rounded-full ${IMPACT_DOTS[ev.impact.toLowerCase() as EventImpact]}`}
+                                            />
+                                          </span>
+                                        </td>
+                                        <td className="py-2.5 px-2 text-dashboard-foreground text-left break-words" title={ev.name}>
+                                          {ev.name}
+                                        </td>
+                                        <td className="py-2.5 px-2 text-center">
+                                          <span className="inline-flex items-center justify-center gap-1">
+                                            <button
+                                              type="button"
+                                              onClick={() => {
+                                                setEditingEvent(ev);
+                                                setEditEventOpen(true);
+                                              }}
+                                              className="text-dashboard-foreground/50 hover:text-primary transition-colors"
+                                              aria-label="Edit event"
+                                              title="Edit event"
+                                            >
+                                              ✎
+                                            </button>
+                                            <button
+                                              type="button"
+                                              onClick={() => deleteEvent(ev.id)}
+                                              className="text-dashboard-foreground/50 hover:text-red-400 transition-colors"
+                                              aria-label="Delete event"
+                                              title="Delete event"
+                                            >
+                                              <Trash2 className="h-4 w-4" />
+                                            </button>
+                                          </span>
+                                        </td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })
                     )}
                   </div>
                 </div>

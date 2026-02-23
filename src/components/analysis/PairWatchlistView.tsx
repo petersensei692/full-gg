@@ -30,6 +30,15 @@ export function PairWatchlistView({ asset }: PairWatchlistViewProps) {
   const [calendarDropdownOpen, setCalendarDropdownOpen] = useState(false);
   const [loadingWatchlists, setLoadingWatchlists] = useState(false);
 
+  const sortedAssetWatchlists = useMemo(
+    () =>
+      [...assetWatchlists].sort(
+        (a, b) =>
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      ),
+    [assetWatchlists]
+  );
+
   const selectedAssetWatchlist = assetWatchlists.find(
     (aw) => aw.id === selectedAssetWatchlistId
   );
@@ -45,9 +54,13 @@ export function PairWatchlistView({ asset }: PairWatchlistViewProps) {
       .getByAsset(asset.id)
       .then((list) => {
         setAssetWatchlists(list);
+        const sorted = [...list].sort(
+          (a, b) =>
+            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        );
         setSelectedAssetWatchlistId((prev) => {
           if (prev && list.some((aw) => aw.id === prev)) return prev;
-          return list[0]?.id ?? null;
+          return sorted[0]?.id ?? null;
         });
       })
       .catch(() => setAssetWatchlists([]))
@@ -121,13 +134,13 @@ export function PairWatchlistView({ asset }: PairWatchlistViewProps) {
                 aria-hidden
                 onClick={() => setCalendarDropdownOpen(false)}
               />
-              <div className="absolute left-0 top-full mt-1 z-50 min-w-[220px] rounded-lg border border-sidebar-border bg-sidebar py-1 shadow-lg">
+              <div className="absolute left-0 top-full mt-1 z-50 min-w-[220px] max-h-[220px] overflow-y-auto rounded-lg border border-sidebar-border bg-sidebar py-1 shadow-lg">
                 {assetWatchlists.length === 0 ? (
                   <p className="px-3 py-2 text-sm text-dashboard-foreground/70">
                     No watchlists yet. Create one from the Watchlist page.
                   </p>
                 ) : (
-                  assetWatchlists.map((aw) => (
+                  sortedAssetWatchlists.map((aw) => (
                     <button
                       key={aw.id}
                       type="button"

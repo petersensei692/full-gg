@@ -5,9 +5,10 @@
   "author": "PETER SENSEI",
   "private": true,
   "scripts": {
+    "postinstall": "node scripts/patch-better-sqlite3.js",
     "dev": "next dev",
     "dev:webpack": "next dev --webpack",
-    "build": "next build",
+    "build": "next build --webpack",
     "start": "next start",
     "lint": "eslint .",
     "dev:server": "cd src/server && nest start --watch",
@@ -28,10 +29,10 @@
     "seed:run": "cd src/server && ts-node -r tsconfig-paths/register src/database/seeds/run-seed.ts",
     "electron": "cross-env NODE_ENV=development electron .",
     "electron:dev": "concurrently -k -n \"next,server,electron\" -c \"cyan,magenta,green\" \"npm run dev:webpack\" \"npm run dev:server\" \"wait-on http://localhost:3000 http://localhost:5000 -t 90000 && cross-env NODE_ENV=development electron .\"",
-    "electron:build": "npm run build && npm run build:server && electron-builder && npx @electron/rebuild -f -w better-sqlite3 -p dist-electron/win-unpacked -m dist-electron/win-unpacked/resources/server/node_modules",
-    "electron:build:dir": "npm run build && npm run build:server && electron-builder --dir && npx @electron/rebuild -f -w better-sqlite3 -p dist-electron/win-unpacked -m dist-electron/win-unpacked/resources/server/node_modules",
+    "electron:build": "node scripts/clean-electron-build.js && npm run build && npm run build:server && node scripts/patch-better-sqlite3.js && electron-builder && npx @electron/rebuild -f -w better-sqlite3 -m dist-electron/win-unpacked/resources/server",
+    "electron:build:dir": "node scripts/clean-electron-build.js && npm run build && npm run build:server && node scripts/patch-better-sqlite3.js && electron-builder --dir && npx @electron/rebuild -f -w better-sqlite3 -m dist-electron/win-unpacked/resources/server",
     "electron:start": "cross-env NODE_ENV=production electron .",
-    "electron-pack": "cross-env NEXT_PUBLIC_API_URL=http://127.0.0.1:5000 npm run build && npm run build:server && electron-builder && npx @electron/rebuild -f -w better-sqlite3 -p dist-electron/win-unpacked -m dist-electron/win-unpacked/resources/server/node_modules"
+    "electron-pack": "cross-env NEXT_PUBLIC_API_URL=http://127.0.0.1:5000 node scripts/clean-electron-build.js && npm run build && npm run build:server && node scripts/patch-better-sqlite3.js && electron-builder && npx @electron/rebuild -f -w better-sqlite3 -m dist-electron/win-unpacked/resources/server"
   },
   "main": "electron/main.js",
   "build": {
@@ -58,6 +59,13 @@
         "to": "server",
         "filter": [
           "**/*"
+        ]
+      },
+      {
+        "from": "package.json",
+        "to": "server/package.json",
+        "filter": [
+          "package.json"
         ]
       },
       {
@@ -109,7 +117,7 @@
     "@nestjs/swagger": "^11.0.0",
     "@nestjs/typeorm": "^11.0.0",
     "@radix-ui/react-dialog": "^1.1.15",
-    "better-sqlite3": "^9.6.0",
+    "better-sqlite3": "^11.10.0",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.1",
     "dotenv": "^16.4.5",

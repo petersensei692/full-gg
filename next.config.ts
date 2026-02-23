@@ -12,15 +12,8 @@ const nextConfig: NextConfig = {
   reactCompiler: true,
   // Static export for Electron production build (output in ./out)
   output: "export",
-  turbopack: {
-    // Force this directory as root (Next otherwise infers root from lockfiles in parent dirs, e.g. GG2 or user home)
-    root: projectRoot,
-    // Resolve tailwind from this project's node_modules (Turbopack ignores webpack config)
-    resolveAlias: {
-      tailwindcss: tailwindcssPath,
-      "@tailwindcss/postcss": tailwindcssPostcssPath,
-    },
-  },
+  // Leading slash satisfies next/font; resolves correctly with app:// protocol
+  assetPrefix: "/",
   webpack: (config) => {
     config.context = projectRoot;
     config.resolve = config.resolve ?? {};

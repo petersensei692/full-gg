@@ -4,6 +4,7 @@ import { useState, useCallback, useMemo, useRef, useEffect } from "react";
 import type { AssetConfig, StreamEntry } from "@/types/asset";
 import type { Analysis } from "@/types/api";
 import { analysisService } from "@/lib/api";
+import { useAssets } from "@/context/AssetsContext";
 import { deleteStoredImage } from "@/lib/imageUpload";
 import { EditAnalysisModal } from "./analysis/EditAnalysisModal";
 import { AssetHeader } from "./analysis/AssetHeader";
@@ -80,6 +81,13 @@ interface AssetAnalysisViewProps {
 }
 
 export function AssetAnalysisView({ asset }: AssetAnalysisViewProps) {
+  const { assets } = useAssets();
+  /** Resolve asset.id at runtime from API (static export has no API at build time) */
+  const resolvedAsset = useMemo(
+    () => (asset.id ? asset : (assets.find((a) => a.slug === asset.slug) ?? asset)),
+    [asset, assets]
+  );
+
   const [activeTab, setActiveTab] = useState<"stream" | "events" | "watchlist">("stream");
   const [analyses, setAnalyses] = useState<Analysis[]>([]);
   const [analysisFilter, setAnalysisFilter] = useState<string>("all");
@@ -89,17 +97,17 @@ export function AssetAnalysisView({ asset }: AssetAnalysisViewProps) {
   const [editModalOpen, setEditModalOpen] = useState(false);
 
   const handleCreate = useCallback(async (payload: { notes: string; images: string[]; analysisType: string }) => {
-    if (!asset.id) {
+    if (!resolvedAsset.id) {
       throw new Error("Asset ID is required to create analysis. Ensure the API is connected.");
     }
     const notesWithMarker = addAnalysisTypeMarker(payload.notes, payload.analysisType);
     const created = await analysisService.create({
-      assetId: asset.id,
+      assetId: resolvedAsset.id,
       notes: notesWithMarker,
       images: payload.images,
     });
     setAnalyses((prev) => [...prev, created]);
-  }, [asset]);
+  }, [resolvedAsset]);
 
   const handleDeleteAnalysis = useCallback(
     async (analysisId: string, images: string[]) => {
@@ -157,11 +165,15 @@ export function AssetAnalysisView({ asset }: AssetAnalysisViewProps) {
   }, [analyses.length]);
 
   useEffect(() => {
+    if (!resolvedAsset.id) {
+      setAnalyses([]);
+      return;
+    }
     analysisService
-      .getAll(asset.id)
+      .getAll(resolvedAsset.id)
       .then((list) => setAnalyses(list))
       .catch(() => setAnalyses([]));
-  }, [asset.id]);
+  }, [resolvedAsset.id]);
 
   const mappedEntries = useMemo(() => {
     return analyses
@@ -230,12 +242,12 @@ export function AssetAnalysisView({ asset }: AssetAnalysisViewProps) {
     });
   }, [filteredEntries]);
 
-  const displayTitle = asset.symbol
-    ? `${asset.label} (${asset.symbol})`
-    : asset.label;
+  const displayTitle = resolvedAsset.symbol
+    ? `${resolvedAsset.label} (${resolvedAsset.symbol})`
+    : resolvedAsset.label;
   const fullTitle =
-    asset.slug === "usd"
-      ? `US Dollar Index (${asset.symbol ?? asset.label})`
+    resolvedAsset.slug === "usd"
+      ? `US Dollar Index (${resolvedAsset.symbol ?? resolvedAsset.label})`
       : displayTitle;
 
   return (
@@ -286,14 +298,14 @@ export function AssetAnalysisView({ asset }: AssetAnalysisViewProps) {
               </div>
             </div>
             <div className="shrink-0 w-full px-6 pb-6 pt-3 border-t border-sidebar-border/50 bg-dashboard-bg">
-              <PostAnalysisInput placeholder={asset.placeholder} onCreated={handleCreate} />
+              <PostAnalysisInput placeholder={resolvedAsset.placeholder} onCreated={handleCreate} />
             </div>
           </div>
         )}
 
-        {activeTab === "events" && <EconomicEventsView asset={asset} />}
+        {activeTab === "events" && <EconomicEventsView asset={resolvedAsset} />}
 
-        {activeTab === "watchlist" && <PairWatchlistView asset={asset} />}
+        {activeTab === "watchlist" && <PairWatchlistView asset={resolvedAsset} />}
       </div>
       {editingAnalysis && (
         <EditAnalysisModal
