@@ -118,11 +118,12 @@ export function WatchlistFocusDialog({
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent
           showClose
-          className={`bg-sidebar border border-sidebar-border rounded-xl w-[90vw] max-w-[90vw] max-h-[85dvh] flex flex-col overflow-hidden p-0 min-w-0 ${BORDER_CLASS[bias]}`}
+          containToMain
+          className={`bg-sidebar border border-sidebar-border rounded-xl w-full max-w-[min(56rem,calc(100vw-280px))] max-h-[85dvh] flex flex-col overflow-hidden p-0 min-w-0 ${BORDER_CLASS[bias]}`}
         >
           {showContent && displayEntry && (
           <>
-          <div className="px-5 py-4 border-b border-sidebar-border flex items-center justify-between gap-3 shrink-0">
+          <div className="px-6 py-4 border-b border-sidebar-border flex items-center justify-between gap-3 shrink-0">
             <div className="flex items-center gap-2 min-w-0">
               <h3 className="text-lg font-semibold text-dashboard-foreground truncate pr-2">
                 {displayEntry.pairName}
@@ -160,7 +161,7 @@ export function WatchlistFocusDialog({
               </button>
             </div>
           </div>
-          <div className="flex-1 min-h-0 w-full min-w-full overflow-x-hidden overflow-y-auto p-5 space-y-4">
+          <div className="flex-1 min-h-0 min-w-0 overflow-x-hidden overflow-y-auto px-6 py-5 space-y-4">
             {displayEntry.thesis?.notes && (
               <div
                 className="w-full min-w-full break-words break-all text-sm text-dashboard-foreground/90 leading-relaxed prose prose-invert prose-sm [&_h1]:text-xl [&_h1]:font-bold [&_h2]:text-lg [&_h2]:font-semibold [&_h3]:text-base [&_h3]:font-medium [&_*]:break-words [&_*]:min-w-0 [&_*]:max-w-full [&_img]:max-w-full [&_img]:max-h-[280px] [&_img]:rounded-lg [&_img]:cursor-pointer [&_img]:my-2"

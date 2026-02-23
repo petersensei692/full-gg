@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { CalendarIcon, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
 
 export type DateRange = { start: Date; end: Date } | null;
@@ -79,15 +80,29 @@ export function DateRangePicker({ value, onChange, className = "" }: DateRangePi
   const [currentMonth, setCurrentMonth] = useState(() => new Date());
   const [selecting, setSelecting] = useState<"start" | "end">("start");
   const containerRef = useRef<HTMLDivElement>(null);
+  const dropdownRef = useRef<HTMLDivElement | null>(null);
+  const [dropdownRect, setDropdownRect] = useState<{ top: number; left: number; width: number } | null>(null);
 
   useEffect(() => {
     if (open) setDraft(value);
   }, [open, value]);
 
   useEffect(() => {
+    if (open && containerRef.current) {
+      const rect = containerRef.current.getBoundingClientRect();
+      setDropdownRect({ top: rect.bottom + 4, left: rect.left, width: rect.width });
+    } else {
+      setDropdownRect(null);
+    }
+  }, [open]);
+
+  useEffect(() => {
     if (!open) return;
     const onDocClick = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) setOpen(false);
+      const target = e.target as Node;
+      const inTrigger = containerRef.current?.contains(target);
+      const inDropdown = dropdownRef.current?.contains(target);
+      if (!inTrigger && !inDropdown) setOpen(false);
     };
     document.addEventListener("mousedown", onDocClick);
     return () => document.removeEventListener("mousedown", onDocClick);
@@ -203,6 +218,56 @@ export function DateRangePicker({ value, onChange, className = "" }: DateRangePi
     );
   };
 
+  const PANEL_WIDTH = 320;
+  const dropdownContent = open && dropdownRect && typeof document !== "undefined" && (
+    <div
+      ref={(el) => { dropdownRef.current = el; }}
+      className="fixed z-[9999] rounded-xl border border-sidebar-border bg-sidebar shadow-xl p-4 min-w-[320px]"
+      style={{
+        top: dropdownRect.top,
+        left: Math.max(0, dropdownRect.left + dropdownRect.width - PANEL_WIDTH),
+      }}
+    >
+      <div className="mb-3">
+        <label className="block text-xs font-medium text-dashboard-foreground/70 mb-1">Date Range</label>
+        <div className="rounded-lg border border-sidebar-border bg-header-input px-3 py-2 text-sm text-dashboard-foreground">
+          {formatRange(draft)}
+        </div>
+      </div>
+      <div className="mb-4">
+        {renderCalendar(currentMonth.getFullYear(), currentMonth.getMonth())}
+      </div>
+      <div className="flex flex-wrap gap-2 mb-4">
+        {quickRanges.map(({ label, get }) => (
+          <button
+            key={label}
+            type="button"
+            onClick={() => setDraft(get())}
+            className="text-xs text-primary hover:underline underline-offset-2"
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+      <div className="flex justify-end gap-2">
+        <button
+          type="button"
+          onClick={handleCancel}
+          className="rounded-lg border border-sidebar-border px-3 py-1.5 text-sm font-medium text-dashboard-foreground hover:bg-sidebar-hover"
+        >
+          Cancel
+        </button>
+        <button
+          type="button"
+          onClick={handleApply}
+          className="rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+        >
+          Apply
+        </button>
+      </div>
+    </div>
+  );
+
   return (
     <div ref={containerRef} className={`relative ${className}`}>
       <button
@@ -214,47 +279,7 @@ export function DateRangePicker({ value, onChange, className = "" }: DateRangePi
         <CalendarIcon className="h-4 w-4 shrink-0 text-dashboard-foreground/60" />
       </button>
 
-      {open && (
-        <div className="absolute left-0 top-full mt-1 z-50 rounded-xl border border-sidebar-border bg-sidebar shadow-xl p-4 min-w-[320px]">
-          <div className="mb-3">
-            <label className="block text-xs font-medium text-dashboard-foreground/70 mb-1">Date Range</label>
-            <div className="rounded-lg border border-sidebar-border bg-header-input px-3 py-2 text-sm text-dashboard-foreground">
-              {formatRange(draft)}
-            </div>
-          </div>
-          <div className="mb-4">
-            {renderCalendar(currentMonth.getFullYear(), currentMonth.getMonth())}
-          </div>
-          <div className="flex flex-wrap gap-2 mb-4">
-            {quickRanges.map(({ label, get }) => (
-              <button
-                key={label}
-                type="button"
-                onClick={() => setDraft(get())}
-                className="text-xs text-primary hover:underline underline-offset-2"
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-          <div className="flex justify-end gap-2">
-            <button
-              type="button"
-              onClick={handleCancel}
-              className="rounded-lg border border-sidebar-border px-3 py-1.5 text-sm font-medium text-dashboard-foreground hover:bg-sidebar-hover"
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              onClick={handleApply}
-              className="rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-            >
-              Apply
-            </button>
-          </div>
-        </div>
-      )}
+      {typeof document !== "undefined" && dropdownContent && createPortal(dropdownContent, document.body)}
     </div>
   );
 }

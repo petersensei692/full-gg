@@ -86,7 +86,7 @@ export function StreamEntry({
     <article className="pb-6 last:pb-0">
       {separatorTop}
       <div
-        className={`min-w-0 rounded-xl border border-sidebar-border border-l-4 ${borderClass} bg-sidebar/50 p-4 shadow-sm`}
+        className={`min-w-0 max-w-[66.666%] rounded-xl border border-sidebar-border border-l-4 ${borderClass} bg-sidebar/50 p-4 shadow-sm`}
       >
         <div className="flex items-center justify-between gap-2 mb-2">
           <div className={`text-xs font-semibold uppercase tracking-wider ${textColorClass}`}>

@@ -1,10 +1,12 @@
 "use client";
 
 import { useState, useCallback, useMemo, useRef, useEffect } from "react";
+import { Calendar, Plus, ChevronDown } from "lucide-react";
 import type { AssetConfig, StreamEntry } from "@/types/asset";
-import type { Analysis } from "@/types/api";
-import { analysisService } from "@/lib/api";
+import type { Analysis, AssetCalendar, AssetWatchlist, Event, WatchItem, CreateWatchItemDto } from "@/types/api";
+import { analysisService, assetCalendarService, assetWatchlistService } from "@/lib/api";
 import { useAssets } from "@/context/AssetsContext";
+import { useWatchlistCalendar } from "@/context/WatchlistCalendarContext";
 import { deleteStoredImage } from "@/lib/imageUpload";
 import { EditAnalysisModal } from "./analysis/EditAnalysisModal";
 import { AssetHeader } from "./analysis/AssetHeader";
@@ -14,6 +16,8 @@ import { PostAnalysisInput } from "./analysis/PostAnalysisInput";
 import { EconomicEventsView } from "./analysis/EconomicEventsView";
 import { PairWatchlistView } from "./analysis/PairWatchlistView";
 import { DateRangePicker, type DateRange } from "./analysis/DateRangePicker";
+import { CreateEventModal } from "./analysis/CreateEventModal";
+import { CreatePairModal } from "./analysis/CreatePairModal";
 
 const ANALYSIS_TYPE_TO_TAG: Record<
   string,
@@ -82,6 +86,7 @@ interface AssetAnalysisViewProps {
 
 export function AssetAnalysisView({ asset }: AssetAnalysisViewProps) {
   const { assets } = useAssets();
+  const { createEvent, updateEvent, refetchAll, createWatchItem, updateWatchItem } = useWatchlistCalendar();
   /** Resolve asset.id at runtime from API (static export has no API at build time) */
   const resolvedAsset = useMemo(
     () => (asset.id ? asset : (assets.find((a) => a.slug === asset.slug) ?? asset)),
@@ -95,6 +100,32 @@ export function AssetAnalysisView({ asset }: AssetAnalysisViewProps) {
   const [editingAnalysis, setEditingAnalysis] = useState<Analysis | null>(null);
   const [editingAnalysisType, setEditingAnalysisType] = useState<string>("daily");
   const [editModalOpen, setEditModalOpen] = useState(false);
+
+  // Events tab state (lifted for unified header)
+  const [assetCalendars, setAssetCalendars] = useState<AssetCalendar[]>([]);
+  const [selectedAssetCalendarId, setSelectedAssetCalendarId] = useState<string | null>(null);
+  const [eventModalOpen, setEventModalOpen] = useState(false);
+  const [editingEvent, setEditingEvent] = useState<Event | null>(null);
+  const [calendarDropdownOpen, setCalendarDropdownOpen] = useState(false);
+  const [loadingCalendars, setLoadingCalendars] = useState(false);
+  const sortedAssetCalendars = useMemo(
+    () => [...assetCalendars].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
+    [assetCalendars]
+  );
+  const selectedAssetCalendar = assetCalendars.find((ac) => ac.id === selectedAssetCalendarId);
+
+  // Watchlist tab state (lifted for unified header)
+  const [assetWatchlists, setAssetWatchlists] = useState<AssetWatchlist[]>([]);
+  const [selectedAssetWatchlistId, setSelectedAssetWatchlistId] = useState<string | null>(null);
+  const [pairModalOpen, setPairModalOpen] = useState(false);
+  const [editingWatchItem, setEditingWatchItem] = useState<WatchItem | null>(null);
+  const [watchlistDropdownOpen, setWatchlistDropdownOpen] = useState(false);
+  const [loadingWatchlists, setLoadingWatchlists] = useState(false);
+  const sortedAssetWatchlists = useMemo(
+    () => [...assetWatchlists].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
+    [assetWatchlists]
+  );
+  const selectedAssetWatchlist = assetWatchlists.find((aw) => aw.id === selectedAssetWatchlistId);
 
   const handleCreate = useCallback(async (payload: { notes: string; images: string[]; analysisType: string }) => {
     if (!resolvedAsset.id) {
@@ -175,6 +206,75 @@ export function AssetAnalysisView({ asset }: AssetAnalysisViewProps) {
       .catch(() => setAnalyses([]));
   }, [resolvedAsset.id]);
 
+  useEffect(() => {
+    if (!resolvedAsset.id) {
+      setAssetCalendars([]);
+      setSelectedAssetCalendarId(null);
+      return;
+    }
+    setLoadingCalendars(true);
+    assetCalendarService
+      .getByAsset(resolvedAsset.id)
+      .then((list) => {
+        setAssetCalendars(list);
+        const sorted = [...list].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+        setSelectedAssetCalendarId((prev) => (prev && list.some((ac) => ac.id === prev) ? prev : sorted[0]?.id ?? null));
+      })
+      .catch(() => setAssetCalendars([]))
+      .finally(() => setLoadingCalendars(false));
+  }, [resolvedAsset.id]);
+
+  useEffect(() => {
+    if (!resolvedAsset.id) {
+      setAssetWatchlists([]);
+      setSelectedAssetWatchlistId(null);
+      return;
+    }
+    setLoadingWatchlists(true);
+    assetWatchlistService
+      .getByAsset(resolvedAsset.id)
+      .then((list) => {
+        setAssetWatchlists(list);
+        const sorted = [...list].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+        setSelectedAssetWatchlistId((prev) => (prev && list.some((aw) => aw.id === prev) ? prev : sorted[0]?.id ?? null));
+      })
+      .catch(() => setAssetWatchlists([]))
+      .finally(() => setLoadingWatchlists(false));
+  }, [resolvedAsset.id]);
+
+  const handleEventSubmit = useCallback(
+    async (dto: { assetCalendarId?: string; calendarId?: string; day: string; time: string; assetId?: string; name: string; impact: string }) => {
+      if (editingEvent) {
+        await updateEvent(editingEvent.id, { day: dto.day, time: dto.time, name: dto.name, impact: dto.impact });
+      } else {
+        await createEvent(dto);
+      }
+      if (dto.assetCalendarId) setSelectedAssetCalendarId(dto.assetCalendarId);
+      setEditingEvent(null);
+      setEventModalOpen(false);
+      refetchAll();
+    },
+    [editingEvent, createEvent, updateEvent, refetchAll]
+  );
+
+  const handlePairSubmit = useCallback(
+    async (dto: CreateWatchItemDto) => {
+      if (editingWatchItem) {
+        await updateWatchItem(editingWatchItem.id, {
+          pairName: dto.pairName,
+          bias: dto.bias,
+          thesis: dto.thesis ? { notes: dto.thesis.notes, images: dto.thesis.images, imageNames: dto.thesis.imageNames ?? editingWatchItem.thesis?.imageNames } : undefined,
+        });
+      } else {
+        await createWatchItem(dto);
+      }
+      setEditingWatchItem(null);
+      setPairModalOpen(false);
+      refetchAll();
+    },
+    [editingWatchItem, createWatchItem, updateWatchItem, refetchAll]
+  );
+
   const mappedEntries = useMemo(() => {
     return analyses
       .map((analysis) => {
@@ -253,30 +353,135 @@ export function AssetAnalysisView({ asset }: AssetAnalysisViewProps) {
   return (
     <>
       <div className="flex h-full min-h-0 flex-col overflow-auto">
-        <div className="px-6 pt-3 pb-0">
-          <AssetHeader title={fullTitle} />
-          <div className="mt-2">
-            <StreamTabs active={activeTab} onSelect={setActiveTab} />
+        {/* Unified header bar: three equal-width sections that shrink together */}
+        <div className="h-14 shrink-0 flex items-center gap-3 px-6 border-b border-sidebar-border overflow-hidden">
+          <div className="flex-grow-0 min-w-0 overflow-hidden flex items-center shrink">
+            <AssetHeader title={fullTitle} />
+          </div>
+          <div className="flex-1 min-w-0 overflow-hidden flex justify-center">
+            <StreamTabs active={activeTab} onSelect={setActiveTab} noBorder />
+          </div>
+          <div className="flex-1 min-w-0 overflow-hidden flex items-center justify-end gap-2">
+            {activeTab === "stream" && (
+              <>
+                <span className="text-sm text-dashboard-foreground/70 shrink-0">Filter:</span>
+                <select
+                  value={analysisFilter}
+                  onChange={(e) => setAnalysisFilter(e.target.value)}
+                  className="rounded-lg border border-sidebar-border bg-sidebar px-3 py-2 text-sm text-dashboard-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary shrink-0"
+                >
+                  {ANALYSIS_FILTER_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+                <DateRangePicker value={dateRange} onChange={setDateRange} />
+              </>
+            )}
+            {activeTab === "events" && (
+              <>
+                <div className="relative min-w-0 max-w-full">
+                  <button
+                    type="button"
+                    onClick={() => setCalendarDropdownOpen((o) => !o)}
+                    disabled={loadingCalendars || !resolvedAsset.id}
+                    className="flex items-center gap-2 rounded-lg border border-sidebar-border bg-sidebar px-3 py-2 text-sm font-medium text-dashboard-foreground hover:bg-sidebar-hover transition-colors disabled:opacity-50 min-w-0 max-w-full truncate"
+                  >
+                    <Calendar className="h-4 w-4 shrink-0" />
+                    <span className="truncate">
+                      {loadingCalendars ? "Loading..." : selectedAssetCalendar
+                        ? `${new Date(selectedAssetCalendar.startDate).toISOString().slice(0, 10)} → ${new Date(selectedAssetCalendar.endDate).toISOString().slice(0, 10)}`
+                        : assetCalendars.length === 0 ? "No calendars" : "Choose calendar"}
+                    </span>
+                    <ChevronDown className="h-4 w-4 shrink-0" />
+                  </button>
+                  {calendarDropdownOpen && (
+                    <>
+                      <div className="fixed inset-0 z-40" aria-hidden onClick={() => setCalendarDropdownOpen(false)} />
+                      <div className="absolute left-0 top-full mt-1 z-50 min-w-[220px] max-h-[220px] overflow-y-auto rounded-lg border border-sidebar-border bg-sidebar py-1 shadow-lg">
+                        {assetCalendars.length === 0 ? (
+                          <p className="px-3 py-2 text-sm text-dashboard-foreground/70">No calendars yet.</p>
+                        ) : (
+                          sortedAssetCalendars.map((ac) => (
+                            <button
+                              key={ac.id}
+                              type="button"
+                              onClick={() => { setSelectedAssetCalendarId(ac.id); setCalendarDropdownOpen(false); }}
+                              className={`w-full text-left px-3 py-2 text-sm hover:text-primary transition-colors ${selectedAssetCalendarId === ac.id ? "text-primary font-medium" : "text-dashboard-foreground"}`}
+                            >
+                              {new Date(ac.startDate).toISOString().slice(0, 10)} → {new Date(ac.endDate).toISOString().slice(0, 10)}
+                            </button>
+                          ))
+                        )}
+                      </div>
+                    </>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setEventModalOpen(true)}
+                  className="flex items-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors shrink-0"
+                >
+                  <Plus className="h-4 w-4" />
+                  Create event
+                </button>
+              </>
+            )}
+            {activeTab === "watchlist" && (
+              <>
+                <div className="relative min-w-0 max-w-full">
+                  <button
+                    type="button"
+                    onClick={() => setWatchlistDropdownOpen((o) => !o)}
+                    disabled={loadingWatchlists || !resolvedAsset.id}
+                    className="flex items-center gap-2 rounded-lg border border-sidebar-border bg-sidebar px-3 py-2 text-sm font-medium text-dashboard-foreground hover:bg-sidebar-hover transition-colors disabled:opacity-50 min-w-0 max-w-full truncate"
+                  >
+                    <Calendar className="h-4 w-4 shrink-0" />
+                    <span className="truncate">
+                      {loadingWatchlists ? "Loading..." : selectedAssetWatchlist
+                        ? `${new Date(selectedAssetWatchlist.startDate).toISOString().slice(0, 10)} → ${new Date(selectedAssetWatchlist.endDate).toISOString().slice(0, 10)}`
+                        : assetWatchlists.length === 0 ? "No watchlists" : "Choose watchlist"}
+                    </span>
+                    <ChevronDown className="h-4 w-4 shrink-0" />
+                  </button>
+                  {watchlistDropdownOpen && (
+                    <>
+                      <div className="fixed inset-0 z-40" aria-hidden onClick={() => setWatchlistDropdownOpen(false)} />
+                      <div className="absolute left-0 top-full mt-1 z-50 min-w-[220px] max-h-[220px] overflow-y-auto rounded-lg border border-sidebar-border bg-sidebar py-1 shadow-lg">
+                        {assetWatchlists.length === 0 ? (
+                          <p className="px-3 py-2 text-sm text-dashboard-foreground/70">No watchlists yet.</p>
+                        ) : (
+                          sortedAssetWatchlists.map((aw) => (
+                            <button
+                              key={aw.id}
+                              type="button"
+                              onClick={() => { setSelectedAssetWatchlistId(aw.id); setWatchlistDropdownOpen(false); }}
+                              className={`w-full text-left px-3 py-2 text-sm hover:text-primary transition-colors ${selectedAssetWatchlistId === aw.id ? "text-primary font-medium" : "text-dashboard-foreground"}`}
+                            >
+                              {new Date(aw.startDate).toISOString().slice(0, 10)} → {new Date(aw.endDate).toISOString().slice(0, 10)}
+                            </button>
+                          ))
+                        )}
+                      </div>
+                    </>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setPairModalOpen(true)}
+                  className="flex items-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors shrink-0"
+                >
+                  <Plus className="h-4 w-4" />
+                  Create Pair
+                </button>
+              </>
+            )}
           </div>
         </div>
 
         {activeTab === "stream" && (
           <div className="flex-1 flex flex-col min-h-0 w-full">
-            <div className="flex flex-wrap items-center gap-3 mb-4 px-6 pt-4 shrink-0">
-              <span className="text-sm text-dashboard-foreground/70">Filter:</span>
-              <select
-                value={analysisFilter}
-                onChange={(e) => setAnalysisFilter(e.target.value)}
-                className="rounded-lg border border-sidebar-border bg-sidebar px-3 py-2 text-sm text-dashboard-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-              >
-                {ANALYSIS_FILTER_OPTIONS.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
-              <DateRangePicker value={dateRange} onChange={setDateRange} />
-            </div>
             <div ref={streamScrollRef} className="flex-1 min-h-0 overflow-auto px-6 w-full">
               <div className="w-full max-w-full space-y-0 pb-4">
                 {entriesWithGroups.map(({ entry, separatorType, weekGroup, dateGroup }) => (
@@ -303,9 +508,31 @@ export function AssetAnalysisView({ asset }: AssetAnalysisViewProps) {
           </div>
         )}
 
-        {activeTab === "events" && <EconomicEventsView asset={resolvedAsset} />}
+        {activeTab === "events" && (
+          <EconomicEventsView
+            asset={resolvedAsset}
+            assetCalendars={assetCalendars}
+            selectedAssetCalendarId={selectedAssetCalendarId}
+            selectedAssetCalendar={selectedAssetCalendar ?? null}
+            eventModalOpen={eventModalOpen}
+            setEventModalOpen={setEventModalOpen}
+            onEditEvent={(ev) => { setEditingEvent(ev); setEventModalOpen(true); }}
+            loadingCalendars={loadingCalendars}
+          />
+        )}
 
-        {activeTab === "watchlist" && <PairWatchlistView asset={resolvedAsset} />}
+        {activeTab === "watchlist" && (
+          <PairWatchlistView
+            asset={resolvedAsset}
+            assetWatchlists={assetWatchlists}
+            selectedAssetWatchlistId={selectedAssetWatchlistId}
+            selectedAssetWatchlist={selectedAssetWatchlist ?? null}
+            pairModalOpen={pairModalOpen}
+            setPairModalOpen={setPairModalOpen}
+            onEditItem={(item) => { setEditingWatchItem(item); setPairModalOpen(true); }}
+            loadingWatchlists={loadingWatchlists}
+          />
+        )}
       </div>
       {editingAnalysis && (
         <EditAnalysisModal
@@ -326,6 +553,31 @@ export function AssetAnalysisView({ asset }: AssetAnalysisViewProps) {
           }}
         />
       )}
+
+      <CreateEventModal
+        open={eventModalOpen}
+        onOpenChange={(open) => { setEventModalOpen(open); if (!open) setEditingEvent(null); }}
+        assetCalendars={assetCalendars}
+        selectedAssetCalendarId={selectedAssetCalendarId}
+        defaultCurrency={resolvedAsset.label}
+        mode={editingEvent ? "edit" : "create"}
+        initialEvent={editingEvent ?? undefined}
+        onSubmit={handleEventSubmit}
+      />
+
+      <CreatePairModal
+        open={pairModalOpen}
+        onOpenChange={(open) => { setPairModalOpen(open); if (!open) setEditingWatchItem(null); }}
+        calendars={[]}
+        selectedCalendarId={null}
+        assetWatchlists={assetWatchlists}
+        selectedAssetWatchlistId={selectedAssetWatchlistId}
+        currentAssetSlug={resolvedAsset.slug}
+        currentAssetLabel={resolvedAsset.label}
+        mode={editingWatchItem ? "edit" : "create"}
+        initialItem={editingWatchItem ?? undefined}
+        onSubmit={handlePairSubmit}
+      />
     </>
   );
 }
