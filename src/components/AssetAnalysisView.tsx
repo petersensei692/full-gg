@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback, useMemo, useRef, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { Calendar, Plus, ChevronDown } from "lucide-react";
 import type { AssetConfig, StreamEntry } from "@/types/asset";
 import type { Analysis, AssetCalendar, AssetWatchlist, Event, WatchItem, CreateWatchItemDto } from "@/types/api";
@@ -121,6 +122,12 @@ export function AssetAnalysisView({ asset }: AssetAnalysisViewProps) {
   const [editingWatchItem, setEditingWatchItem] = useState<WatchItem | null>(null);
   const [watchlistDropdownOpen, setWatchlistDropdownOpen] = useState(false);
   const [loadingWatchlists, setLoadingWatchlists] = useState(false);
+  const calendarTriggerRef = useRef<HTMLButtonElement>(null);
+  const watchlistTriggerRef = useRef<HTMLButtonElement>(null);
+  const calendarDropdownRef = useRef<HTMLDivElement | null>(null);
+  const watchlistDropdownRef = useRef<HTMLDivElement | null>(null);
+  const [calendarDropdownRect, setCalendarDropdownRect] = useState<{ top: number; left: number; width: number } | null>(null);
+  const [watchlistDropdownRect, setWatchlistDropdownRect] = useState<{ top: number; left: number; width: number } | null>(null);
   const sortedAssetWatchlists = useMemo(
     () => [...assetWatchlists].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
     [assetWatchlists]
@@ -241,6 +248,48 @@ export function AssetAnalysisView({ asset }: AssetAnalysisViewProps) {
       .catch(() => setAssetWatchlists([]))
       .finally(() => setLoadingWatchlists(false));
   }, [resolvedAsset.id]);
+
+  useEffect(() => {
+    if (calendarDropdownOpen && calendarTriggerRef.current) {
+      const rect = calendarTriggerRef.current.getBoundingClientRect();
+      setCalendarDropdownRect({ top: rect.bottom + 4, left: rect.left + rect.width - 220, width: rect.width });
+    } else {
+      setCalendarDropdownRect(null);
+    }
+  }, [calendarDropdownOpen]);
+
+  useEffect(() => {
+    if (watchlistDropdownOpen && watchlistTriggerRef.current) {
+      const rect = watchlistTriggerRef.current.getBoundingClientRect();
+      setWatchlistDropdownRect({ top: rect.bottom + 4, left: rect.left + rect.width - 220, width: rect.width });
+    } else {
+      setWatchlistDropdownRect(null);
+    }
+  }, [watchlistDropdownOpen]);
+
+  useEffect(() => {
+    if (!calendarDropdownOpen) return;
+    const onDocClick = (e: MouseEvent) => {
+      const target = e.target as Node;
+      if (!calendarTriggerRef.current?.contains(target) && !calendarDropdownRef.current?.contains(target)) {
+        setCalendarDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", onDocClick);
+    return () => document.removeEventListener("mousedown", onDocClick);
+  }, [calendarDropdownOpen]);
+
+  useEffect(() => {
+    if (!watchlistDropdownOpen) return;
+    const onDocClick = (e: MouseEvent) => {
+      const target = e.target as Node;
+      if (!watchlistTriggerRef.current?.contains(target) && !watchlistDropdownRef.current?.contains(target)) {
+        setWatchlistDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", onDocClick);
+    return () => document.removeEventListener("mousedown", onDocClick);
+  }, [watchlistDropdownOpen]);
 
   const handleEventSubmit = useCallback(
     async (dto: { assetCalendarId?: string; calendarId?: string; day: string; time: string; assetId?: string; name: string; impact: string }) => {
@@ -383,6 +432,7 @@ export function AssetAnalysisView({ asset }: AssetAnalysisViewProps) {
               <>
                 <div className="relative min-w-0 max-w-full">
                   <button
+                    ref={calendarTriggerRef}
                     type="button"
                     onClick={() => setCalendarDropdownOpen((o) => !o)}
                     disabled={loadingCalendars || !resolvedAsset.id}
@@ -396,27 +446,6 @@ export function AssetAnalysisView({ asset }: AssetAnalysisViewProps) {
                     </span>
                     <ChevronDown className="h-4 w-4 shrink-0" />
                   </button>
-                  {calendarDropdownOpen && (
-                    <>
-                      <div className="fixed inset-0 z-40" aria-hidden onClick={() => setCalendarDropdownOpen(false)} />
-                      <div className="absolute left-0 top-full mt-1 z-50 min-w-[220px] max-h-[220px] overflow-y-auto rounded-lg border border-sidebar-border bg-sidebar py-1 shadow-lg">
-                        {assetCalendars.length === 0 ? (
-                          <p className="px-3 py-2 text-sm text-dashboard-foreground/70">No calendars yet.</p>
-                        ) : (
-                          sortedAssetCalendars.map((ac) => (
-                            <button
-                              key={ac.id}
-                              type="button"
-                              onClick={() => { setSelectedAssetCalendarId(ac.id); setCalendarDropdownOpen(false); }}
-                              className={`w-full text-left px-3 py-2 text-sm hover:text-primary transition-colors ${selectedAssetCalendarId === ac.id ? "text-primary font-medium" : "text-dashboard-foreground"}`}
-                            >
-                              {new Date(ac.startDate).toISOString().slice(0, 10)} → {new Date(ac.endDate).toISOString().slice(0, 10)}
-                            </button>
-                          ))
-                        )}
-                      </div>
-                    </>
-                  )}
                 </div>
                 <button
                   type="button"
@@ -432,6 +461,7 @@ export function AssetAnalysisView({ asset }: AssetAnalysisViewProps) {
               <>
                 <div className="relative min-w-0 max-w-full">
                   <button
+                    ref={watchlistTriggerRef}
                     type="button"
                     onClick={() => setWatchlistDropdownOpen((o) => !o)}
                     disabled={loadingWatchlists || !resolvedAsset.id}
@@ -445,27 +475,6 @@ export function AssetAnalysisView({ asset }: AssetAnalysisViewProps) {
                     </span>
                     <ChevronDown className="h-4 w-4 shrink-0" />
                   </button>
-                  {watchlistDropdownOpen && (
-                    <>
-                      <div className="fixed inset-0 z-40" aria-hidden onClick={() => setWatchlistDropdownOpen(false)} />
-                      <div className="absolute left-0 top-full mt-1 z-50 min-w-[220px] max-h-[220px] overflow-y-auto rounded-lg border border-sidebar-border bg-sidebar py-1 shadow-lg">
-                        {assetWatchlists.length === 0 ? (
-                          <p className="px-3 py-2 text-sm text-dashboard-foreground/70">No watchlists yet.</p>
-                        ) : (
-                          sortedAssetWatchlists.map((aw) => (
-                            <button
-                              key={aw.id}
-                              type="button"
-                              onClick={() => { setSelectedAssetWatchlistId(aw.id); setWatchlistDropdownOpen(false); }}
-                              className={`w-full text-left px-3 py-2 text-sm hover:text-primary transition-colors ${selectedAssetWatchlistId === aw.id ? "text-primary font-medium" : "text-dashboard-foreground"}`}
-                            >
-                              {new Date(aw.startDate).toISOString().slice(0, 10)} → {new Date(aw.endDate).toISOString().slice(0, 10)}
-                            </button>
-                          ))
-                        )}
-                      </div>
-                    </>
-                  )}
                 </div>
                 <button
                   type="button"
@@ -578,6 +587,60 @@ export function AssetAnalysisView({ asset }: AssetAnalysisViewProps) {
         initialItem={editingWatchItem ?? undefined}
         onSubmit={handlePairSubmit}
       />
+
+      {typeof document !== "undefined" &&
+        calendarDropdownOpen &&
+        calendarDropdownRect &&
+        createPortal(
+          <div
+            ref={(el) => { calendarDropdownRef.current = el; }}
+            className="fixed z-[9999] w-[240px] max-h-[220px] overflow-y-auto rounded-lg border border-sidebar-border bg-sidebar py-1 shadow-lg"
+            style={{ top: calendarDropdownRect.top, left: Math.max(0, calendarDropdownRect.left) }}
+          >
+            {assetCalendars.length === 0 ? (
+              <p className="px-3 py-2 text-sm text-dashboard-foreground/70">No calendars yet.</p>
+            ) : (
+              sortedAssetCalendars.map((ac) => (
+                <button
+                  key={ac.id}
+                  type="button"
+                  onClick={() => { setSelectedAssetCalendarId(ac.id); setCalendarDropdownOpen(false); }}
+                  className={`w-full text-left px-3 py-2 text-sm hover:text-primary transition-colors ${selectedAssetCalendarId === ac.id ? "text-primary font-medium" : "text-dashboard-foreground"}`}
+                >
+                  {new Date(ac.startDate).toISOString().slice(0, 10)} → {new Date(ac.endDate).toISOString().slice(0, 10)}
+                </button>
+              ))
+            )}
+          </div>,
+          document.body
+        )}
+
+      {typeof document !== "undefined" &&
+        watchlistDropdownOpen &&
+        watchlistDropdownRect &&
+        createPortal(
+          <div
+            ref={(el) => { watchlistDropdownRef.current = el; }}
+            className="fixed z-[9999] w-[240px] max-h-[220px] overflow-y-auto rounded-lg border border-sidebar-border bg-sidebar py-1 shadow-lg"
+            style={{ top: watchlistDropdownRect.top, left: Math.max(0, watchlistDropdownRect.left) }}
+          >
+            {assetWatchlists.length === 0 ? (
+              <p className="px-3 py-2 text-sm text-dashboard-foreground/70">No watchlists yet.</p>
+            ) : (
+              sortedAssetWatchlists.map((aw) => (
+                <button
+                  key={aw.id}
+                  type="button"
+                  onClick={() => { setSelectedAssetWatchlistId(aw.id); setWatchlistDropdownOpen(false); }}
+                  className={`w-full text-left px-3 py-2 text-sm hover:text-primary transition-colors ${selectedAssetWatchlistId === aw.id ? "text-primary font-medium" : "text-dashboard-foreground"}`}
+                >
+                  {new Date(aw.startDate).toISOString().slice(0, 10)} → {new Date(aw.endDate).toISOString().slice(0, 10)}
+                </button>
+              ))
+            )}
+          </div>,
+          document.body
+        )}
     </>
   );
 }
