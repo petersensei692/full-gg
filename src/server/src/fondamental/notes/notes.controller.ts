@@ -6,6 +6,7 @@ import {
   Patch,
   Param,
   Delete,
+  Query,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -35,8 +36,8 @@ export class NotesController {
   @Get()
   @ApiOperation({ summary: 'Get all notes' })
   @ApiResponse({ status: 200, description: 'List of notes (ordered by updatedAt desc).' })
-  findAll() {
-    return this.notesService.findAll();
+  findAll(@Query('type') type?: string) {
+    return this.notesService.findAll(type);
   }
 
   @Get(':id')

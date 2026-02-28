@@ -13,12 +13,22 @@ export class NotesService {
   ) {}
 
   async create(createNoteDto: CreateNoteDto): Promise<Note> {
-    const note = this.noteRepository.create(createNoteDto);
+    const payload = {
+      ...createNoteDto,
+      type: createNoteDto.type ?? 'other',
+      images: createNoteDto.images ?? null,
+      imageNames: createNoteDto.imageNames ?? null,
+    };
+    const note = this.noteRepository.create(payload);
     return this.noteRepository.save(note);
   }
 
-  async findAll(): Promise<Note[]> {
+  async findAll(type?: string): Promise<Note[]> {
+    const where = type && ['macro', 'technical', 'other'].includes(type)
+      ? { type }
+      : {};
     const notes = await this.noteRepository.find({
+      where,
       order: { updatedAt: 'DESC' },
     });
     // Sort: tier_1 first, tier_2 second, tier_3 last

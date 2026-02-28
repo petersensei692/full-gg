@@ -3,7 +3,10 @@
 import { useRef, useCallback, useEffect, useState } from "react";
 import { Bold, Italic, Underline } from "lucide-react";
 import { Dialog, DialogContent } from "@/components/ui/Dialog";
-import type { Note, NoteTier } from "@/types/api";
+import { useImagePaste } from "@/hooks/useImagePaste";
+import { deleteStoredImage } from "@/lib/imageUpload";
+import { getImageUrl } from "@/lib/imageUrls";
+import type { Note, NoteTier, NoteType } from "@/types/api";
 
 const TIER_OPTIONS: { value: NoteTier; label: string }[] = [
   { value: "tier_1", label: "Tier 1" },
@@ -11,12 +14,18 @@ const TIER_OPTIONS: { value: NoteTier; label: string }[] = [
   { value: "tier_3", label: "Tier 3" },
 ];
 
+const TYPE_OPTIONS: { value: NoteType; label: string }[] = [
+  { value: "macro", label: "Macro" },
+  { value: "technical", label: "Technical" },
+  { value: "other", label: "Other" },
+];
+
 interface CreateNoteModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   mode: "create" | "edit";
   initialNote?: Note | null;
-  onSubmit: (payload: { title: string; note: string; tier: NoteTier }) => void | Promise<void>;
+  onSubmit: (payload: { title: string; note: string; tier: NoteTier; type: NoteType; images?: string[]; imageNames?: string[] }) => void | Promise<void>;
 }
 
 /** Normalize contenteditable HTML to a non-empty string for API (backend requires note). */
@@ -37,18 +46,30 @@ export function CreateNoteModal({
   const titleRef = useRef<HTMLInputElement>(null);
   const editorRef = useRef<HTMLDivElement>(null);
   const [tier, setTier] = useState<NoteTier>("tier_2");
+  const [type, setType] = useState<NoteType>("other");
+  const [noteImages, setNoteImages] = useState<Array<{ path: string; url: string }>>([]);
+  const [zoomedImageSrc, setZoomedImageSrc] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+
+  const { handlePaste: handleImagePaste } = useImagePaste({
+    onImageReady: (img) => setNoteImages((prev) => [...prev, img]),
+  });
 
   useEffect(() => {
     if (!open) {
       setError("");
       setSubmitting(false);
+      setNoteImages([]);
+      setZoomedImageSrc(null);
       return;
     }
     const title = initialNote?.title ?? "";
     const noteHtml = initialNote?.note ?? "";
     setTier((initialNote?.tier ?? "tier_2") as NoteTier);
+    setType((initialNote?.type ?? "other") as NoteType);
+    const images = initialNote?.images ?? [];
+    setNoteImages(images.map((path) => ({ path, url: getImageUrl(path) })));
     const applyInitial = () => {
       if (titleRef.current) titleRef.current.value = title;
       if (editorRef.current) editorRef.current.innerHTML = noteHtml;
@@ -60,7 +81,7 @@ export function CreateNoteModal({
       clearTimeout(t);
       clearTimeout(t2);
     };
-  }, [open, initialNote?.id, initialNote?.title, initialNote?.note, initialNote?.tier]);
+  }, [open, initialNote?.id, initialNote?.title, initialNote?.note, initialNote?.tier, initialNote?.type, initialNote?.images?.length]);
 
   const applyFormat = useCallback((command: "bold" | "italic" | "underline") => {
     document.execCommand(command, false);
@@ -149,14 +170,28 @@ export function CreateNoteModal({
     }
     setSubmitting(true);
     try {
-      await Promise.resolve(onSubmit({ title, note, tier }));
+      await Promise.resolve(onSubmit({
+        title,
+        note,
+        tier,
+        type,
+        images: noteImages.length ? noteImages.map((img) => img.path) : undefined,
+      }));
       onOpenChange(false);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to save note.");
     } finally {
       setSubmitting(false);
     }
-  }, [onSubmit, onOpenChange, tier]);
+  }, [onSubmit, onOpenChange, tier, type, noteImages]);
+
+  const handlePasteWithImages = useCallback(
+    (e: React.ClipboardEvent) => {
+      handleImagePaste(e);
+      if (!e.defaultPrevented) handlePaste(e);
+    },
+    [handleImagePaste, handlePaste]
+  );
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -203,6 +238,24 @@ export function CreateNoteModal({
               className="w-full min-w-0 rounded-lg border border-sidebar-border bg-header-input px-3 py-2 text-sm text-dashboard-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
             >
               {TIER_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="min-w-0 w-full">
+            <label htmlFor="note-type-input" className="block text-sm font-medium text-dashboard-foreground/80 mb-2 whitespace-nowrap">
+              Type
+            </label>
+            <select
+              id="note-type-input"
+              value={type}
+              onChange={(e) => setType(e.target.value as NoteType)}
+              className="w-full min-w-0 rounded-lg border border-sidebar-border bg-header-input px-3 py-2 text-sm text-dashboard-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+            >
+              {TYPE_OPTIONS.map((opt) => (
                 <option key={opt.value} value={opt.value}>
                   {opt.label}
                 </option>
@@ -262,14 +315,45 @@ export function CreateNoteModal({
             <div
               ref={editorRef}
               contentEditable
-              data-placeholder="Write your note..."
+              data-placeholder="Write your note... (Paste images to upload)"
               role="textbox"
               aria-multiline="true"
-              onPaste={handlePaste}
-              className="min-h-[200px] min-w-0 max-w-full flex-1 w-full overflow-x-hidden overflow-y-auto break-words rounded-lg border border-sidebar-border bg-header-input px-3 py-2.5 text-sm text-dashboard-foreground placeholder:text-dashboard-foreground/50 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary [&:empty::before]:content-[attr(data-placeholder)] [&:empty::before]:text-dashboard-foreground/50 [&_h1]:text-xl [&_h1]:font-bold [&_h2]:text-lg [&_h2]:font-semibold [&_h3]:text-base [&_h3]:font-medium [&_u]:underline [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:list-decimal [&_ol]:pl-6 [&_li]:my-0.5 [&_*]:break-words [&_*]:min-w-0 [&_*]:max-w-full"
+              onPaste={handlePasteWithImages}
+              className="min-h-[200px] min-w-0 max-w-full flex-1 w-full overflow-x-hidden overflow-y-auto break-words rounded-lg border border-sidebar-border bg-header-input px-3 py-2.5 text-sm text-dashboard-foreground placeholder:text-dashboard-foreground/50 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary [&:empty::before]:content-[attr(data-placeholder)] [&:empty::before]:text-dashboard-foreground/50 [&_h1]:text-xl [&_h1]:font-bold [&_h2]:text-lg [&_h2]:font-semibold [&_h3]:text-base [&_h3]:font-medium [&_u]:underline [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:list-decimal [&_ol]:pl-6 [&_li]:my-0.5 [&_*]:break-words [&_*]:min-w-0 [&_*]:max-w-full [&_img]:max-w-[50%] [&_img]:rounded-lg [&_img]:my-2"
               style={{ wordBreak: 'break-word' } as React.CSSProperties}
               suppressContentEditableWarning
             />
+            {noteImages.length > 0 && (
+              <div className="mt-3 flex flex-wrap gap-2">
+                {noteImages.map((img) => (
+                  <div key={img.path} className="relative">
+                    <button
+                      type="button"
+                      onClick={() => setZoomedImageSrc(img.url)}
+                      className="block"
+                    >
+                      <img
+                        src={img.url}
+                        alt="Note attachment"
+                        className="h-20 w-28 object-cover rounded-lg border border-sidebar-border hover:border-primary/50 transition-colors"
+                      />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        setNoteImages((prev) => prev.filter((p) => p.path !== img.path));
+                        await deleteStoredImage(img.path).catch(() => undefined);
+                      }}
+                      className="absolute -top-2 -right-2 rounded-full bg-red-500 text-white text-xs w-5 h-5 flex items-center justify-center shadow"
+                      aria-label="Remove image"
+                      title="Remove image"
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {error && (
@@ -297,6 +381,19 @@ export function CreateNoteModal({
           </button>
           </div>
         </div>
+        {zoomedImageSrc && (
+          <Dialog open={!!zoomedImageSrc} onOpenChange={(o) => !o && setZoomedImageSrc(null)}>
+            <DialogContent showClose className="bg-black/95 border-0">
+              <div className="relative w-full h-[90dvh] flex items-center justify-center">
+                <img
+                  src={zoomedImageSrc}
+                  alt="Note attachment"
+                  className="max-w-full max-h-full w-auto h-auto object-contain"
+                />
+              </div>
+            </DialogContent>
+          </Dialog>
+        )}
       </DialogContent>
     </Dialog>
   );

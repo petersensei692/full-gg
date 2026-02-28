@@ -2,8 +2,9 @@ import { BASE_URL, handleResponse } from "@/lib/api-client";
 import type { Note, CreateNoteDto, UpdateNoteDto } from "@/types/api";
 
 export const notesService = {
-  async getAll(): Promise<Note[]> {
-    const url = `${BASE_URL}/fondamental/notes`;
+  async getAll(typeFilter?: string): Promise<Note[]> {
+    const params = typeFilter ? `?type=${encodeURIComponent(typeFilter)}` : "";
+    const url = `${BASE_URL}/fondamental/notes${params}`;
     const res = await fetch(url, {
       headers: { "Content-Type": "application/json" },
     });

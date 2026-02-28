@@ -1,6 +1,6 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsIn, IsOptional, IsString, MaxLength } from 'class-validator';
-import { NOTE_TIERS } from './create-note.dto';
+import { IsIn, IsOptional, IsString, IsArray, MaxLength } from 'class-validator';
+import { NOTE_TIERS, NOTE_TYPES } from './create-note.dto';
 
 export class UpdateNoteDto {
   @ApiPropertyOptional({
@@ -29,4 +29,25 @@ export class UpdateNoteDto {
   @IsString()
   @IsIn(NOTE_TIERS)
   tier?: string;
+
+  @ApiPropertyOptional({
+    description: 'Note type (macro, technical, other)',
+    enum: NOTE_TYPES,
+  })
+  @IsOptional()
+  @IsString()
+  @IsIn(NOTE_TYPES)
+  type?: string;
+
+  @ApiPropertyOptional({ description: 'Image paths (from upload)', type: [String] })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  images?: string[];
+
+  @ApiPropertyOptional({ description: 'Optional names for each image', type: [String] })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  imageNames?: string[];
 }

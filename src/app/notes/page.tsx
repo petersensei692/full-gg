@@ -4,16 +4,21 @@ import { useState, useEffect, useCallback } from "react";
 import { FileText, Plus } from "lucide-react";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { notesService } from "@/lib/services/notes.service";
-import type { Note } from "@/types/api";
+import type { Note, NoteType } from "@/types/api";
 import { NoteCard } from "@/components/notes/NoteCard";
-import { NoteFocusDialog } from "@/components/notes/NoteFocusDialog";
 import { CreateNoteModal } from "@/components/notes/CreateNoteModal";
+
+const TYPE_FILTER_OPTIONS: { value: "" | NoteType; label: string }[] = [
+  { value: "", label: "All" },
+  { value: "macro", label: "Macro" },
+  { value: "technical", label: "Technical" },
+  { value: "other", label: "Other" },
+];
 
 export default function NotesPage() {
   const [notes, setNotes] = useState<Note[]>([]);
   const [loading, setLoading] = useState(true);
-  const [focusedNote, setFocusedNote] = useState<Note | null>(null);
-  const [focusOpen, setFocusOpen] = useState(false);
+  const [typeFilter, setTypeFilter] = useState<"" | NoteType>("");
   const [createOpen, setCreateOpen] = useState(false);
   const [editingNote, setEditingNote] = useState<Note | null>(null);
   const [editModalOpen, setEditModalOpen] = useState(false);
@@ -21,36 +26,28 @@ export default function NotesPage() {
   const loadNotes = useCallback(async () => {
     setLoading(true);
     try {
-      const list = await notesService.getAll();
+      const list = await notesService.getAll(typeFilter || undefined);
       setNotes(list);
     } catch {
       setNotes([]);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [typeFilter]);
 
   useEffect(() => {
     loadNotes();
   }, [loadNotes]);
 
-  const handleCardClick = useCallback((note: Note) => {
-    setFocusedNote(note);
-    setFocusOpen(true);
-  }, []);
-
-  const handleEditFromFocus = useCallback((note: Note) => {
-    setFocusOpen(false);
+  const handleEditNote = useCallback((note: Note) => {
     setEditingNote(note);
     setEditModalOpen(true);
   }, []);
 
-  const handleDeleteFromFocus = useCallback(
+  const handleDeleteNote = useCallback(
     async (note: Note) => {
       try {
         await notesService.delete(note.id);
-        setFocusOpen(false);
-        setFocusedNote(null);
         loadNotes();
       } catch {
         // ignore
@@ -60,7 +57,7 @@ export default function NotesPage() {
   );
 
   const handleCreateSubmit = useCallback(
-    async (payload: { title: string; note: string; tier: import("@/types/api").NoteTier }) => {
+    async (payload: { title: string; note: string; tier: import("@/types/api").NoteTier; type: NoteType; images?: string[] }) => {
       await notesService.create(payload);
       setCreateOpen(false);
       loadNotes();
@@ -69,7 +66,7 @@ export default function NotesPage() {
   );
 
   const handleEditSubmit = useCallback(
-    async (payload: { title: string; note: string; tier: import("@/types/api").NoteTier }) => {
+    async (payload: { title: string; note: string; tier: import("@/types/api").NoteTier; type: NoteType; images?: string[] }) => {
       if (!editingNote) return;
       await notesService.update(editingNote.id, payload);
       setEditModalOpen(false);
@@ -91,6 +88,18 @@ export default function NotesPage() {
         </p>
 
         <div className="flex items-center gap-3 mb-6">
+          <span className="text-sm text-dashboard-foreground/70">Filter:</span>
+          <select
+            value={typeFilter}
+            onChange={(e) => setTypeFilter(e.target.value as "" | NoteType)}
+            className="rounded-lg border border-sidebar-border bg-sidebar px-3 py-2 text-sm text-dashboard-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+          >
+            {TYPE_FILTER_OPTIONS.map((opt) => (
+              <option key={opt.value || "all"} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
           <button
             type="button"
             onClick={() => setCreateOpen(true)}
@@ -126,20 +135,13 @@ export default function NotesPage() {
               <NoteCard
                 key={note.id}
                 note={note}
-                onClick={() => handleCardClick(note)}
+                onEdit={handleEditNote}
+                onDelete={handleDeleteNote}
               />
             ))}
           </div>
         )}
       </div>
-
-      <NoteFocusDialog
-        note={focusedNote}
-        open={focusOpen}
-        onOpenChange={setFocusOpen}
-        onEdit={handleEditFromFocus}
-        onDelete={handleDeleteFromFocus}
-      />
 
       <CreateNoteModal
         open={createOpen}

@@ -186,6 +186,7 @@ export interface UpdateAnalysisDto {
 }
 
 export type NoteTier = "tier_1" | "tier_2" | "tier_3";
+export type NoteType = "macro" | "technical" | "other";
 
 /** Single note returned by the API */
 export interface Note {
@@ -193,6 +194,9 @@ export interface Note {
   title: string;
   note: string;
   tier?: NoteTier;
+  type?: NoteType;
+  images?: string[] | null;
+  imageNames?: string[] | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -202,6 +206,9 @@ export interface CreateNoteDto {
   title: string;
   note: string;
   tier: NoteTier;
+  type?: NoteType;
+  images?: string[];
+  imageNames?: string[];
 }
 
 /** Body for updating a note */
@@ -209,4 +216,7 @@ export interface UpdateNoteDto {
   title?: string;
   note?: string;
   tier?: NoteTier;
+  type?: NoteType;
+  images?: string[];
+  imageNames?: string[];
 }
