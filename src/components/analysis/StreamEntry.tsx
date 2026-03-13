@@ -86,11 +86,16 @@ export function StreamEntry({
     <article className="pb-6 last:pb-0">
       {separatorTop}
       <div
-        className={`min-w-0 max-w-[66.666%] rounded-xl border border-sidebar-border border-l-4 ${borderClass} bg-sidebar/50 p-4 shadow-sm`}
+        className={`min-w-0 max-w-[50%] rounded-xl border border-sidebar-border border-l-4 ${borderClass} bg-sidebar/50 p-4 shadow-sm`}
       >
         <div className="flex items-center justify-between gap-2 mb-2">
           <div className={`text-xs font-semibold uppercase tracking-wider ${textColorClass}`}>
             {entry.tag} • {entry.time}
+            {entry.scopeLabel != null && entry.scopeLabel !== "" && (
+              <span className="ml-1.5 text-dashboard-foreground/70 font-medium normal-case">
+                • {entry.scopeLabel}
+              </span>
+            )}
           </div>
           <div className="flex items-center gap-2">
             {onEdit && (
@@ -122,7 +127,7 @@ export function StreamEntry({
           dangerouslySetInnerHTML={{ __html: entry.content }}
         />
         {entry.images && entry.images.length > 0 && (
-          <div className="grid grid-cols-2 gap-4 mb-3">
+          <div className="grid grid-cols-1 gap-4 mb-3">
             {entry.images.map((path, index) => {
               const url = getImageUrl(path);
               const savedName = entry.imageNames?.[index] ?? "";
@@ -135,6 +140,7 @@ export function StreamEntry({
                 >
                   <textarea
                     value={displayName}
+                    spellCheck={false}
                     onChange={(e) => setDraftNames((prev) => ({ ...prev, [path]: e.target.value }))}
                     onBlur={(e) => {
                       const value = (e.target.value || "").trim();

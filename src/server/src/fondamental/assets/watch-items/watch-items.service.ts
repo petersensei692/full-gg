@@ -106,6 +106,7 @@ export class WatchItemsService {
       pairName: createDto.pairName,
       bias: createDto.bias,
       thesis: createDto.thesis || null,
+      finished: createDto.finished ?? false,
     });
 
     return this.watchItemRepository.save(watchItem);
@@ -202,6 +203,9 @@ export class WatchItemsService {
         };
         watchItem.thesis = thesis;
       }
+    }
+    if (updateDto.finished !== undefined) {
+      watchItem.finished = updateDto.finished;
     }
 
     return this.watchItemRepository.save(watchItem);

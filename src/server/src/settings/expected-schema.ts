@@ -4,7 +4,7 @@ export const EXPECTED_SQLITE_SCHEMA: Record<string, string[]> = {
   assets: ['id', 'name', 'created_at', 'updated_at'],
   notes: ['id', 'title', 'note', 'tier', 'type', 'images', 'image_names', 'created_at', 'updated_at'],
   events: ['id', 'calendar_id', 'day', 'time', 'asset_id', 'name', 'impact', 'created_at', 'updated_at'],
-  watch_items: ['id', 'watchlist_id', 'base_asset_id', 'quote_asset_id', 'pair_name', 'bias', 'thesis', 'created_at', 'updated_at'],
+  watch_items: ['id', 'watchlist_id', 'base_asset_id', 'quote_asset_id', 'pair_name', 'bias', 'thesis', 'finished', 'created_at', 'updated_at'],
   weekly_watchlist: ['id', 'start_date', 'end_date', 'created_at', 'updated_at'],
   weekly_calendar: ['id', 'start_date', 'end_date', 'created_at', 'updated_at'],
 };

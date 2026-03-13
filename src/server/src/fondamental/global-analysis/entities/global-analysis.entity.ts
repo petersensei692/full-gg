@@ -4,11 +4,8 @@ import {
   Column,
   CreateDateColumn,
   UpdateDateColumn,
-  ManyToOne,
-  JoinColumn,
   ValueTransformer,
 } from 'typeorm';
-import { Asset } from '../../entities/asset.entity';
 
 const stringArrayTransformer: ValueTransformer = {
   to: (v: string[] | null): string | null =>
@@ -17,17 +14,17 @@ const stringArrayTransformer: ValueTransformer = {
     v == null ? null : JSON.parse(v),
 };
 
-@Entity('analysis')
-export class Analysis {
+const scopeTransformer: ValueTransformer = {
+  to: (v: 'global' | string[]): string =>
+    typeof v === 'string' ? v : JSON.stringify(v),
+  from: (v: string): 'global' | string[] =>
+    v === 'global' ? 'global' : (JSON.parse(v) as string[]),
+};
+
+@Entity('global_analysis')
+export class GlobalAnalysis {
   @PrimaryGeneratedColumn('uuid')
   id: string;
-
-  @Column({ type: 'varchar', length: 36, name: 'asset_id', nullable: true })
-  assetId: string | null;
-
-  @ManyToOne(() => Asset, { onDelete: 'CASCADE', nullable: true })
-  @JoinColumn({ name: 'asset_id' })
-  asset: Asset | null;
 
   @Column({ type: 'text' })
   notes: string;
@@ -38,12 +35,11 @@ export class Analysis {
   @Column({ type: 'text', nullable: true, name: 'image_names', transformer: stringArrayTransformer })
   imageNames: string[] | null;
 
-  /** Display label for scope: "GLOBAL", "USD•EUR•...", or null for single-asset analysis */
-  @Column({ type: 'varchar', length: 500, name: 'scope_label', nullable: true })
-  scopeLabel: string | null;
+  @Column({ type: 'text', transformer: scopeTransformer })
+  scope: 'global' | string[];
 
-  @Column({ type: 'varchar', length: 36, name: 'global_analysis_id', nullable: true })
-  globalAnalysisId: string | null;
+  @Column({ type: 'varchar', length: 20, name: 'analysis_type', default: 'daily' })
+  analysisType: string;
 
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;

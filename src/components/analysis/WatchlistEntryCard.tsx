@@ -4,7 +4,7 @@ import { useState } from "react";
 import type { WatchItem } from "@/types/api";
 import { useWatchlistCalendar } from "@/context/WatchlistCalendarContext";
 import { getImageUrl } from "@/lib/imageUrls";
-import { Trash2 } from "lucide-react";
+import { Check, Trash2 } from "lucide-react";
 import { WatchlistFocusDialog } from "./WatchlistFocusDialog";
 
 interface WatchlistEntryCardProps {
@@ -19,10 +19,16 @@ const BORDER_CLASS = {
 
 export function WatchlistEntryCard({ entry, onEdit }: WatchlistEntryCardProps) {
   const [focusOpen, setFocusOpen] = useState(false);
-  const { deleteWatchItem } = useWatchlistCalendar();
+  const { deleteWatchItem, updateWatchItem } = useWatchlistCalendar();
 
   const bias = (entry.bias as "bullish" | "bearish") ?? "bullish";
   const firstImage = entry.thesis?.images?.[0];
+  const finished = entry.finished === true;
+
+  const handleToggleFinished = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    updateWatchItem(entry.id, { finished: !finished });
+  };
 
   return (
     <>
@@ -36,13 +42,30 @@ export function WatchlistEntryCard({ entry, onEdit }: WatchlistEntryCardProps) {
             setFocusOpen(true);
           }
         }}
-        className={`rounded-xl ${BORDER_CLASS[bias]} bg-sidebar/50 overflow-hidden shadow-sm cursor-pointer hover:opacity-90 transition-opacity flex flex-col min-h-[200px]`}
+        className={`rounded-xl ${BORDER_CLASS[bias]} overflow-hidden shadow-sm cursor-pointer flex flex-col min-h-[200px] ${
+          finished
+            ? "bg-dashboard-foreground/10 focus:bg-dashboard-foreground/10 hover:bg-dashboard-foreground/10"
+            : "bg-sidebar/50 hover:opacity-90 transition-opacity"
+        }`}
       >
         <div className="px-4 py-3 border-b border-sidebar-border flex items-center justify-between gap-2 shrink-0">
           <h4 className="text-base font-semibold text-dashboard-foreground truncate">
             {entry.pairName}
           </h4>
           <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
+            <button
+              type="button"
+              onClick={handleToggleFinished}
+              className={`p-1 transition-colors rounded ${
+                finished
+                  ? "text-primary bg-primary/20"
+                  : "text-dashboard-foreground/50 hover:text-primary hover:bg-sidebar-hover"
+              }`}
+              aria-label={finished ? "Mark as not finished" : "Mark as finished"}
+              title={finished ? "Mark as not finished" : "Mark as finished"}
+            >
+              <Check className="h-4 w-4" />
+            </button>
             <button
               type="button"
               onClick={(e) => {
@@ -71,7 +94,11 @@ export function WatchlistEntryCard({ entry, onEdit }: WatchlistEntryCardProps) {
             )}
           </div>
         </div>
-        <div className="flex-1 min-h-0 flex items-center justify-center p-4 bg-sidebar/30">
+        <div
+          className={`flex-1 min-h-0 flex items-center justify-center p-4 ${
+            finished ? "bg-dashboard-foreground/5" : "bg-sidebar/30"
+          }`}
+        >
           {firstImage ? (
             <img
               src={getImageUrl(firstImage)}

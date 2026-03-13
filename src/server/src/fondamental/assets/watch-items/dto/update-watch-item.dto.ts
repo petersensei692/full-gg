@@ -1,5 +1,5 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsOptional, IsString, IsUUID, MaxLength, ValidateNested, IsArray } from 'class-validator';
+import { IsOptional, IsString, IsUUID, MaxLength, ValidateNested, IsArray, IsBoolean } from 'class-validator';
 import { Type } from 'class-transformer';
 
 class ThesisDto {
@@ -54,4 +54,9 @@ export class UpdateWatchItemDto {
   @ValidateNested()
   @Type(() => ThesisDto)
   thesis?: ThesisDto | null;
+
+  @ApiPropertyOptional({ description: 'Whether the watch item is marked as finished', default: false })
+  @IsOptional()
+  @IsBoolean()
+  finished?: boolean;
 }

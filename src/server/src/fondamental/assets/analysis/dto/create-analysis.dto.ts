@@ -17,4 +17,10 @@ export class CreateAnalysisDto {
   @IsArray()
   @IsString({ each: true })
   images?: string[];
+
+  @ApiPropertyOptional({ description: 'Display names for each image (same order as images)', type: [String] })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  imageNames?: string[];
 }

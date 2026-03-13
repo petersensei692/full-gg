@@ -33,6 +33,8 @@ $ npm install
 
 ## Compile and run the project
 
+If you get **Cannot POST /fondamental/global-analysis** (404), the server may be running an old build. From the **project root** run `npm run build:server` then restart the server so the Global Analysis module is loaded.
+
 ```bash
 # development
 $ npm run start

@@ -11,6 +11,7 @@ import {
   ChevronDown,
   ChevronRight,
   Loader2,
+  Globe,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useState } from "react";
@@ -44,6 +45,7 @@ export function Sidebar() {
     icon: BarChart3,
     assets,
     subNav: [
+      { href: "/global-analysis", label: "Global Analysis", icon: Globe },
       { href: "/watch-list", label: "Watch List", icon: Eye },
       { href: "/calendar", label: "Calendar", icon: Calendar },
     ],

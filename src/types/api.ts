@@ -132,6 +132,8 @@ export interface WatchItem {
   pairName: string;
   bias: string;
   thesis: Thesis | null;
+  /** Whether the watch item is marked as finished (greyed out) */
+  finished?: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -156,6 +158,7 @@ export interface UpdateWatchItemDto {
   pairName?: string;
   bias?: string;
   thesis?: Thesis | null;
+  finished?: boolean;
 }
 
 /** Single analysis returned by the API */
@@ -166,6 +169,10 @@ export interface Analysis {
   notes: string;
   images: string[] | null;
   imageNames?: string[] | null;
+  /** "GLOBAL", "USD•EUR•...", or null for single-asset analysis */
+  scopeLabel?: string | null;
+  /** Set when this analysis was created from a global analysis; edit/delete only from Global Analysis page */
+  globalAnalysisId?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -183,6 +190,36 @@ export interface UpdateAnalysisDto {
   notes?: string;
   images?: string[] | null;
   imageNames?: string[] | null;
+}
+
+/** Global analysis (template applied to one or more assets) */
+export interface GlobalAnalysis {
+  id: string;
+  notes: string;
+  images: string[] | null;
+  imageNames: string[] | null;
+  scope: "global" | string[];
+  scopeDisplay: string;
+  analysisType?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** Body for creating a global analysis */
+export interface CreateGlobalAnalysisDto {
+  notes: string;
+  images?: string[];
+  imageNames?: string[];
+  scope: "global" | string[];
+  analysisType?: string;
+}
+
+/** Body for updating a global analysis */
+export interface UpdateGlobalAnalysisDto {
+  notes?: string;
+  images?: string[] | null;
+  imageNames?: string[] | null;
+  analysisType?: string;
 }
 
 export type NoteTier = "tier_1" | "tier_2" | "tier_3";

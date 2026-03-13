@@ -58,6 +58,9 @@ export class WatchItem {
   })
   thesis: Thesis | null;
 
+  @Column({ type: 'boolean', default: false })
+  finished: boolean;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 

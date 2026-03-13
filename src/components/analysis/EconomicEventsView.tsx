@@ -52,6 +52,20 @@ function getWeekdayName(date: string): string {
   });
 }
 
+const todayIso = () => new Date().toISOString().slice(0, 10);
+
+/** True if the given date is strictly before today */
+function isDayPassed(date: string): boolean {
+  return date < todayIso();
+}
+
+/** True if the event's datetime (date + time) is in the past */
+function isEventPassed(date: string, time: string): boolean {
+  const dateTime = `${date}T${time || "23:59"}`;
+  const eventMs = new Date(dateTime).getTime();
+  return eventMs < Date.now();
+}
+
 /** Resolve weekday (e.g. "Tuesday") to the first matching date in range (same logic as principal calendar). */
 function getDateForWeekdayInRange(
   startDate: string,
@@ -216,74 +230,90 @@ export function EconomicEventsView({
       )}
 
       {/* Weekly calendar view: days and events */}
-      <div className="flex-1 min-h-0 overflow-auto rounded-lg border border-sidebar-border bg-sidebar/30">
-        {!selectedAssetCalendar ? (
-          <div className="flex flex-col items-center justify-center h-64 text-dashboard-foreground/60 text-sm">
-            <Calendar className="h-10 w-10 mb-2 opacity-50" />
-            <p>
-              {asset.id
-                ? "Select a calendar or create one from the Calendar page."
-                : "Asset ID required to load calendars."}
-            </p>
-          </div>
-        ) : (
-          <div className="divide-y divide-sidebar-border">
-            {daysInWeek.map(({ date, label }) => {
-              const today = new Date().toISOString().slice(0, 10);
-              const isToday = date === today;
-              const dayEvents = (eventsByDate[date] || []).sort((a, b) =>
-                (a.time || "00:00").localeCompare(b.time || "00:00")
-              );
-              return (
-                <div key={date} className="p-4">
-                  <div className="flex items-center gap-2 mb-3">
-                    <h4 className="text-sm font-semibold text-dashboard-foreground">
-                      {label}
-                    </h4>
-                    {isToday && (
-                      <span className="rounded bg-sidebar-hover px-2 py-0.5 text-xs font-medium text-dashboard-foreground/80">
-                        TODAY
-                      </span>
-                    )}
-                  </div>
-                  <div className="rounded-lg border border-sidebar-border overflow-hidden">
-                    <table className="w-full text-sm table-fixed">
-                      <colgroup>
-                        <col className="w-[15%]" />
-                        <col className="w-[12.5%]" />
-                        <col className="w-[12.5%]" />
-                        <col className="w-[12.5%]" />
-                        <col className="w-[35%]" />
-                        <col className="w-[12.5%]" />
-                      </colgroup>
-                      <thead>
-                        <tr className="border-b border-sidebar-border bg-sidebar/80 text-dashboard-foreground/70 font-medium">
-                          <th className="py-2.5 px-2 text-left">DATE</th>
-                          <th className="py-2.5 px-2 text-center">TIME</th>
-                          <th className="py-2.5 px-2 text-center">CUR</th>
-                          <th className="py-2.5 px-2 text-center">IMPACT</th>
-                          <th className="py-2.5 px-2 text-left"></th>
-                          <th className="py-2.5 px-2 text-center">DEL</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {dayEvents.length === 0 ? (
-                          <tr>
-                            <td
-                              colSpan={6}
-                              className="py-4 px-2 text-dashboard-foreground/50 text-center"
-                            >
-                              No events
-                            </td>
+      {!selectedAssetCalendar ? (
+        <div className="flex-1 min-h-0 overflow-auto rounded-lg border border-sidebar-border bg-sidebar/30 flex flex-col items-center justify-center h-64 text-dashboard-foreground/60 text-sm">
+          <Calendar className="h-10 w-10 mb-2 opacity-50" />
+          <p>
+            {asset.id
+              ? "Select a calendar or create one from the Calendar page."
+              : "Asset ID required to load calendars."}
+          </p>
+        </div>
+      ) : (() => {
+        const allDaysPassed = daysInWeek.length > 0 && daysInWeek.every((d) => isDayPassed(d.date));
+        return (
+          <div
+            className={`flex-1 min-h-0 overflow-auto rounded-lg border border-sidebar-border ${
+              allDaysPassed ? "bg-dashboard-foreground/10" : "bg-sidebar/30"
+            }`}
+          >
+            <div className="divide-y divide-sidebar-border">
+              {daysInWeek.map(({ date, label }) => {
+                const today = todayIso();
+                const isToday = date === today;
+                const dayPassed = isDayPassed(date);
+                const dayEvents = (eventsByDate[date] || []).sort((a, b) =>
+                  (a.time || "00:00").localeCompare(b.time || "00:00")
+                );
+                return (
+                  <div
+                    key={date}
+                    className={`p-4 ${dayPassed ? "bg-dashboard-foreground/10" : ""}`}
+                  >
+                    <div className="flex items-center gap-2 mb-3">
+                      <h4 className="text-sm font-semibold text-dashboard-foreground">
+                        {label}
+                      </h4>
+                      {isToday && (
+                        <span className="rounded bg-sidebar-hover px-2 py-0.5 text-xs font-medium text-dashboard-foreground/80">
+                          TODAY
+                        </span>
+                      )}
+                    </div>
+                    <div className="rounded-lg border border-sidebar-border overflow-hidden">
+                      <table className="w-full text-sm table-fixed">
+                        <colgroup>
+                          <col className="w-[15%]" />
+                          <col className="w-[12.5%]" />
+                          <col className="w-[12.5%]" />
+                          <col className="w-[12.5%]" />
+                          <col className="w-[35%]" />
+                          <col className="w-[12.5%]" />
+                        </colgroup>
+                        <thead>
+                          <tr className="border-b border-sidebar-border bg-sidebar/80 text-dashboard-foreground/70 font-medium">
+                            <th className="py-2.5 px-2 text-left">DATE</th>
+                            <th className="py-2.5 px-2 text-center">TIME</th>
+                            <th className="py-2.5 px-2 text-center">CUR</th>
+                            <th className="py-2.5 px-2 text-center">IMPACT</th>
+                            <th className="py-2.5 px-2 text-left"></th>
+                            <th className="py-2.5 px-2 text-center">DEL</th>
                           </tr>
-                        ) : (
-                          dayEvents.map((ev, i) => (
-                            <tr
-                              key={ev.id}
-                              className={`border-b border-sidebar-border/50 last:border-0 ${
-                                i % 2 === 0 ? "bg-header-input/30" : "bg-sidebar/30"
-                              }`}
-                            >
+                        </thead>
+                        <tbody>
+                          {dayEvents.length === 0 ? (
+                            <tr>
+                              <td
+                                colSpan={6}
+                                className="py-4 px-2 text-dashboard-foreground/50 text-center"
+                              >
+                                No events
+                              </td>
+                            </tr>
+                          ) : (
+                            dayEvents.map((ev, i) => {
+                              const eventPassed = isEventPassed(date, ev.time || "");
+                              return (
+                                <tr
+                                  key={ev.id}
+                                  className={`border-b border-sidebar-border/50 last:border-0 ${
+                                    eventPassed
+                                      ? "bg-dashboard-foreground/15"
+                                      : i % 2 === 0
+                                        ? "bg-header-input/30"
+                                        : "bg-sidebar/30"
+                                  }`}
+                                >
                               <td className="py-2.5 px-2 text-dashboard-foreground/90 text-left break-words">
                                 {new Date(date + "T12:00:00").toLocaleDateString("en-US", {
                                   weekday: "short",
@@ -336,17 +366,19 @@ export function EconomicEventsView({
                                 </span>
                               </td>
                             </tr>
-                          ))
-                        )}
-                      </tbody>
-                    </table>
+                              );
+                            })
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
           </div>
-        )}
-      </div>
+        );
+      })()}
 
       {!controlled && (
         <CreateEventModal

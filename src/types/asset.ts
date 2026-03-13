@@ -35,6 +35,8 @@ export interface StreamEntry {
   createdAt?: number;
   /** Analysis type for filtering: daily | weekly | monthly | qoq | yearly */
   analysisType?: string;
+  /** Scope label: "GLOBAL", "USD•EUR•...", or single asset name for asset analysis */
+  scopeLabel?: string | null;
 }
 
 export interface AssetSnapshot {

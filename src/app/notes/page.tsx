@@ -19,6 +19,7 @@ export default function NotesPage() {
   const [notes, setNotes] = useState<Note[]>([]);
   const [loading, setLoading] = useState(true);
   const [typeFilter, setTypeFilter] = useState<"" | NoteType>("");
+  const [searchQuery, setSearchQuery] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
   const [editingNote, setEditingNote] = useState<Note | null>(null);
   const [editModalOpen, setEditModalOpen] = useState(false);
@@ -87,7 +88,16 @@ export default function NotesPage() {
           Your notes appear as cards. Click a card to view the full note.
         </p>
 
-        <div className="flex items-center gap-3 mb-6">
+        <div className="flex flex-wrap items-center gap-3 mb-6">
+          <input
+            type="search"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search notes by title..."
+            spellCheck={false}
+            className="rounded-lg border border-sidebar-border bg-sidebar px-3 py-2 text-sm text-dashboard-foreground placeholder:text-dashboard-foreground/50 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary min-w-[200px] max-w-[320px]"
+            aria-label="Search notes by title"
+          />
           <span className="text-sm text-dashboard-foreground/70">Filter:</span>
           <select
             value={typeFilter}
@@ -121,26 +131,40 @@ export default function NotesPage() {
             <p>No notes yet.</p>
             <p className="text-xs mt-1">Create one with the button above.</p>
           </div>
-        ) : (
-          <div className="grid grid-cols-2 gap-4">
-            {[...notes]
-              .sort((a, b) => {
-                const order: Record<string, number> = { tier_1: 0, tier_2: 1, tier_3: 2 };
-                const oa = order[a.tier ?? "tier_2"] ?? 1;
-                const ob = order[b.tier ?? "tier_2"] ?? 1;
-                if (oa !== ob) return oa - ob;
-                return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
-              })
-              .map((note) => (
-              <NoteCard
-                key={note.id}
-                note={note}
-                onEdit={handleEditNote}
-                onDelete={handleDeleteNote}
-              />
-            ))}
-          </div>
-        )}
+        ) : (() => {
+          const q = searchQuery.trim().toLowerCase();
+          const filtered = q
+            ? notes.filter((note) => (note.title ?? "").toLowerCase().includes(q))
+            : notes;
+          const sorted = [...filtered].sort((a, b) => {
+            const order: Record<string, number> = { tier_1: 0, tier_2: 1, tier_3: 2 };
+            const oa = order[a.tier ?? "tier_2"] ?? 1;
+            const ob = order[b.tier ?? "tier_2"] ?? 1;
+            if (oa !== ob) return oa - ob;
+            return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+          });
+          if (sorted.length === 0) {
+            return (
+              <div className="flex flex-col items-center justify-center min-h-[280px] text-dashboard-foreground/60 text-sm rounded-xl border border-sidebar-border bg-sidebar/30">
+                <FileText className="h-12 w-12 mb-3 opacity-50" />
+                <p>No notes match your search.</p>
+                <p className="text-xs mt-1">Try a different title or clear the search.</p>
+              </div>
+            );
+          }
+          return (
+            <div className="grid grid-cols-2 gap-4">
+              {sorted.map((note) => (
+                <NoteCard
+                  key={note.id}
+                  note={note}
+                  onEdit={handleEditNote}
+                  onDelete={handleDeleteNote}
+                />
+              ))}
+            </div>
+          );
+        })()}
       </div>
 
       <CreateNoteModal

@@ -122,6 +122,11 @@ export function CreateNoteModal({
     }
   }, []);
 
+  const applyNormalText = useCallback(() => {
+    document.execCommand("formatBlock", false, "p");
+    editorRef.current?.focus();
+  }, []);
+
   /** Keep editor focus/selection when clicking toolbar so underline etc. apply to selection */
   const handleFormatMouseDown = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
@@ -222,6 +227,8 @@ export function CreateNoteModal({
               defaultValue={initialNote?.title ?? ""}
               placeholder="Note title"
               maxLength={500}
+              spellCheck={false}
+              autoComplete="off"
               className="w-full min-w-0 rounded-lg border border-sidebar-border bg-header-input px-3 py-2 text-sm text-dashboard-foreground placeholder:text-dashboard-foreground/50 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary break-words"
             />
           </div>
@@ -311,17 +318,29 @@ export function CreateNoteModal({
                   {tag.toUpperCase()}
                 </button>
               ))}
+              <button
+                type="button"
+                onMouseDown={handleHeadingMouseDown}
+                onClick={applyNormalText}
+                className="rounded p-1.5 text-dashboard-foreground/60 hover:bg-sidebar-hover hover:text-dashboard-foreground transition-colors text-xs"
+                aria-label="Normal text"
+                title="Normal text"
+              >
+                P
+              </button>
             </div>
             <div
               ref={editorRef}
               contentEditable
+              spellCheck={false}
               data-placeholder="Write your note... (Paste images to upload)"
               role="textbox"
               aria-multiline="true"
               onPaste={handlePasteWithImages}
               className="min-h-[200px] min-w-0 max-w-full flex-1 w-full overflow-x-hidden overflow-y-auto break-words rounded-lg border border-sidebar-border bg-header-input px-3 py-2.5 text-sm text-dashboard-foreground placeholder:text-dashboard-foreground/50 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary [&:empty::before]:content-[attr(data-placeholder)] [&:empty::before]:text-dashboard-foreground/50 [&_h1]:text-xl [&_h1]:font-bold [&_h2]:text-lg [&_h2]:font-semibold [&_h3]:text-base [&_h3]:font-medium [&_u]:underline [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:list-decimal [&_ol]:pl-6 [&_li]:my-0.5 [&_*]:break-words [&_*]:min-w-0 [&_*]:max-w-full [&_img]:max-w-[50%] [&_img]:rounded-lg [&_img]:my-2"
-              style={{ wordBreak: 'break-word' } as React.CSSProperties}
+              style={{ wordBreak: "break-word" } as React.CSSProperties}
               suppressContentEditableWarning
+              suppressHydrationWarning
             />
             {noteImages.length > 0 && (
               <div className="mt-3 flex flex-wrap gap-2">

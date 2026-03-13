@@ -184,6 +184,9 @@ export function AssetAnalysisView({ asset }: AssetAnalysisViewProps) {
       if (index < 0) return;
       const currentNames = target.imageNames ?? [];
       const nextImageNames = imageList.map((_, i) => (i === index ? name : (currentNames[i] ?? "")));
+      setAnalyses((prev) =>
+        prev.map((a) => (a.id === analysisId ? { ...a, imageNames: nextImageNames } : a))
+      );
       const updated = await analysisService.update(analysisId, { imageNames: nextImageNames });
       setAnalyses((prev) => prev.map((a) => (a.id === analysisId ? updated : a)));
     },
@@ -346,6 +349,7 @@ export function AssetAnalysisView({ asset }: AssetAnalysisViewProps) {
           analysisType,
           images: imageList,
           imageNames,
+          scopeLabel: analysis.scopeLabel ?? resolvedAsset.label,
         };
         return entry;
       })
@@ -493,22 +497,23 @@ export function AssetAnalysisView({ asset }: AssetAnalysisViewProps) {
           <div className="flex-1 flex flex-col min-h-0 w-full">
             <div ref={streamScrollRef} className="flex-1 min-h-0 overflow-auto px-6 w-full">
               <div className="w-full max-w-full space-y-0 pb-4">
-                {entriesWithGroups.map(({ entry, separatorType, weekGroup, dateGroup }) => (
-                  <StreamEntryComponent
-                    key={entry.id}
-                    entry={entry}
-                    separatorType={separatorType}
-                    weekGroup={weekGroup}
-                    dateGroup={dateGroup}
-                    onDelete={() => handleDeleteAnalysis(entry.id, entry.images ?? [])}
-                    onDeleteImage={(path) => handleDeleteImage(entry.id, path)}
-                    onUpdateImageName={(path, name) => handleUpdateImageName(entry.id, path, name)}
-                    onEdit={() => {
-                      const analysis = analyses.find((a) => a.id === entry.id);
-                      if (analysis) handleEditAnalysis(analysis);
-                    }}
-                  />
-                ))}
+                {entriesWithGroups.map(({ entry, separatorType, weekGroup, dateGroup }) => {
+                  const analysis = analyses.find((a) => a.id === entry.id);
+                  const fromGlobalAnalysis = !!analysis?.globalAnalysisId;
+                  return (
+                    <StreamEntryComponent
+                      key={entry.id}
+                      entry={entry}
+                      separatorType={separatorType}
+                      weekGroup={weekGroup}
+                      dateGroup={dateGroup}
+                      onDelete={fromGlobalAnalysis ? undefined : () => handleDeleteAnalysis(entry.id, entry.images ?? [])}
+                      onDeleteImage={fromGlobalAnalysis ? undefined : (path) => handleDeleteImage(entry.id, path)}
+                      onUpdateImageName={fromGlobalAnalysis ? undefined : (path, name) => handleUpdateImageName(entry.id, path, name)}
+                      onEdit={fromGlobalAnalysis ? undefined : () => analysis && handleEditAnalysis(analysis)}
+                    />
+                  );
+                })}
               </div>
             </div>
             <div className="shrink-0 w-full px-6 pb-6 pt-3 border-t border-sidebar-border/50 bg-dashboard-bg">
