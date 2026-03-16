@@ -1,11 +1,32 @@
 "use client";
 
-import { useRef, useState, useCallback } from "react";
+import { useRef, useState, useCallback, useMemo } from "react";
 import { Bold, Italic, Underline, PenSquare, Check, ChevronDown } from "lucide-react";
 import { useImagePaste } from "@/hooks/useImagePaste";
 import { Dialog, DialogContent } from "@/components/ui/Dialog";
 import { deleteStoredImage } from "@/lib/imageUpload";
 import type { AssetConfig } from "@/types/asset";
+
+const ASSET_TYPE_ORDER = ["currency", "commodity", "stocks", "crypto", "bond"] as const;
+const ASSET_TYPE_LABELS: Record<string, string> = {
+  currency: "Currencies",
+  commodity: "Commodities",
+  stocks: "Stocks",
+  crypto: "Crypto",
+  bond: "Bonds",
+};
+
+const CURRENCY_NAMES = new Set(["USD", "EUR", "GBP", "JPY", "CAD", "CHF", "AUD", "NZD"]);
+const COMMODITY_NAMES = new Set(["XAU", "XAG"]);
+
+function getAssetType(asset: AssetConfig): string {
+  if (asset.type) return asset.type;
+  const name = (asset.label ?? asset.slug?.toUpperCase().replace(/-/g, " ") ?? "").toUpperCase();
+  if (CURRENCY_NAMES.has(name)) return "currency";
+  if (COMMODITY_NAMES.has(name)) return "commodity";
+  if (name === "STOCKS") return "stocks";
+  return "currency";
+}
 
 interface PostGlobalAnalysisInputProps {
   placeholder: string;
@@ -53,6 +74,30 @@ export function PostGlobalAnalysisInput({
       return next;
     });
   }, []);
+
+  const assetsByType = useMemo(() => {
+    const m: Record<string, AssetConfig[]> = {};
+    for (const t of ASSET_TYPE_ORDER) m[t] = [];
+    for (const a of assets) {
+      const t = getAssetType(a);
+      if (!m[t]) m[t] = [];
+      m[t].push(a);
+    }
+    return m;
+  }, [assets]);
+
+  const toggleSection = useCallback((type: string) => {
+    const typeAssets = assetsByType[type] ?? [];
+    const ids = typeAssets.map((a) => a.id).filter(Boolean) as string[];
+    if (ids.length === 0) return;
+    setSelectedAssetIds((prev) => {
+      const next = new Set(prev);
+      const allSelected = ids.every((id) => next.has(id));
+      if (allSelected) ids.forEach((id) => next.delete(id));
+      else ids.forEach((id) => next.add(id));
+      return next;
+    });
+  }, [assetsByType]);
 
   const applyFormat = useCallback((command: "bold" | "italic" | "underline") => {
     document.execCommand(command, false);
@@ -227,39 +272,78 @@ export function PostGlobalAnalysisInput({
                     aria-hidden
                     onClick={() => setAssetsDropdownOpen(false)}
                   />
-                  <div className="absolute left-0 bottom-full z-20 mb-1 max-h-[180px] w-56 overflow-y-auto rounded-lg border border-sidebar-border bg-sidebar p-2 shadow-lg">
-                    {assets.map((asset) => {
-                      const id = asset.id ?? asset.slug;
-                      const checked = selectedAssetIds.has(id);
+                  <div className="absolute left-0 bottom-full z-20 mb-1 max-h-[320px] w-64 overflow-y-auto rounded-lg border border-sidebar-border bg-sidebar p-2 shadow-lg">
+                    {ASSET_TYPE_ORDER.map((type) => {
+                      const typeAssets = assetsByType[type] ?? [];
+                      const typeLabel = ASSET_TYPE_LABELS[type] ?? type;
+                      const typeIds = typeAssets.map((a) => a.id).filter(Boolean) as string[];
+                      const allSelected = typeIds.length > 0 && typeIds.every((id) => selectedAssetIds.has(id));
+                      const someSelected = typeIds.some((id) => selectedAssetIds.has(id));
                       return (
-                        <label
-                          key={id}
-                          role="button"
-                          tabIndex={0}
-                          aria-pressed={checked}
-                          onClick={(e) => {
-                            e.preventDefault();
-                            toggleAsset(id);
-                          }}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter" || e.key === " ") {
-                              e.preventDefault();
-                              toggleAsset(id);
-                            }
-                          }}
-                          className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-dashboard-foreground hover:bg-sidebar-hover cursor-pointer select-none"
-                        >
-                          <span
-                            className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border pointer-events-none ${
-                              checked
-                                ? "border-primary bg-primary text-primary-foreground"
-                                : "border-sidebar-border bg-sidebar"
-                            }`}
+                        <div key={type} className="mb-2 last:mb-0">
+                          <button
+                            type="button"
+                            onClick={() => toggleSection(type)}
+                            className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-semibold text-dashboard-foreground hover:bg-sidebar-hover"
+                            title={allSelected ? "Deselect all" : "Select all"}
                           >
-                            {checked ? <Check className="h-3 w-3" /> : null}
-                          </span>
-                          {asset.label}
-                        </label>
+                            <span
+                              className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border ${
+                                allSelected
+                                  ? "border-primary bg-primary text-primary-foreground"
+                                  : someSelected
+                                    ? "border-primary bg-primary/30 text-primary"
+                                    : "border-sidebar-border bg-sidebar"
+                              }`}
+                            >
+                              {allSelected ? <Check className="h-3 w-3" /> : null}
+                            </span>
+                            {typeLabel}
+                            {typeAssets.length === 0 && (
+                              <span className="text-sidebar-muted font-normal">(empty)</span>
+                            )}
+                          </button>
+                          <div className="mt-0.5 pl-6 space-y-0.5">
+                            {typeAssets.length === 0 ? (
+                              <div className="py-1 text-xs text-sidebar-muted">No assets</div>
+                            ) : (
+                              typeAssets.map((asset) => {
+                                const id = asset.id ?? asset.slug;
+                                const checked = selectedAssetIds.has(id);
+                                return (
+                                  <label
+                                    key={id}
+                                    role="button"
+                                    tabIndex={0}
+                                    aria-pressed={checked}
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      toggleAsset(id);
+                                    }}
+                                    onKeyDown={(e) => {
+                                      if (e.key === "Enter" || e.key === " ") {
+                                        e.preventDefault();
+                                        toggleAsset(id);
+                                      }
+                                    }}
+                                    className="flex items-center gap-2.5 rounded-lg px-2 py-1.5 text-sm text-dashboard-foreground hover:bg-sidebar-hover cursor-pointer select-none"
+                                  >
+                                    <span
+                                      className={`flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded border pointer-events-none ${
+                                        checked
+                                          ? "border-primary bg-primary text-primary-foreground"
+                                          : "border-sidebar-border bg-sidebar"
+                                      }`}
+                                    >
+                                      {checked ? <Check className="h-2.5 w-2.5" /> : null}
+                                    </span>
+                                    {asset.label}
+                                  </label>
+                                );
+                              })
+                            )}
+                          </div>
+                        </div>
                       );
                     })}
                   </div>

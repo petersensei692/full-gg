@@ -18,6 +18,7 @@ import {
 import { AssetsService } from './assets.service';
 import { CreateAssetDto } from './dto/create-asset.dto';
 import { UpdateAssetDto } from './dto/update-asset.dto';
+import { ReorderAssetDto } from './dto/reorder-asset.dto';
 
 @ApiTags('fondamental')
 @Controller('fondamental/assets')
@@ -41,6 +42,13 @@ export class AssetsController {
     return this.assetsService.findAll();
   }
 
+  @Get('with-stats')
+  @ApiOperation({ summary: 'Get all assets with analysis and watch counts' })
+  @ApiResponse({ status: 200, description: 'List of assets with analysisCount and watchCount.' })
+  findAllWithStats() {
+    return this.assetsService.findAllWithStats();
+  }
+
   @Get('by-id/:id')
   @ApiOperation({ summary: 'Get one asset by ID' })
   @ApiParam({ name: 'id', description: 'UUID of the asset', example: '123e4567-e89b-12d3-a456-426614174000' })
@@ -49,6 +57,19 @@ export class AssetsController {
   @ApiResponse({ status: 404, description: 'Asset not found.' })
   findOne(@Param('id', ParseUUIDPipe) id: string) {
     return this.assetsService.findOne(id);
+  }
+
+  @Patch('by-id/:id/reorder')
+  @ApiOperation({ summary: 'Move asset up or down within its type section' })
+  @ApiParam({ name: 'id', description: 'UUID of the asset' })
+  @ApiBody({ type: ReorderAssetDto })
+  @ApiResponse({ status: 200, description: 'Asset order updated; returns full asset list.' })
+  @ApiResponse({ status: 400, description: 'Invalid UUID or already at first/last.' })
+  @ApiResponse({ status: 404, description: 'Asset not found.' })
+  reorder(@Param('id', ParseUUIDPipe) id: string, @Body() dto: ReorderAssetDto) {
+    return dto.direction === 'up'
+      ? this.assetsService.moveUp(id)
+      : this.assetsService.moveDown(id);
   }
 
   @Patch('by-id/:id')

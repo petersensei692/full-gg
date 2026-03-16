@@ -10,13 +10,37 @@ import {
   Settings,
   ChevronDown,
   ChevronRight,
+  ChevronUp,
   Loader2,
   Globe,
+  Coins,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import { useState } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { useAssets } from "@/context/AssetsContext";
+import { assetsApi } from "@/lib/api";
 import type { AssetConfig } from "@/types/asset";
+
+const ASSET_TYPE_ORDER = ["currency", "commodity", "stocks", "crypto", "bond"] as const;
+const ASSET_TYPE_LABELS: Record<string, string> = {
+  currency: "Currencies",
+  commodity: "Commodities",
+  stocks: "Stocks",
+  crypto: "Crypto",
+  bond: "Bonds",
+};
+
+const CURRENCY_NAMES = new Set(["USD", "EUR", "GBP", "JPY", "CAD", "CHF", "AUD", "NZD"]);
+const COMMODITY_NAMES = new Set(["XAU", "XAG"]);
+
+function getAssetType(asset: AssetConfig): string {
+  if (asset.type) return asset.type;
+  const name = (asset.label ?? asset.slug?.toUpperCase().replace(/-/g, " ") ?? "").toUpperCase();
+  if (CURRENCY_NAMES.has(name)) return "currency";
+  if (COMMODITY_NAMES.has(name)) return "commodity";
+  if (name === "STOCKS") return "stocks";
+  return "currency";
+}
 
 type NavSubItem = { href: string; label: string; icon: LucideIcon };
 type NavItemWithAssets = {
@@ -37,7 +61,41 @@ export function Sidebar() {
   const pathname = usePathname();
   const [fundamentalOpen, setFundamentalOpen] = useState(true);
   const [assetsOpen, setAssetsOpen] = useState(true);
-  const { assets, loading } = useAssets();
+  const [typeSectionsOpen, setTypeSectionsOpen] = useState<Record<string, boolean>>(() =>
+    ASSET_TYPE_ORDER.reduce((acc, t) => ({ ...acc, [t]: true }), {} as Record<string, boolean>)
+  );
+  const { assets, loading, refetch } = useAssets();
+
+  const assetsByType = useMemo(() => {
+    const m: Record<string, AssetConfig[]> = {};
+    for (const a of assets) {
+      const t = getAssetType(a);
+      if (!m[t]) m[t] = [];
+      m[t].push(a);
+    }
+    return m;
+  }, [assets]);
+
+  /** Slug of the asset currently being viewed (e.g. "usd") when path is /fundamental-analysis/usd */
+  const activeAssetSlug = useMemo(() => {
+    const base = "/fundamental-analysis/";
+    if (!pathname.startsWith(base)) return null;
+    const suffix = pathname.slice(base.length);
+    const first = suffix.split("/")[0];
+    return first && first.length > 0 ? first : null;
+  }, [pathname]);
+
+  const handleMove = useCallback(
+    async (assetId: string, direction: "up" | "down") => {
+      try {
+        await assetsApi.reorder(assetId, direction);
+        await refetch();
+      } catch {
+        // ignore
+      }
+    },
+    [refetch]
+  );
 
   const fundamentalNavItem: NavItemWithAssets = {
     href: "/fundamental-analysis",
@@ -82,6 +140,7 @@ export function Sidebar() {
               const isExpanded = fundamentalOpen;
               const subActive =
                 pathname.startsWith(item.href) ||
+                pathname === "/assets" ||
                 itemWithAssets.subNav.some((s: NavSubItem) => pathname === s.href);
               return (
                 <li key={item.href}>
@@ -106,41 +165,129 @@ export function Sidebar() {
                   </button>
                   {isExpanded && (
                     <ul className="mt-0.5 space-y-0.5 pl-4">
-                      {itemWithAssets.assets.length > 0 && (
-                        <li>
+                      <li className="flex items-center gap-0">
+                        <Link
+                          href="/assets"
+                          className={`flex-1 flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
+                            pathname === "/assets"
+                              ? "bg-primary/15 text-primary"
+                              : "text-sidebar-foreground hover:bg-sidebar-hover"
+                          }`}
+                        >
+                          <Coins className="h-4 w-4 shrink-0" />
+                          Assets
+                        </Link>
+                        {itemWithAssets.assets.length > 0 && (
                           <button
                             type="button"
                             onClick={() => setAssetsOpen(!assetsOpen)}
-                            className="flex w-full items-center justify-between gap-2.5 rounded-lg px-3 py-2.5 text-left text-sm font-medium text-sidebar-foreground transition-colors hover:bg-sidebar-hover"
+                            className="rounded p-1.5 text-sidebar-foreground hover:bg-sidebar-hover"
+                            aria-label={assetsOpen ? "Collapse asset list" : "Expand asset list"}
                           >
-                            Assets
                             {assetsOpen ? (
                               <ChevronDown className="h-4 w-4 shrink-0" />
                             ) : (
                               <ChevronRight className="h-4 w-4 shrink-0" />
                             )}
                           </button>
-                          {assetsOpen && (
-                            <ul className="mt-0.5 space-y-0.5 pl-2">
+                        )}
+                      </li>
+                      {itemWithAssets.assets.length > 0 && assetsOpen && (
+                        <li>
+                          <ul className="mt-0.5 space-y-0.5 pl-2">
                               {loading ? (
                                 <li className="px-3 py-2 flex items-center gap-2 text-xs text-sidebar-muted">
                                   <Loader2 className="h-3 w-3 animate-spin" />
                                   Loading...
                                 </li>
                               ) : (
-                                itemWithAssets.assets.map((asset) => (
-                                  <li key={asset.id ?? asset.slug}>
-                                    <Link
-                                      href={`${item.href}/${asset.slug}`}
-                                      className="block rounded-lg px-3 py-2 text-xs text-sidebar-foreground hover:bg-sidebar-hover"
-                                    >
-                                      {asset.label}
-                                    </Link>
-                                  </li>
-                                ))
+                                ASSET_TYPE_ORDER.map((type) => {
+                                  const typeAssets = assetsByType[type] ?? [];
+                                  const hasActiveAsset = activeAssetSlug != null && typeAssets.some((a) => a.slug === activeAssetSlug);
+                                  const isTypeOpen = typeSectionsOpen[type] !== false || hasActiveAsset;
+                                  const typeLabel = ASSET_TYPE_LABELS[type] ?? type;
+                                  return (
+                                    <li key={type}>
+                                      <button
+                                        type="button"
+                                        onClick={() =>
+                                          setTypeSectionsOpen((prev) => ({ ...prev, [type]: !prev[type] }))
+                                        }
+                                        className={`flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2 text-left text-xs font-medium hover:bg-sidebar-hover ${
+                                          hasActiveAsset ? "bg-primary/10 text-primary" : "text-sidebar-foreground"
+                                        }`}
+                                      >
+                                        {typeLabel}
+                                        {isTypeOpen ? (
+                                          <ChevronDown className="h-3 w-3 shrink-0" />
+                                        ) : (
+                                          <ChevronRight className="h-3 w-3 shrink-0" />
+                                        )}
+                                      </button>
+                                      {isTypeOpen && (
+                                        <ul className="mt-0.5 space-y-0.5 pl-2">
+                                          {typeAssets.length === 0 ? (
+                                            <li className="px-3 py-1.5 text-xs text-sidebar-muted">
+                                              No assets
+                                            </li>
+                                          ) : (
+                                            typeAssets.map((asset, idx) => {
+                                              const isActive = activeAssetSlug != null && asset.slug === activeAssetSlug;
+                                              return (
+                                            <li key={asset.id ?? asset.slug} className="flex items-center gap-0.5 group/list-item">
+                                              <Link
+                                                href={`${item.href}/${asset.slug}`}
+                                                className={`flex-1 min-w-0 rounded-lg px-3 py-2 text-xs truncate ${
+                                                  isActive
+                                                    ? "bg-primary/15 text-primary font-medium"
+                                                    : "text-sidebar-foreground hover:bg-sidebar-hover"
+                                                }`}
+                                              >
+                                                {asset.label}
+                                              </Link>
+                                              {asset.id && (
+                                                <div className="flex flex-row items-center gap-0 shrink-0 relative z-10" role="group" aria-label="Reorder">
+                                                  <button
+                                                    type="button"
+                                                    onClick={(e) => {
+                                                      e.preventDefault();
+                                                      e.stopPropagation();
+                                                      handleMove(asset.id!, "up");
+                                                    }}
+                                                    disabled={idx === 0}
+                                                    className="p-0.5 rounded text-sidebar-muted hover:text-sidebar-foreground hover:bg-sidebar-hover disabled:opacity-30 disabled:pointer-events-none cursor-pointer"
+                                                    aria-label="Move up"
+                                                    title="Move up"
+                                                  >
+                                                    <ChevronUp className="h-3 w-3" />
+                                                  </button>
+                                                  <button
+                                                    type="button"
+                                                    onClick={(e) => {
+                                                      e.preventDefault();
+                                                      e.stopPropagation();
+                                                      handleMove(asset.id!, "down");
+                                                    }}
+                                                    disabled={idx === typeAssets.length - 1}
+                                                    className="p-0.5 rounded text-sidebar-muted hover:text-sidebar-foreground hover:bg-sidebar-hover disabled:opacity-30 disabled:pointer-events-none cursor-pointer"
+                                                    aria-label="Move down"
+                                                    title="Move down"
+                                                  >
+                                                    <ChevronDown className="h-3 w-3" />
+                                                  </button>
+                                                </div>
+                                              )}
+                                            </li>
+                                          );
+                                            })
+                                          )}
+                                        </ul>
+                                      )}
+                                    </li>
+                                  );
+                                })
                               )}
                             </ul>
-                          )}
                         </li>
                       )}
                       {itemWithAssets.subNav.map((sub) => {

@@ -53,6 +53,10 @@ export interface AssetConfig {
   id?: string; // UUID from API
   slug: string;
   label: string;
+  type?: string; // currency | commodity | stocks | crypto | bond
+  sortOrder?: number;
+  /** Position within the asset's type section (1, 2, 3, ...). */
+  place?: number;
   symbol?: string; // e.g. "DXY" for USD
   indexLabel: string; // e.g. "DXY INDEX"
   placeholder: string; // e.g. "Post a new USD analysis entry..."
@@ -73,13 +77,22 @@ const KNOWN_SYMBOLS: Record<string, string> = {
 };
 
 /** Convert API Asset to frontend AssetConfig */
-export function assetToConfig(asset: { id: string; name: string }): AssetConfig {
+export function assetToConfig(asset: {
+  id: string;
+  name: string;
+  type?: string;
+  sortOrder?: number;
+  place?: number;
+}): AssetConfig {
   const slug = asset.name.toLowerCase().replace(/\s/g, "-");
   const symbol = KNOWN_SYMBOLS[slug];
   return {
     id: asset.id,
     slug,
     label: asset.name,
+    type: asset.type,
+    sortOrder: asset.sortOrder,
+    place: asset.place,
     symbol,
     indexLabel: symbol ? `${symbol} INDEX` : `${asset.name} INDEX`,
     placeholder: `Post a new ${asset.name} analysis entry...`,

@@ -1,5 +1,5 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsOptional, IsString, MaxLength } from 'class-validator';
+import { IsOptional, IsString, MaxLength, IsInt, Min } from 'class-validator';
 
 export class UpdateAssetDto {
   @ApiPropertyOptional({
@@ -11,4 +11,26 @@ export class UpdateAssetDto {
   @IsString()
   @MaxLength(100)
   name?: string;
+
+  @ApiPropertyOptional({
+    description: 'Asset type: currency, commodity, stocks, crypto, bond',
+    example: 'currency',
+    maxLength: 50,
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(50)
+  type?: string;
+
+  @ApiPropertyOptional({ description: 'Sort order within the same type' })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  sortOrder?: number;
+
+  @ApiPropertyOptional({ description: 'Place (position) within the type section (1, 2, 3, ...)' })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  place?: number;
 }

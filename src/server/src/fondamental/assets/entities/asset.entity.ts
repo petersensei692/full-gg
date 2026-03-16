@@ -14,6 +14,16 @@ export class Asset {
   @Column({ type: 'varchar', length: 100, unique: true })
   name: string;
 
+  @Column({ type: 'varchar', length: 50, default: 'currency' })
+  type: string;
+
+  @Column({ type: 'int', name: 'sort_order', default: 0 })
+  sortOrder: number;
+
+  /** Position within the asset's type section (1, 2, 3, ...). Used for ordering and reorder (up/down). */
+  @Column({ type: 'int', default: 1 })
+  place: number;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 

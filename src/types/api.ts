@@ -2,6 +2,10 @@
 export interface Asset {
   id: string;
   name: string;
+  type?: string;
+  sortOrder?: number;
+  /** Position within the asset's type section (1, 2, 3, ...). */
+  place?: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -9,11 +13,22 @@ export interface Asset {
 /** Body for creating an asset */
 export interface CreateAssetDto {
   name: string;
+  type?: string;
+  sortOrder?: number;
 }
 
 /** Body for updating an asset (all fields optional) */
 export interface UpdateAssetDto {
   name?: string;
+  type?: string;
+  sortOrder?: number;
+  place?: number;
+}
+
+/** Asset with analysis and watch counts (for Assets page) */
+export interface AssetWithStats extends Asset {
+  analysisCount: number;
+  watchCount: number;
 }
 
 /** Weekly calendar entry */
