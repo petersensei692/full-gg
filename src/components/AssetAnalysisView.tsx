@@ -19,6 +19,7 @@ import { PairWatchlistView } from "./analysis/PairWatchlistView";
 import { DateRangePicker, type DateRange } from "./analysis/DateRangePicker";
 import { CreateEventModal } from "./analysis/CreateEventModal";
 import { CreatePairModal } from "./analysis/CreatePairModal";
+import { SidebarTrigger } from "./SidebarTrigger";
 
 const ANALYSIS_TYPE_TO_TAG: Record<
   string,
@@ -406,92 +407,93 @@ export function AssetAnalysisView({ asset }: AssetAnalysisViewProps) {
   return (
     <>
       <div className="flex h-full min-h-0 flex-col overflow-auto">
-        {/* Unified header bar: three equal-width sections that shrink together */}
-        <div className="h-14 shrink-0 flex items-center gap-3 px-6 border-b border-sidebar-border overflow-hidden">
+        {/* Header bar: hamburger (mobile) + title + tabs; reduced height */}
+        <div className="h-11 shrink-0 flex items-center gap-3 px-4 sm:px-6 border-b border-sidebar-border overflow-hidden">
+          <SidebarTrigger />
           <div className="flex-grow-0 min-w-0 overflow-hidden flex items-center shrink">
             <AssetHeader title={fullTitle} />
           </div>
           <div className="flex-1 min-w-0 overflow-hidden flex justify-center">
             <StreamTabs active={activeTab} onSelect={setActiveTab} noBorder />
           </div>
-          <div className="flex-1 min-w-0 overflow-hidden flex items-center justify-end gap-2">
-            {activeTab === "stream" && (
-              <>
-                <span className="text-sm text-dashboard-foreground/70 shrink-0">Filter:</span>
-                <select
-                  value={analysisFilter}
-                  onChange={(e) => setAnalysisFilter(e.target.value)}
-                  className="rounded-lg border border-sidebar-border bg-sidebar px-3 py-2 text-sm text-dashboard-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary shrink-0"
-                >
-                  {ANALYSIS_FILTER_OPTIONS.map((opt) => (
-                    <option key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </option>
-                  ))}
-                </select>
-                <DateRangePicker value={dateRange} onChange={setDateRange} />
-              </>
-            )}
-            {activeTab === "events" && (
-              <>
-                <div className="relative min-w-0 max-w-full">
-                  <button
-                    ref={calendarTriggerRef}
-                    type="button"
-                    onClick={() => setCalendarDropdownOpen((o) => !o)}
-                    disabled={loadingCalendars || !resolvedAsset.id}
-                    className="flex items-center gap-2 rounded-lg border border-sidebar-border bg-sidebar px-3 py-2 text-sm font-medium text-dashboard-foreground hover:bg-sidebar-hover transition-colors disabled:opacity-50 min-w-0 max-w-full truncate"
-                  >
-                    <Calendar className="h-4 w-4 shrink-0" />
-                    <span className="truncate">
-                      {loadingCalendars ? "Loading..." : selectedAssetCalendar
-                        ? `${new Date(selectedAssetCalendar.startDate).toISOString().slice(0, 10)} → ${new Date(selectedAssetCalendar.endDate).toISOString().slice(0, 10)}`
-                        : assetCalendars.length === 0 ? "No calendars" : "Choose calendar"}
-                    </span>
-                    <ChevronDown className="h-4 w-4 shrink-0" />
-                  </button>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setEventModalOpen(true)}
-                  className="flex items-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors shrink-0"
-                >
-                  <Plus className="h-4 w-4" />
-                  Create event
-                </button>
-              </>
-            )}
-            {activeTab === "watchlist" && (
-              <>
-                <div className="relative min-w-0 max-w-full">
-                  <button
-                    ref={watchlistTriggerRef}
-                    type="button"
-                    onClick={() => setWatchlistDropdownOpen((o) => !o)}
-                    disabled={loadingWatchlists || !resolvedAsset.id}
-                    className="flex items-center gap-2 rounded-lg border border-sidebar-border bg-sidebar px-3 py-2 text-sm font-medium text-dashboard-foreground hover:bg-sidebar-hover transition-colors disabled:opacity-50 min-w-0 max-w-full truncate"
-                  >
-                    <Calendar className="h-4 w-4 shrink-0" />
-                    <span className="truncate">
-                      {loadingWatchlists ? "Loading..." : selectedAssetWatchlist
-                        ? `${new Date(selectedAssetWatchlist.startDate).toISOString().slice(0, 10)} → ${new Date(selectedAssetWatchlist.endDate).toISOString().slice(0, 10)}`
-                        : assetWatchlists.length === 0 ? "No watchlists" : "Choose watchlist"}
-                    </span>
-                    <ChevronDown className="h-4 w-4 shrink-0" />
-                  </button>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setPairModalOpen(true)}
-                  className="flex items-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors shrink-0"
-                >
-                  <Plus className="h-4 w-4" />
-                  Create Pair
-                </button>
-              </>
-            )}
-          </div>
         </div>
+
+        {/* Filters / actions bar below header (per tab) */}
+        {activeTab === "stream" && (
+          <div className="shrink-0 flex items-center gap-3 px-6 py-3 border-b border-sidebar-border bg-sidebar/30">
+            <span className="text-sm text-dashboard-foreground/70 shrink-0">Filter:</span>
+            <select
+              value={analysisFilter}
+              onChange={(e) => setAnalysisFilter(e.target.value)}
+              className="rounded-lg border border-sidebar-border bg-sidebar px-3 py-2 text-sm text-dashboard-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary shrink-0"
+            >
+              {ANALYSIS_FILTER_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+            <DateRangePicker value={dateRange} onChange={setDateRange} />
+          </div>
+        )}
+        {activeTab === "events" && (
+          <div className="shrink-0 flex items-center gap-3 px-6 py-3 border-b border-sidebar-border bg-sidebar/30">
+            <div className="relative min-w-0 max-w-full">
+              <button
+                ref={calendarTriggerRef}
+                type="button"
+                onClick={() => setCalendarDropdownOpen((o) => !o)}
+                disabled={loadingCalendars || !resolvedAsset.id}
+                className="flex items-center gap-2 rounded-lg border border-sidebar-border bg-sidebar px-3 py-2 text-sm font-medium text-dashboard-foreground hover:bg-sidebar-hover transition-colors disabled:opacity-50 min-w-0 max-w-full truncate"
+              >
+                <Calendar className="h-4 w-4 shrink-0" />
+                <span className="truncate">
+                  {loadingCalendars ? "Loading..." : selectedAssetCalendar
+                    ? `${new Date(selectedAssetCalendar.startDate).toISOString().slice(0, 10)} → ${new Date(selectedAssetCalendar.endDate).toISOString().slice(0, 10)}`
+                    : assetCalendars.length === 0 ? "No calendars" : "Choose calendar"}
+                </span>
+                <ChevronDown className="h-4 w-4 shrink-0" />
+              </button>
+            </div>
+            <button
+              type="button"
+              onClick={() => setEventModalOpen(true)}
+              className="flex items-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors shrink-0"
+            >
+              <Plus className="h-4 w-4" />
+              Create event
+            </button>
+          </div>
+        )}
+        {activeTab === "watchlist" && (
+          <div className="shrink-0 flex items-center gap-3 px-6 py-3 border-b border-sidebar-border bg-sidebar/30">
+            <div className="relative min-w-0 max-w-full">
+              <button
+                ref={watchlistTriggerRef}
+                type="button"
+                onClick={() => setWatchlistDropdownOpen((o) => !o)}
+                disabled={loadingWatchlists || !resolvedAsset.id}
+                className="flex items-center gap-2 rounded-lg border border-sidebar-border bg-sidebar px-3 py-2 text-sm font-medium text-dashboard-foreground hover:bg-sidebar-hover transition-colors disabled:opacity-50 min-w-0 max-w-full truncate"
+              >
+                <Calendar className="h-4 w-4 shrink-0" />
+                <span className="truncate">
+                  {loadingWatchlists ? "Loading..." : selectedAssetWatchlist
+                    ? `${new Date(selectedAssetWatchlist.startDate).toISOString().slice(0, 10)} → ${new Date(selectedAssetWatchlist.endDate).toISOString().slice(0, 10)}`
+                    : assetWatchlists.length === 0 ? "No watchlists" : "Choose watchlist"}
+                </span>
+                <ChevronDown className="h-4 w-4 shrink-0" />
+              </button>
+            </div>
+            <button
+              type="button"
+              onClick={() => setPairModalOpen(true)}
+              className="flex items-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors shrink-0"
+            >
+              <Plus className="h-4 w-4" />
+              Create Pair
+            </button>
+          </div>
+        )}
 
         {activeTab === "stream" && (
           <div className="flex-1 flex flex-col min-h-0 w-full">

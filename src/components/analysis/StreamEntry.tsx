@@ -86,7 +86,7 @@ export function StreamEntry({
     <article className="pb-6 last:pb-0">
       {separatorTop}
       <div
-        className={`min-w-0 max-w-[50%] rounded-xl border border-sidebar-border border-l-4 ${borderClass} bg-sidebar/50 p-4 shadow-sm`}
+        className={`min-w-0 w-full max-w-full sm:max-w-[90%] md:max-w-[80%] lg:max-w-[70%] xl:max-w-[60%] 2xl:max-w-[50%] rounded-xl border border-sidebar-border border-l-4 ${borderClass} bg-sidebar/50 p-4 shadow-sm overflow-hidden`}
       >
         <div className="flex items-center justify-between gap-2 mb-2">
           <div className={`text-xs font-semibold uppercase tracking-wider ${textColorClass}`}>
@@ -123,7 +123,8 @@ export function StreamEntry({
           </div>
         </div>
         <div
-          className="stream-entry-content min-w-0 break-words break-all text-sm text-dashboard-foreground/90 leading-relaxed mb-2 [&_*]:break-words [&_img]:max-w-[50%] [&_img]:w-[50%] [&_img]:max-h-[300px] [&_img]:h-auto [&_img]:object-contain [&_img]:rounded-lg [&_img]:my-2 [&_img]:cursor-pointer [&_h1]:text-xl [&_h1]:font-bold [&_h2]:text-lg [&_h2]:font-semibold [&_h3]:text-base [&_h3]:font-medium"
+          className="stream-entry-content min-w-0 max-w-full break-words text-sm text-dashboard-foreground/90 leading-relaxed mb-2 [&_*]:break-words [&_*]:min-w-0 [&_*]:max-w-full [&_img]:max-w-[50%] [&_img]:w-[50%] [&_img]:max-h-[300px] [&_img]:h-auto [&_img]:object-contain [&_img]:rounded-lg [&_img]:my-2 [&_img]:cursor-pointer [&_h1]:text-xl [&_h1]:font-bold [&_h2]:text-lg [&_h2]:font-semibold [&_h3]:text-base [&_h3]:font-medium"
+          style={{ overflowWrap: "break-word" } as React.CSSProperties}
           dangerouslySetInnerHTML={{ __html: entry.content }}
         />
         {entry.images && entry.images.length > 0 && (
@@ -159,6 +160,7 @@ export function StreamEntry({
                     <AnalysisImage
                       src={url}
                       alt={displayName || fallbackLabel}
+                      caption={displayName || fallbackLabel}
                       unoptimized
                       className="w-full max-h-[280px] object-contain"
                     />

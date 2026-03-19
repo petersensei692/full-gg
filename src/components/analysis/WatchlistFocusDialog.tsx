@@ -164,8 +164,8 @@ export function WatchlistFocusDialog({
           <div className="flex-1 min-h-0 min-w-0 overflow-x-hidden overflow-y-auto px-6 py-5 space-y-4">
             {displayEntry.thesis?.notes && (
               <div
-                className="w-full min-w-full break-words break-all text-sm text-dashboard-foreground/90 leading-relaxed prose prose-invert prose-sm [&_h1]:text-xl [&_h1]:font-bold [&_h2]:text-lg [&_h2]:font-semibold [&_h3]:text-base [&_h3]:font-medium [&_*]:break-words [&_*]:min-w-0 [&_*]:max-w-full [&_img]:max-w-full [&_img]:max-h-[280px] [&_img]:rounded-lg [&_img]:cursor-pointer [&_img]:my-2"
-                style={{ wordBreak: "break-word" } as React.CSSProperties}
+                className="w-full min-w-0 max-w-full break-words break-all text-sm text-dashboard-foreground/90 leading-relaxed prose prose-invert prose-sm [&_h1]:text-xl [&_h1]:font-bold [&_h2]:text-lg [&_h2]:font-semibold [&_h3]:text-base [&_h3]:font-medium [&_*]:break-words [&_*]:min-w-0 [&_*]:max-w-full [&_img]:max-w-full [&_img]:max-h-[280px] [&_img]:rounded-lg [&_img]:cursor-pointer [&_img]:my-2 overflow-hidden"
+                style={{ wordBreak: "break-word", overflowWrap: "break-word" } as React.CSSProperties}
                 dangerouslySetInnerHTML={{ __html: displayEntry.thesis.notes }}
                 onClick={(e) => {
                   const target = e.target as HTMLElement;

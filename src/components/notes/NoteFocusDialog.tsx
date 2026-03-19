@@ -60,8 +60,8 @@ export function NoteFocusDialog({
         </div>
         <div className="flex-1 min-h-0 min-w-0 overflow-x-hidden overflow-y-auto p-6 space-y-4">
           <div
-            className="min-w-0 max-w-full columns-1 break-words break-all text-sm text-dashboard-foreground/90 leading-relaxed prose prose-invert prose-sm px-3 [&_h1]:text-xl [&_h1]:font-bold [&_h2]:text-lg [&_h2]:font-semibold [&_h3]:text-base [&_h3]:font-medium [&_u]:underline [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:list-decimal [&_ol]:pl-6 [&_li]:my-0.5 [&_*]:break-words [&_*]:min-w-0 [&_*]:max-w-full [&_*]:columns-1 [&_img]:max-w-full [&_img]:rounded-lg [&_img]:my-2"
-            style={{ wordBreak: 'break-word' } as React.CSSProperties}
+            className="min-w-0 max-w-full columns-1 break-words break-all text-sm text-dashboard-foreground/90 leading-relaxed prose prose-invert prose-sm px-3 overflow-hidden [&_h1]:text-xl [&_h1]:font-bold [&_h2]:text-lg [&_h2]:font-semibold [&_h3]:text-base [&_h3]:font-medium [&_u]:underline [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:list-decimal [&_ol]:pl-6 [&_li]:my-0.5 [&_*]:break-words [&_*]:min-w-0 [&_*]:max-w-full [&_*]:columns-1 [&_img]:max-w-full [&_img]:rounded-lg [&_img]:my-2"
+            style={{ wordBreak: "break-word", overflowWrap: "break-word" } as React.CSSProperties}
             dangerouslySetInnerHTML={{ __html: note.note }}
           />
           {note.images && note.images.length > 0 && (

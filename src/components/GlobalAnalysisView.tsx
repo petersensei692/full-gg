@@ -231,25 +231,22 @@ export function GlobalAnalysisView() {
     <>
       <div className="flex h-full min-h-0 flex-col overflow-auto">
         <div className="h-14 shrink-0 flex items-center gap-3 px-6 border-b border-sidebar-border overflow-hidden">
-          <div className="flex-grow-0 min-w-0 overflow-hidden">
-            <h2 className="text-sm font-semibold text-dashboard-foreground truncate">Global Analysis</h2>
-          </div>
-          <div className="flex-1 min-w-0 overflow-hidden flex justify-center" />
-          <div className="flex-1 min-w-0 overflow-hidden flex items-center justify-end gap-2">
-            <span className="text-sm text-dashboard-foreground/70 shrink-0">Filter:</span>
-            <select
-              value={analysisFilter}
-              onChange={(e) => setAnalysisFilter(e.target.value)}
-              className="rounded-lg border border-sidebar-border bg-sidebar px-3 py-2 text-sm text-dashboard-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary shrink-0"
-            >
-              {ANALYSIS_FILTER_OPTIONS.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
-            <DateRangePicker value={dateRange} onChange={setDateRange} />
-          </div>
+          <h2 className="text-sm font-semibold text-dashboard-foreground truncate">Global Analysis</h2>
+        </div>
+        <div className="shrink-0 flex items-center gap-3 px-6 py-3 border-b border-sidebar-border bg-sidebar/30">
+          <span className="text-sm text-dashboard-foreground/70 shrink-0">Filter:</span>
+          <select
+            value={analysisFilter}
+            onChange={(e) => setAnalysisFilter(e.target.value)}
+            className="rounded-lg border border-sidebar-border bg-sidebar px-3 py-2 text-sm text-dashboard-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary shrink-0"
+          >
+            {ANALYSIS_FILTER_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+          <DateRangePicker value={dateRange} onChange={setDateRange} />
         </div>
         <div className="flex-1 flex flex-col min-h-0 w-full">
           <div className="flex-1 min-h-0 overflow-auto px-6 w-full">
