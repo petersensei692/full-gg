@@ -119,11 +119,18 @@ export function GlobalAnalysisView() {
   }, []);
 
   const handleEditSubmit = useCallback(
-    async (payload: { notes: string; images: string[] }) => {
+    async (payload: {
+      notes: string;
+      images: string[];
+      analysisType?: string;
+      scope?: "global" | string[];
+    }) => {
       if (!editing) return;
       await globalAnalysisService.update(editing.id, {
         notes: payload.notes,
         images: payload.images.length > 0 ? payload.images : null,
+        analysisType: payload.analysisType,
+        scope: payload.scope,
       });
       setEditing(null);
       setEditModalOpen(false);
@@ -151,7 +158,7 @@ export function GlobalAnalysisView() {
   );
 
   const mappedEntries = useMemo((): StreamEntry[] => {
-    return list.map((ga) => {
+    const entries = list.map((ga) => {
       const createdAt = new Date(ga.createdAt).getTime();
       const imageList = ga.images ?? [];
       const names = ga.imageNames ?? [];
@@ -174,6 +181,8 @@ export function GlobalAnalysisView() {
         scopeLabel: ga.scopeDisplay,
       };
     });
+    /** Oldest first, newest at bottom (same as asset analysis stream) */
+    return entries.sort((a, b) => (a.createdAt ?? 0) - (b.createdAt ?? 0));
   }, [list]);
 
   const filteredEntries = useMemo(() => {
@@ -288,6 +297,8 @@ export function GlobalAnalysisView() {
           onOpenChange={setEditModalOpen}
           initialNotes={editing.notes}
           initialImages={editing.images ?? []}
+          initialAnalysisType={editing.analysisType ?? "daily"}
+          globalScopeEditor={{ initialScope: editing.scope, assets }}
           onSubmit={handleEditSubmit}
         />
       )}

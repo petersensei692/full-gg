@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import {
   BookOpen,
   BarChart3,
@@ -20,6 +20,7 @@ import type { LucideIcon } from "lucide-react";
 import { useState, useCallback, useMemo, useEffect } from "react";
 import { useAssets } from "@/context/AssetsContext";
 import { assetsApi } from "@/lib/api";
+import { assetAnalysisHref } from "@/lib/assetRoutes";
 import type { AssetConfig } from "@/types/asset";
 
 const SIDEBAR_OPEN_TYPE_KEY = "sidebar-open-asset-type";
@@ -81,6 +82,7 @@ export function Sidebar({
   isOverlayMode = false,
 }: SidebarProps) {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [assetsOpen, setAssetsOpen] = useState(true);
   /** Only one type section open at a time; restored from sessionStorage so it stays open when navigating to an asset */
   const [typeSectionsOpen, setTypeSectionsOpen] = useState<Record<string, boolean>>(() =>
@@ -106,14 +108,20 @@ export function Sidebar({
     return m;
   }, [assets]);
 
-  /** Slug of the asset currently being viewed (e.g. "usd") when path is /fundamental-analysis/usd */
+  /** Active asset slug: query route (/fundamental-analysis/asset?slug=) or legacy /fundamental-analysis/:slug */
   const activeAssetSlug = useMemo(() => {
+    if (pathname === "/fundamental-analysis/asset") {
+      const raw = searchParams.get("slug");
+      if (!raw?.trim()) return null;
+      return raw.trim().toLowerCase().replace(/\s/g, "-");
+    }
     const base = "/fundamental-analysis/";
     if (!pathname.startsWith(base)) return null;
     const suffix = pathname.slice(base.length);
     const first = suffix.split("/")[0];
-    return first && first.length > 0 ? first : null;
-  }, [pathname]);
+    if (!first || first === "asset") return null;
+    return first.length > 0 ? first : null;
+  }, [pathname, searchParams]);
 
   const handleMove = useCallback(
     async (assetId: string, direction: "up" | "down") => {
@@ -299,7 +307,7 @@ export function Sidebar({
                                             return (
                                               <li key={asset.id ?? asset.slug} className="flex items-center gap-0.5 group/list-item">
                                                 <Link
-                                                  href={`${item.href}/${asset.slug}`}
+                                                  href={assetAnalysisHref(asset.slug)}
                                                   className={`flex-1 min-w-0 rounded-lg px-3 py-2 text-xs truncate ${
                                                     isAssetActive
                                                       ? "bg-primary/15 text-primary font-medium"

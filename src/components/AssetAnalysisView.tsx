@@ -556,9 +556,11 @@ export function AssetAnalysisView({ asset }: AssetAnalysisViewProps) {
           onOpenChange={setEditModalOpen}
           initialNotes={extractAnalysisType(editingAnalysis.notes).cleanedNotes}
           initialImages={editingAnalysis.images ?? []}
-          onSubmit={async ({ notes, images }) => {
+          initialAnalysisType={editingAnalysisType}
+          onSubmit={async ({ notes, images, analysisType: nextType }) => {
             if (!editingAnalysis) return;
-            const notesWithMarker = addAnalysisTypeMarker(notes, editingAnalysisType);
+            const type = nextType ?? editingAnalysisType;
+            const notesWithMarker = addAnalysisTypeMarker(notes, type);
             const updated = await analysisService.update(editingAnalysis.id, {
               notes: notesWithMarker,
               images,

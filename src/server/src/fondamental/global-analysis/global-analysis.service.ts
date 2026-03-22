@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { GlobalAnalysis } from './entities/global-analysis.entity';
@@ -108,19 +112,76 @@ export class GlobalAnalysisService {
     return { ...ga, scopeDisplay: await this.getScopeDisplay(ga.scope) };
   }
 
+  private scopesEqual(
+    a: 'global' | string[],
+    b: 'global' | string[],
+  ): boolean {
+    if (a === 'global' && b === 'global') return true;
+    if (a === 'global' || b === 'global') return false;
+    if (a.length !== b.length) return false;
+    return a.every((id, i) => id === b[i]);
+  }
+
   async update(
     id: string,
     dto: UpdateGlobalAnalysisDto,
   ): Promise<GlobalAnalysis & { scopeDisplay: string }> {
     const ga = await this.globalAnalysisRepository.findOne({ where: { id } });
     if (!ga) throw new NotFoundException(`Global analysis with id ${id} not found`);
+
+    const scopeChanged =
+      dto.scope !== undefined && !this.scopesEqual(ga.scope, dto.scope);
+
+    if (scopeChanged) {
+      const nextScope: 'global' | string[] =
+        dto.scope === 'global'
+          ? 'global'
+          : Array.isArray(dto.scope)
+            ? dto.scope
+            : [String(dto.scope)];
+      if (nextScope !== 'global' && nextScope.length === 0) {
+        throw new BadRequestException(
+          'Scope must be "global" or a non-empty list of asset IDs',
+        );
+      }
+      if (dto.notes !== undefined) ga.notes = dto.notes;
+      if (dto.images !== undefined) ga.images = dto.images;
+      if (dto.imageNames !== undefined) ga.imageNames = dto.imageNames;
+      if (dto.analysisType !== undefined) ga.analysisType = dto.analysisType;
+      ga.scope = nextScope;
+      const saved = await this.globalAnalysisRepository.save(ga);
+
+      await this.analysisService.removeByGlobalAnalysisId(id);
+      const { assetIds, scopeLabel } = await this.resolveScope(saved.scope);
+      const notesForChildren = this.addAnalysisTypeMarker(
+        saved.notes,
+        saved.analysisType,
+      );
+      const images = saved.images ?? null;
+      const imageNames = saved.imageNames ?? null;
+      for (const assetId of assetIds) {
+        await this.analysisService.createFromGlobal(
+          assetId,
+          notesForChildren,
+          images,
+          imageNames,
+          scopeLabel,
+          saved.id,
+        );
+      }
+      return { ...saved, scopeDisplay: scopeLabel };
+    }
+
     if (dto.notes !== undefined) ga.notes = dto.notes;
     if (dto.images !== undefined) ga.images = dto.images;
     if (dto.imageNames !== undefined) ga.imageNames = dto.imageNames;
     if (dto.analysisType !== undefined) ga.analysisType = dto.analysisType;
     const saved = await this.globalAnalysisRepository.save(ga);
 
-    const notesForChildren = this.addAnalysisTypeMarker(saved.notes, saved.analysisType);
+    const notesForChildren = this.addAnalysisTypeMarker(
+      saved.notes,
+      saved.analysisType,
+    );
     await this.analysisService.updateByGlobalAnalysisId(id, {
       notes: notesForChildren,
       images: saved.images,

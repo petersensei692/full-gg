@@ -1,6 +1,7 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { IsOptional, IsString, IsArray } from 'class-validator';
 
+/** Scope: "global" or list of asset UUIDs (same shape as create). */
 export class UpdateGlobalAnalysisDto {
   @ApiPropertyOptional({ description: 'Analysis notes' })
   @IsOptional()
@@ -23,4 +24,11 @@ export class UpdateGlobalAnalysisDto {
   @IsOptional()
   @IsString()
   analysisType?: string;
+
+  @ApiPropertyOptional({
+    description: 'New scope: "global" or array of asset UUIDs. Recreates per-asset copies when changed.',
+    oneOf: [{ type: 'string', enum: ['global'] }, { type: 'array', items: { type: 'string' } }],
+  })
+  @IsOptional()
+  scope?: 'global' | string[];
 }

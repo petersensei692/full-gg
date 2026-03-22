@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import { usePathname } from "next/navigation";
 import { Sidebar } from "./Sidebar";
 import { SidebarTrigger } from "./SidebarTrigger";
@@ -17,20 +17,28 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
   const [overlayOpen, setOverlayOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
 
-  /** Asset analysis page has its own header with hamburger; other pages get a slim layout bar */
-  const isAssetAnalysisPage = pathname?.match(/^\/fundamental-analysis\/[^/]+$/);
+  /** Asset analysis: legacy /fundamental-analysis/:slug or static /fundamental-analysis/asset?slug= */
+  const isAssetAnalysisPage =
+    pathname === "/fundamental-analysis/asset" ||
+    !!pathname?.match(/^\/fundamental-analysis\/[^/]+$/);
 
   return (
     <SidebarContextProvider openOverlay={() => setOverlayOpen(true)}>
       <div className="flex h-screen bg-dashboard-bg text-dashboard-foreground">
-        <Sidebar
-          collapsed={collapsed}
-          overlayOpen={overlayOpen}
-          onOverlayClose={() => setOverlayOpen(false)}
-          onToggleCollapsed={() => setCollapsed((c) => !c)}
-          onToggleOverlay={() => setOverlayOpen((o) => !o)}
-          isOverlayMode={!isDesktop}
-        />
+        <Suspense
+          fallback={
+            <aside className="flex h-full w-[260px] shrink-0 flex-col border-r border-sidebar-border bg-sidebar" />
+          }
+        >
+          <Sidebar
+            collapsed={collapsed}
+            overlayOpen={overlayOpen}
+            onOverlayClose={() => setOverlayOpen(false)}
+            onToggleCollapsed={() => setCollapsed((c) => !c)}
+            onToggleOverlay={() => setOverlayOpen((o) => !o)}
+            isOverlayMode={!isDesktop}
+          />
+        </Suspense>
 
         {!isDesktop && overlayOpen && (
           <button

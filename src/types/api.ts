@@ -235,6 +235,8 @@ export interface UpdateGlobalAnalysisDto {
   images?: string[] | null;
   imageNames?: string[] | null;
   analysisType?: string;
+  /** When set and different from current scope, child analyses are recreated for the new assets */
+  scope?: "global" | string[];
 }
 
 export type NoteTier = "tier_1" | "tier_2" | "tier_3";

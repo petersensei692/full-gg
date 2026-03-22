@@ -7,6 +7,7 @@ import { assetsService } from "@/lib/services/assets.service";
 import type { AssetWithStats } from "@/types/api";
 import { CreateAssetModal } from "./CreateAssetModal";
 import { EditAssetModal } from "./EditAssetModal";
+import { assetAnalysisHref } from "@/lib/assetRoutes";
 
 const ASSET_TYPE_ORDER = ["currency", "commodity", "stocks", "crypto", "bond"] as const;
 const ASSET_TYPE_LABELS: Record<string, string> = {
@@ -149,7 +150,7 @@ export function AssetsView() {
                             </span>
                           </div>
                           <Link
-                            href={`/fundamental-analysis/${asset.name.toLowerCase().replace(/\s/g, "-")}`}
+                            href={assetAnalysisHref(asset.name.toLowerCase().replace(/\s/g, "-"))}
                             onClick={(e) => e.stopPropagation()}
                             className="mt-3 inline-block text-xs text-primary hover:underline"
                           >
