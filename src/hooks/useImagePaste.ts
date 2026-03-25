@@ -58,39 +58,45 @@ export function useImagePaste(options: UseImagePasteOptions) {
       const items = e.clipboardData?.items;
       if (!items) return;
 
-      const file = Array.from(items).find(
-        (item) => item.kind === "file" && item.type.startsWith("image/")
-      )?.getAsFile();
+      const files = Array.from(items)
+        .filter((item) => item.kind === "file" && item.type.startsWith("image/"))
+        .map((item) => item.getAsFile())
+        .filter(Boolean) as File[];
 
-      if (!file) return;
-      if (file.size > MAX_PASTE_FILE_BYTES) return;
+      if (files.length === 0) return;
 
+      // If any images are present, take over the paste so we can upload them.
       e.preventDefault();
 
-      let blob;
-      try {
-        blob = await compressImageToBlob(file);
-      } catch {
-        return;
-      }
-      if (!blob) return;
-
-      let uploaded;
-      try {
-        uploaded = await uploadImageBlob(blob);
-      } catch {
-        return;
-      }
-
-      if (onImageReady) {
-        onImageReady(uploaded);
-        return;
-      }
-
       const el = editorRef?.current;
-      if (el && typeof el.focus === "function") {
+      if (!onImageReady && el && typeof el.focus === "function") {
         el.focus();
-        insertImageAtSelection(el, uploaded.url);
+      }
+
+      for (const file of files) {
+        if (file.size > MAX_PASTE_FILE_BYTES) continue;
+
+        let blob: Blob | null = null;
+        try {
+          blob = await compressImageToBlob(file);
+        } catch {
+          blob = null;
+        }
+        if (!blob) continue;
+
+        let uploaded: { path: string; url: string } | null = null;
+        try {
+          uploaded = await uploadImageBlob(blob);
+        } catch {
+          uploaded = null;
+        }
+        if (!uploaded) continue;
+
+        if (onImageReady) {
+          onImageReady(uploaded);
+        } else if (el) {
+          insertImageAtSelection(el, uploaded.url);
+        }
       }
     },
     [onImageReady, editorRef]

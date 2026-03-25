@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useMemo, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
-import { Calendar, Plus, ChevronDown } from "lucide-react";
+import { Calendar, Plus, ChevronDown, ChevronUp } from "lucide-react";
 import type { AssetConfig, StreamEntry } from "@/types/asset";
 import type { Analysis, AssetCalendar, AssetWatchlist, Event, WatchItem, CreateWatchItemDto } from "@/types/api";
 import { analysisService, assetCalendarService, assetWatchlistService } from "@/lib/api";
@@ -497,25 +497,61 @@ export function AssetAnalysisView({ asset }: AssetAnalysisViewProps) {
 
         {activeTab === "stream" && (
           <div className="flex-1 flex flex-col min-h-0 w-full">
-            <div ref={streamScrollRef} className="flex-1 min-h-0 overflow-auto px-6 w-full">
-              <div className="w-full max-w-full space-y-0 pb-4">
-                {entriesWithGroups.map(({ entry, separatorType, weekGroup, dateGroup }) => {
-                  const analysis = analyses.find((a) => a.id === entry.id);
-                  const fromGlobalAnalysis = !!analysis?.globalAnalysisId;
-                  return (
-                    <StreamEntryComponent
-                      key={entry.id}
-                      entry={entry}
-                      separatorType={separatorType}
-                      weekGroup={weekGroup}
-                      dateGroup={dateGroup}
-                      onDelete={fromGlobalAnalysis ? undefined : () => handleDeleteAnalysis(entry.id, entry.images ?? [])}
-                      onDeleteImage={fromGlobalAnalysis ? undefined : (path) => handleDeleteImage(entry.id, path)}
-                      onUpdateImageName={fromGlobalAnalysis ? undefined : (path, name) => handleUpdateImageName(entry.id, path, name)}
-                      onEdit={fromGlobalAnalysis ? undefined : () => analysis && handleEditAnalysis(analysis)}
-                    />
-                  );
-                })}
+            <div className="flex-1 min-h-0 relative w-full">
+              <div
+                ref={streamScrollRef}
+                className="absolute inset-0 overflow-x-hidden overflow-y-auto px-6"
+              >
+                <div className="w-full max-w-full space-y-0 pb-4">
+                  {entriesWithGroups.map(({ entry, separatorType, weekGroup, dateGroup }) => {
+                    const analysis = analyses.find((a) => a.id === entry.id);
+                    const fromGlobalAnalysis = !!analysis?.globalAnalysisId;
+                    return (
+                      <StreamEntryComponent
+                        key={entry.id}
+                        entry={entry}
+                        separatorType={separatorType}
+                        weekGroup={weekGroup}
+                        dateGroup={dateGroup}
+                        onDelete={fromGlobalAnalysis ? undefined : () => handleDeleteAnalysis(entry.id, entry.images ?? [])}
+                        onDeleteImage={fromGlobalAnalysis ? undefined : (path) => handleDeleteImage(entry.id, path)}
+                        onUpdateImageName={fromGlobalAnalysis ? undefined : (path, name) => handleUpdateImageName(entry.id, path, name)}
+                        onEdit={fromGlobalAnalysis ? undefined : () => analysis && handleEditAnalysis(analysis)}
+                      />
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="pointer-events-none absolute inset-0 z-20">
+                <div className="pointer-events-auto absolute bottom-4 right-2 flex flex-col gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const el = streamScrollRef.current;
+                      if (!el) return;
+                      el.scrollTo({ top: 0, behavior: "smooth" });
+                    }}
+                    className="h-9 w-9 rounded-lg border border-sidebar-border bg-sidebar/95 text-dashboard-foreground hover:bg-sidebar-hover transition-colors shadow-md backdrop-blur-sm"
+                    aria-label="Go to top"
+                    title="Go to top"
+                  >
+                    <ChevronUp className="h-5 w-5 mx-auto" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const el = streamScrollRef.current;
+                      if (!el) return;
+                      el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+                    }}
+                    className="h-9 w-9 rounded-lg border border-sidebar-border bg-sidebar/95 text-dashboard-foreground hover:bg-sidebar-hover transition-colors shadow-md backdrop-blur-sm"
+                    aria-label="Go to bottom"
+                    title="Go to bottom"
+                  >
+                    <ChevronDown className="h-5 w-5 mx-auto" />
+                  </button>
+                </div>
               </div>
             </div>
             <div className="shrink-0 w-full px-6 pb-6 pt-3 border-t border-sidebar-border/50 bg-dashboard-bg">

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useMemo, useEffect } from "react";
+import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import type { StreamEntry } from "@/types/asset";
 import type { GlobalAnalysis } from "@/types/api";
 import { globalAnalysisService } from "@/lib/api";
@@ -9,6 +9,7 @@ import { StreamEntry as StreamEntryComponent } from "./analysis/StreamEntry";
 import { PostGlobalAnalysisInput } from "./PostGlobalAnalysisInput";
 import { EditAnalysisModal } from "./analysis/EditAnalysisModal";
 import { DateRangePicker, type DateRange } from "./analysis/DateRangePicker";
+import { ChevronUp, ChevronDown } from "lucide-react";
 
 const ANALYSIS_TYPE_TO_TAG: Record<
   string,
@@ -68,6 +69,10 @@ export function GlobalAnalysisView() {
   const [dateRange, setDateRange] = useState<DateRange>(null);
   const [editing, setEditing] = useState<GlobalAnalysis | null>(null);
   const [editModalOpen, setEditModalOpen] = useState(false);
+  const [pendingFocusId, setPendingFocusId] = useState<string | null>(null);
+  const entryRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const streamScrollRef = useRef<HTMLDivElement | null>(null);
+  const didInitialAutoScrollRef = useRef(false);
 
   const fetchList = useCallback(async () => {
     setLoading(true);
@@ -93,13 +98,14 @@ export function GlobalAnalysisView() {
       scope: "global" | string[];
       analysisType: string;
     }) => {
-      await globalAnalysisService.create({
+      const created = await globalAnalysisService.create({
         notes: payload.notes,
         images: payload.images,
         imageNames: payload.imageNames,
         scope: payload.scope,
         analysisType: payload.analysisType,
       });
+      setPendingFocusId(created.id);
       await fetchList();
     },
     [fetchList]
@@ -126,12 +132,13 @@ export function GlobalAnalysisView() {
       scope?: "global" | string[];
     }) => {
       if (!editing) return;
-      await globalAnalysisService.update(editing.id, {
+      const updated = await globalAnalysisService.update(editing.id, {
         notes: payload.notes,
         images: payload.images.length > 0 ? payload.images : null,
         analysisType: payload.analysisType,
         scope: payload.scope,
       });
+      setPendingFocusId(updated.id);
       setEditing(null);
       setEditModalOpen(false);
       await fetchList();
@@ -236,6 +243,37 @@ export function GlobalAnalysisView() {
     });
   }, [filteredEntries]);
 
+  useEffect(() => {
+    if (!pendingFocusId || loading) return;
+    const target = entryRefs.current[pendingFocusId];
+    if (!target) return;
+    target.scrollIntoView({ behavior: "smooth", block: "center" });
+    setPendingFocusId(null);
+  }, [pendingFocusId, loading, entriesWithGroups]);
+
+  // On first entry to the page, scroll to the bottom (latest).
+  useEffect(() => {
+    if (loading) return;
+    if (pendingFocusId) return; // focus effect will handle it
+    if (didInitialAutoScrollRef.current) return;
+    didInitialAutoScrollRef.current = true;
+    const el = streamScrollRef.current;
+    if (!el) return;
+    el.scrollTo({ top: el.scrollHeight, behavior: "auto" });
+  }, [loading, pendingFocusId, entriesWithGroups]);
+
+  const scrollToTop = useCallback(() => {
+    const el = streamScrollRef.current;
+    if (!el) return;
+    el.scrollTo({ top: 0, behavior: "smooth" });
+  }, []);
+
+  const scrollToBottom = useCallback(() => {
+    const el = streamScrollRef.current;
+    if (!el) return;
+    el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+  }, []);
+
   return (
     <>
       <div className="flex h-full min-h-0 flex-col overflow-auto">
@@ -258,27 +296,62 @@ export function GlobalAnalysisView() {
           <DateRangePicker value={dateRange} onChange={setDateRange} />
         </div>
         <div className="flex-1 flex flex-col min-h-0 w-full">
-          <div className="flex-1 min-h-0 overflow-auto px-6 w-full">
-            <div className="w-full max-w-full space-y-0 pb-4">
-              {loading ? (
-                <p className="text-sm text-dashboard-foreground/70 py-4">Loading...</p>
-              ) : (
-                entriesWithGroups.map(({ entry, separatorType, weekGroup, dateGroup }) => (
-                  <StreamEntryComponent
-                    key={entry.id}
-                    entry={entry}
-                    separatorType={separatorType}
-                    weekGroup={weekGroup}
-                    dateGroup={dateGroup}
-                    onDelete={() => handleDelete(entry.id)}
-                    onUpdateImageName={(path, name) => handleUpdateImageName(entry.id, path, name)}
-                    onEdit={() => {
-                      const ga = list.find((g) => g.id === entry.id);
-                      if (ga) handleEdit(ga);
-                    }}
-                  />
-                ))
-              )}
+          {/* Buttons are outside the scroll layer so they stay fixed to this panel’s bottom-right */}
+          <div className="flex-1 min-h-0 relative w-full">
+            <div
+              ref={streamScrollRef}
+              className="absolute inset-0 overflow-x-hidden overflow-y-auto px-6"
+            >
+              <div className="w-full max-w-full space-y-0 pb-4">
+                {loading ? (
+                  <p className="text-sm text-dashboard-foreground/70 py-4">Loading...</p>
+                ) : (
+                  entriesWithGroups.map(({ entry, separatorType, weekGroup, dateGroup }) => (
+                    <div
+                      key={entry.id}
+                      ref={(el) => {
+                        entryRefs.current[entry.id] = el;
+                      }}
+                    >
+                      <StreamEntryComponent
+                        entry={entry}
+                        separatorType={separatorType}
+                        weekGroup={weekGroup}
+                        dateGroup={dateGroup}
+                        onDelete={() => handleDelete(entry.id)}
+                        onUpdateImageName={(path, name) => handleUpdateImageName(entry.id, path, name)}
+                        onEdit={() => {
+                          const ga = list.find((g) => g.id === entry.id);
+                          if (ga) handleEdit(ga);
+                        }}
+                      />
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            <div className="pointer-events-none absolute inset-0 z-20">
+              <div className="pointer-events-auto absolute bottom-4 right-8 flex flex-col gap-2">
+                <button
+                  type="button"
+                  onClick={scrollToTop}
+                  className="h-9 w-9 rounded-lg border border-sidebar-border bg-sidebar/95 text-dashboard-foreground hover:bg-sidebar-hover transition-colors shadow-md backdrop-blur-sm"
+                  aria-label="Go to top"
+                  title="Go to top"
+                >
+                  <ChevronUp className="h-5 w-5 mx-auto" />
+                </button>
+                <button
+                  type="button"
+                  onClick={scrollToBottom}
+                  className="h-9 w-9 rounded-lg border border-sidebar-border bg-sidebar/95 text-dashboard-foreground hover:bg-sidebar-hover transition-colors shadow-md backdrop-blur-sm"
+                  aria-label="Go to bottom"
+                  title="Go to bottom"
+                >
+                  <ChevronDown className="h-5 w-5 mx-auto" />
+                </button>
+              </div>
             </div>
           </div>
           <div className="shrink-0 w-full px-6 pb-6 pt-3 border-t border-sidebar-border/50 bg-dashboard-bg">
