@@ -75,3 +75,12 @@ body {
 .scrollbar-modal::-webkit-scrollbar-corner {
   background: var(--sidebar-border);
 }
+
+/* Hide visual scrollbar while preserving horizontal scroll behavior */
+.scrollbar-hide {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}

@@ -1,0 +1,181 @@
+import { Type } from 'class-transformer';
+import {
+  IsArray,
+  IsDateString,
+  IsEnum,
+  IsNumber,
+  IsOptional,
+  IsString,
+  IsUUID,
+  Min,
+  ValidateNested,
+} from 'class-validator';
+import { ApiPropertyOptional } from '@nestjs/swagger';
+
+const TRADE_TYPE_VALUES = ['buy', 'sell'] as const;
+const TRADE_EXECUTION_TYPE_VALUES = [
+  'market order',
+  'buy stop',
+  'sell stop',
+  'buy limit',
+  'sell limit',
+] as const;
+const TRADE_CLOSE_TYPE_VALUES = ['fullClose', 'partClose'] as const;
+const TRADE_STATUS_VALUES = [
+  'pending',
+  'executed',
+  'partlyClosed',
+  'fullyClosed',
+  'cancelled',
+] as const;
+
+class TradeProfitEarningDto {
+  @ApiPropertyOptional({ description: 'Earned R for a partial/full close', example: -0.5 })
+  @IsOptional()
+  @IsNumber()
+  earnedR?: number;
+}
+
+class TradeProfitFactorEarnedDto {
+  @ApiPropertyOptional({ type: [TradeProfitEarningDto] })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => TradeProfitEarningDto)
+  earnings?: TradeProfitEarningDto[];
+
+  @ApiPropertyOptional({ example: 1 })
+  @IsOptional()
+  @IsNumber()
+  earningsNumber?: number;
+
+  @ApiPropertyOptional({ example: 1.25 })
+  @IsOptional()
+  @IsNumber()
+  totalEarned?: number;
+}
+
+class TradeClosePriceDto {
+  @ApiPropertyOptional({ example: 1.1425 })
+  @IsOptional()
+  @IsNumber()
+  price?: number;
+
+  @ApiPropertyOptional({ enum: TRADE_CLOSE_TYPE_VALUES })
+  @IsOptional()
+  @IsEnum(TRADE_CLOSE_TYPE_VALUES)
+  type?: (typeof TRADE_CLOSE_TYPE_VALUES)[number];
+
+  @ApiPropertyOptional({ example: 0.5 })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  lots?: number;
+
+  @ApiPropertyOptional({ example: 50 })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  percentage?: number;
+
+  @ApiPropertyOptional({ example: '2026-03-21T03:08:00.000Z' })
+  @IsOptional()
+  @IsDateString()
+  time?: string;
+}
+
+class TradeNoteDto {
+  @ApiPropertyOptional({ example: 'Break of structure confirmed.' })
+  @IsOptional()
+  @IsString()
+  text?: string;
+
+  @ApiPropertyOptional({ type: [String], example: ['/uploads/note-1.png'] })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  images?: string[];
+}
+
+export class UpdateTradeDto {
+  @ApiPropertyOptional({ description: 'Pair (e.g. EURUSD)' })
+  @IsOptional()
+  @IsString()
+  pair?: string;
+
+  @ApiPropertyOptional({ description: 'Linked watch item ID', nullable: true })
+  @IsOptional()
+  @IsUUID()
+  pairWatchedId?: string | null;
+
+  @ApiPropertyOptional({ enum: TRADE_TYPE_VALUES })
+  @IsOptional()
+  @IsEnum(TRADE_TYPE_VALUES)
+  type?: (typeof TRADE_TYPE_VALUES)[number];
+
+  @ApiPropertyOptional({ enum: TRADE_EXECUTION_TYPE_VALUES })
+  @IsOptional()
+  @IsEnum(TRADE_EXECUTION_TYPE_VALUES)
+  executionType?: (typeof TRADE_EXECUTION_TYPE_VALUES)[number];
+
+  @ApiPropertyOptional({ example: '2026-03-21T01:35:00.000Z' })
+  @IsOptional()
+  @IsDateString()
+  executionTime?: string;
+
+  @ApiPropertyOptional({ example: 1.1405 })
+  @IsOptional()
+  @IsNumber()
+  executionPrice?: number;
+
+  @ApiPropertyOptional({ example: 1.132 })
+  @IsOptional()
+  @IsNumber()
+  tpPrice?: number;
+
+  @ApiPropertyOptional({ example: 1.145 })
+  @IsOptional()
+  @IsNumber()
+  slPrice?: number;
+
+  @ApiPropertyOptional({ example: 2.5 })
+  @IsOptional()
+  @IsNumber()
+  profitFactorTargeted?: number;
+
+  @ApiPropertyOptional({ type: TradeProfitFactorEarnedDto })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => TradeProfitFactorEarnedDto)
+  profitFactorEarned?: TradeProfitFactorEarnedDto;
+
+  @ApiPropertyOptional({ example: 1.5 })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  positionSize?: number;
+
+  @ApiPropertyOptional({ type: [TradeClosePriceDto] })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => TradeClosePriceDto)
+  closePrices?: TradeClosePriceDto[];
+
+  @ApiPropertyOptional({ example: '2026-03-21T03:08:00.000Z', nullable: true })
+  @IsOptional()
+  @IsDateString()
+  tradeCloseTime?: string | null;
+
+  @ApiPropertyOptional({ enum: TRADE_STATUS_VALUES })
+  @IsOptional()
+  @IsEnum(TRADE_STATUS_VALUES)
+  status?: (typeof TRADE_STATUS_VALUES)[number];
+
+  @ApiPropertyOptional({ type: [TradeNoteDto] })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => TradeNoteDto)
+  trackNotes?: TradeNoteDto[];
+}

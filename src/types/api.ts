@@ -176,6 +176,101 @@ export interface UpdateWatchItemDto {
   finished?: boolean;
 }
 
+export type TradeType = "buy" | "sell";
+export type TradeExecutionType =
+  | "market order"
+  | "buy stop"
+  | "sell stop"
+  | "buy limit"
+  | "sell limit";
+export type TradeCloseType = "fullClose" | "partClose";
+export type TradeStatus =
+  | "pending"
+  | "executed"
+  | "partlyClosed"
+  | "fullyClosed"
+  | "cancelled";
+
+export interface TradeProfitEarning {
+  earnedR: number;
+}
+
+export interface TradeProfitFactorEarned {
+  earnings: TradeProfitEarning[];
+  earningsNumber: number;
+  totalEarned: number;
+}
+
+export interface TradeClosePrice {
+  price: number;
+  type: TradeCloseType;
+  lots: number;
+  percentage: number;
+  time: string;
+}
+
+export interface TradeNote {
+  text: string;
+  images: string[];
+}
+
+export interface Trade {
+  id: string;
+  pair: string;
+  type: TradeType;
+  executionType: TradeExecutionType;
+  executionTime: string;
+  executionPrice: number;
+  tpPrice: number;
+  slPrice: number;
+  profitFactorTargeted: number;
+  profitFactorEarned: TradeProfitFactorEarned;
+  positionSize: number;
+  closePrices: TradeClosePrice[];
+  tradeCloseTime: string | null;
+  status: TradeStatus;
+  trackNotes: TradeNote[];
+  pairWatched: WatchItem | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateTradeDto {
+  pair?: string;
+  pairWatchedId?: string | null;
+  type: TradeType;
+  executionType: TradeExecutionType;
+  executionTime: string;
+  executionPrice: number;
+  tpPrice: number;
+  slPrice: number;
+  profitFactorTargeted: number;
+  profitFactorEarned: TradeProfitFactorEarned;
+  positionSize: number;
+  closePrices?: TradeClosePrice[];
+  tradeCloseTime?: string | null;
+  status: TradeStatus;
+  trackNotes?: TradeNote[];
+}
+
+export interface UpdateTradeDto {
+  pair?: string;
+  pairWatchedId?: string | null;
+  type?: TradeType;
+  executionType?: TradeExecutionType;
+  executionTime?: string;
+  executionPrice?: number;
+  tpPrice?: number;
+  slPrice?: number;
+  profitFactorTargeted?: number;
+  profitFactorEarned?: TradeProfitFactorEarned;
+  positionSize?: number;
+  closePrices?: TradeClosePrice[];
+  tradeCloseTime?: string | null;
+  status?: TradeStatus;
+  trackNotes?: TradeNote[];
+}
+
 /** Single analysis returned by the API */
 export interface Analysis {
   id: string;

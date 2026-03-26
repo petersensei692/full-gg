@@ -8,6 +8,7 @@ import { AppService } from './app.service';
 import { FondamentalModule } from './fondamental/fondamental.module';
 import { ImagesModule } from './images/images.module';
 import { SettingsModule } from './settings/settings.module';
+import { AnalyticsModule } from './analytics/analytics.module';
 
 const cwd = process.cwd();
 const rootEnv = path.resolve(cwd, cwd.replace(/[/\\]+$/, '').endsWith('server') ? '..' : '.', '.env');
@@ -30,6 +31,7 @@ const rootEnv = path.resolve(cwd, cwd.replace(/[/\\]+$/, '').endsWith('server') 
     }),
     SettingsModule,
     FondamentalModule,
+    AnalyticsModule,
     ImagesModule,
   ],
   controllers: [AppController],

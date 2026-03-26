@@ -5,8 +5,8 @@ import { usePathname, useSearchParams } from "next/navigation";
 import {
   BookOpen,
   BarChart3,
-  LineChart,
   LayoutDashboard,
+  ArrowLeftRight,
   Eye,
   Calendar,
   Settings,
@@ -61,6 +61,10 @@ type NavItemSimple = { href: string; label: string; icon: LucideIcon };
 const otherNavItems: NavItemSimple[] = [
   { href: "/notes", label: "Notes", icon: BookOpen },
   { href: "/settings", label: "Settings", icon: Settings },
+];
+const analyticsNavItems: NavItemSimple[] = [
+  { href: "/analytics", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/analytics/trades", label: "Trades", icon: ArrowLeftRight },
 ];
 
 interface SidebarProps {
@@ -154,7 +158,7 @@ export function Sidebar({
   }, []);
 
   const topLevelNav: (NavItemWithAssets | NavItemSimple)[] = isAnalytics
-    ? [{ href: "/analytics", label: "Dashboard", icon: LayoutDashboard }]
+    ? analyticsNavItems
     : [
         { href: "/fundamental-analysis", label: "Assets", icon: Coins, assets, subNav: [] },
         { href: "/global-analysis", label: "Global Analysis", icon: Globe },
