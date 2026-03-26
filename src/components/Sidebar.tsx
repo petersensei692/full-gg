@@ -5,6 +5,8 @@ import { usePathname, useSearchParams } from "next/navigation";
 import {
   BookOpen,
   BarChart3,
+  LineChart,
+  LayoutDashboard,
   Eye,
   Calendar,
   Settings,
@@ -83,6 +85,7 @@ export function Sidebar({
 }: SidebarProps) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const isAnalytics = pathname === "/analytics" || pathname.startsWith("/analytics/");
   const [assetsOpen, setAssetsOpen] = useState(true);
   /** Only one type section open at a time; restored from sessionStorage so it stays open when navigating to an asset */
   const [typeSectionsOpen, setTypeSectionsOpen] = useState<Record<string, boolean>>(() =>
@@ -150,13 +153,15 @@ export function Sidebar({
     });
   }, []);
 
-  const topLevelNav: (NavItemWithAssets | NavItemSimple)[] = [
-    { href: "/fundamental-analysis", label: "Assets", icon: Coins, assets, subNav: [] },
-    { href: "/global-analysis", label: "Global Analysis", icon: Globe },
-    { href: "/watch-list", label: "Watch List", icon: Eye },
-    { href: "/calendar", label: "Calendar", icon: Calendar },
-    ...otherNavItems,
-  ];
+  const topLevelNav: (NavItemWithAssets | NavItemSimple)[] = isAnalytics
+    ? [{ href: "/analytics", label: "Dashboard", icon: LayoutDashboard }]
+    : [
+        { href: "/fundamental-analysis", label: "Assets", icon: Coins, assets, subNav: [] },
+        { href: "/global-analysis", label: "Global Analysis", icon: Globe },
+        { href: "/watch-list", label: "Watch List", icon: Eye },
+        { href: "/calendar", label: "Calendar", icon: Calendar },
+        ...otherNavItems,
+      ];
 
   const showAsOverlay = isOverlayMode;
   const isExpanded = !collapsed || (isOverlayMode && overlayOpen);

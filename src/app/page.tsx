@@ -1,5 +1,5 @@
-import { redirect } from "next/navigation";
+import { WelcomeLanding } from "@/components/WelcomeLanding";
 
 export default function Home() {
-  redirect("/fundamental-analysis/asset?slug=usd");
+  return <WelcomeLanding />;
 }

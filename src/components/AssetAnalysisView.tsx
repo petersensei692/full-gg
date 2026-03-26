@@ -524,7 +524,7 @@ export function AssetAnalysisView({ asset }: AssetAnalysisViewProps) {
               </div>
 
               <div className="pointer-events-none absolute inset-0 z-20">
-                <div className="pointer-events-auto absolute bottom-4 right-2 flex flex-col gap-2">
+                <div className="pointer-events-auto absolute bottom-4 right-8 flex flex-col gap-2">
                   <button
                     type="button"
                     onClick={() => {
