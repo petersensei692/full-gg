@@ -47,6 +47,10 @@ export interface TradeNote {
   images: string[];
 }
 
+export interface TradeSlEvolutionEntry {
+  [key: string]: number;
+}
+
 @Entity('analytics_trades')
 export class Trade {
   @PrimaryGeneratedColumn('uuid')
@@ -70,8 +74,19 @@ export class Trade {
   @Column({ type: 'float', name: 'tp_price' })
   tpPrice: number;
 
-  @Column({ type: 'float', name: 'sl_price' })
-  slPrice: number;
+  @Column({ type: 'float', name: 'initial_sl_price', default: 0 })
+  initialSlPrice: number;
+
+  @Column({
+    type: 'text',
+    name: 'sl_evolution',
+    default: '[]',
+    transformer: {
+      to: (v: TradeSlEvolutionEntry[]) => JSON.stringify(v ?? []),
+      from: (v: string) => (v ? (JSON.parse(v) as TradeSlEvolutionEntry[]) : []),
+    },
+  })
+  slEvolution: TradeSlEvolutionEntry[];
 
   @Column({ type: 'float', name: 'profit_factor_targeted' })
   profitFactorTargeted: number;

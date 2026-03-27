@@ -136,7 +136,15 @@ export class UpdateTradeDto {
   @ApiPropertyOptional({ example: 1.145 })
   @IsOptional()
   @IsNumber()
-  slPrice?: number;
+  initialSlPrice?: number;
+
+  @ApiPropertyOptional({
+    description: 'SL evolution sequence, e.g. [{ "slUpdate1": 1.14 }, { "slUpdate2": 1.1425 }]',
+    type: [Object],
+  })
+  @IsOptional()
+  @IsArray()
+  slEvolution?: Record<string, number>[];
 
   @ApiPropertyOptional({ example: 2.5 })
   @IsOptional()

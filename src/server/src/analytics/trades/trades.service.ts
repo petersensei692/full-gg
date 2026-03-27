@@ -5,6 +5,7 @@ import { Trade } from './entities/trade.entity';
 import { CreateTradeDto } from './dto/create-trade.dto';
 import { UpdateTradeDto } from './dto/update-trade.dto';
 import { WatchItem } from '../../fondamental/assets/watch-items/entities/watch-item.entity';
+import { PairPipsValue } from '../pairs-pips-values/entities/pair-pips-value.entity';
 
 @Injectable()
 export class TradesService {
@@ -13,7 +14,121 @@ export class TradesService {
     private readonly tradesRepository: Repository<Trade>,
     @InjectRepository(WatchItem)
     private readonly watchItemsRepository: Repository<WatchItem>,
+    @InjectRepository(PairPipsValue)
+    private readonly pairsPipsRepository: Repository<PairPipsValue>,
   ) {}
+
+  private normalizePair(value: string): string {
+    return value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+  }
+
+  private inferFallbackPipStep(pair: string): number {
+    const normalized = this.normalizePair(pair);
+    if (normalized.includes('JPY')) return 0.01;
+    if (normalized.startsWith('XAU') || normalized.startsWith('WTI')) return 0.01;
+    if (normalized.startsWith('XAG')) return 0.001;
+    return 0.0001;
+  }
+
+  private async resolvePipStep(pair: string): Promise<number> {
+    const normalized = this.normalizePair(pair);
+    const all = await this.pairsPipsRepository.find();
+    const match = all.find((row) => this.normalizePair(row.pair) === normalized);
+    if (match) return match.pairFormat;
+    return this.inferFallbackPipStep(pair);
+  }
+
+  private async recalculateProfitFactorEarned(trade: Trade): Promise<void> {
+    const closePrices = trade.closePrices ?? [];
+    if (closePrices.length === 0) {
+      trade.profitFactorEarned = { earnings: [], earningsNumber: 0, totalEarned: 0 };
+      return;
+    }
+
+    const riskPriceAbs = Math.abs(trade.executionPrice - trade.initialSlPrice);
+    if (riskPriceAbs <= 0 || trade.positionSize <= 0) {
+      trade.profitFactorEarned = { earnings: [], earningsNumber: 0, totalEarned: 0 };
+      return;
+    }
+
+    const pipStep = await this.resolvePipStep(trade.pair);
+    const riskPips = riskPriceAbs / pipStep;
+    if (riskPips <= 0) {
+      trade.profitFactorEarned = { earnings: [], earningsNumber: 0, totalEarned: 0 };
+      return;
+    }
+
+    let cumulative = 0;
+    const earnings = closePrices.map((c) => {
+      const priceDelta =
+        trade.type === 'buy'
+          ? c.price - trade.executionPrice
+          : trade.executionPrice - c.price;
+      const closePips = priceDelta / pipStep;
+      const sizeWeight = c.lots / trade.positionSize;
+      const rawEarnedR = (closePips / riskPips) * sizeWeight;
+      const remainingAllowedLoss = -1 - cumulative;
+      const earnedR = rawEarnedR < remainingAllowedLoss ? remainingAllowedLoss : rawEarnedR;
+      cumulative += earnedR;
+      return { earnedR };
+    });
+    const totalEarned = earnings.reduce((sum, item) => sum + item.earnedR, 0);
+
+    trade.profitFactorEarned = {
+      earnings,
+      earningsNumber: earnings.length,
+      totalEarned,
+    };
+  }
+
+  private sanitizeClosePrices(trade: Trade, closePrices: Trade['closePrices']): Trade['closePrices'] {
+    const positionSize = trade.positionSize;
+    if (positionSize <= 0) return [];
+    let remaining = positionSize;
+    const sanitized: Trade['closePrices'] = [];
+
+    for (const item of closePrices) {
+      if (remaining <= 0) break;
+      let lots = Math.max(0, item.lots);
+      if (item.type === 'fullClose') {
+        lots = remaining;
+      } else {
+        lots = Math.min(lots, remaining);
+      }
+      const percentage = (lots / positionSize) * 100;
+      sanitized.push({
+        ...item,
+        lots,
+        percentage,
+      });
+      remaining -= lots;
+    }
+    return sanitized;
+  }
+
+  private applyLifecycleFields(trade: Trade): void {
+    const totalClosedLots = (trade.closePrices ?? []).reduce((sum, c) => sum + c.lots, 0);
+    const isFullyClosed = totalClosedLots >= trade.positionSize - 1e-9;
+    const hasAnyClose = totalClosedLots > 0;
+
+    if (isFullyClosed) {
+      trade.status = 'fullyClosed';
+      const latestClose = trade.closePrices[trade.closePrices.length - 1];
+      trade.tradeCloseTime = latestClose ? new Date(latestClose.time) : trade.tradeCloseTime;
+      return;
+    }
+
+    if (hasAnyClose) {
+      trade.status = 'partlyClosed';
+      trade.tradeCloseTime = null;
+      return;
+    }
+
+    if (trade.status !== 'pending' && trade.status !== 'cancelled') {
+      trade.status = 'executed';
+    }
+    trade.tradeCloseTime = null;
+  }
 
   private async resolvePairWatched(pairWatchedId?: string | null): Promise<WatchItem | null> {
     if (pairWatchedId == null) return null;
@@ -41,7 +156,8 @@ export class TradesService {
       executionTime: new Date(dto.executionTime),
       executionPrice: dto.executionPrice,
       tpPrice: dto.tpPrice,
-      slPrice: dto.slPrice,
+      initialSlPrice: dto.initialSlPrice,
+      slEvolution: dto.slEvolution ?? [],
       profitFactorTargeted: dto.profitFactorTargeted,
       profitFactorEarned: {
         earnings: dto.profitFactorEarned.earnings ?? [],
@@ -58,6 +174,11 @@ export class TradesService {
       })),
       pairWatched,
     });
+
+    trade.closePrices = this.sanitizeClosePrices(trade, trade.closePrices ?? []);
+    this.applyLifecycleFields(trade);
+
+    await this.recalculateProfitFactorEarned(trade);
 
     return this.tradesRepository.save(trade);
   }
@@ -92,7 +213,8 @@ export class TradesService {
     if (dto.executionTime !== undefined) trade.executionTime = new Date(dto.executionTime);
     if (dto.executionPrice !== undefined) trade.executionPrice = dto.executionPrice;
     if (dto.tpPrice !== undefined) trade.tpPrice = dto.tpPrice;
-    if (dto.slPrice !== undefined) trade.slPrice = dto.slPrice;
+    if (dto.initialSlPrice !== undefined) trade.initialSlPrice = dto.initialSlPrice;
+    if (dto.slEvolution !== undefined) trade.slEvolution = dto.slEvolution;
     if (dto.profitFactorTargeted !== undefined) trade.profitFactorTargeted = dto.profitFactorTargeted;
     if (dto.positionSize !== undefined) trade.positionSize = dto.positionSize;
     if (dto.closePrices !== undefined) {
@@ -126,6 +248,10 @@ export class TradesService {
         totalEarned: dto.profitFactorEarned.totalEarned ?? existing.totalEarned ?? 0,
       };
     }
+
+    trade.closePrices = this.sanitizeClosePrices(trade, trade.closePrices ?? []);
+    this.applyLifecycleFields(trade);
+    await this.recalculateProfitFactorEarned(trade);
 
     if (!trade.pair?.trim()) {
       throw new BadRequestException('pair must not be empty');

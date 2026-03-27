@@ -209,6 +209,8 @@ export interface TradeClosePrice {
   time: string;
 }
 
+export type TradeSlEvolutionEntry = Record<string, number>;
+
 export interface TradeNote {
   text: string;
   images: string[];
@@ -222,7 +224,8 @@ export interface Trade {
   executionTime: string;
   executionPrice: number;
   tpPrice: number;
-  slPrice: number;
+  initialSlPrice: number;
+  slEvolution: TradeSlEvolutionEntry[];
   profitFactorTargeted: number;
   profitFactorEarned: TradeProfitFactorEarned;
   positionSize: number;
@@ -243,7 +246,8 @@ export interface CreateTradeDto {
   executionTime: string;
   executionPrice: number;
   tpPrice: number;
-  slPrice: number;
+  initialSlPrice: number;
+  slEvolution?: TradeSlEvolutionEntry[];
   profitFactorTargeted: number;
   profitFactorEarned: TradeProfitFactorEarned;
   positionSize: number;
@@ -261,7 +265,8 @@ export interface UpdateTradeDto {
   executionTime?: string;
   executionPrice?: number;
   tpPrice?: number;
-  slPrice?: number;
+  initialSlPrice?: number;
+  slEvolution?: TradeSlEvolutionEntry[];
   profitFactorTargeted?: number;
   profitFactorEarned?: TradeProfitFactorEarned;
   positionSize?: number;
@@ -269,6 +274,64 @@ export interface UpdateTradeDto {
   tradeCloseTime?: string | null;
   status?: TradeStatus;
   trackNotes?: TradeNote[];
+}
+
+export type AnalyticsRange = "1D" | "1W" | "1M" | "1Y" | "ALL";
+
+export interface DashboardAnalyticsResponse {
+  tradeCount: {
+    countByWeek: number;
+    averageByWeek: number;
+    total: number;
+    evolution: { labels: string[]; values: number[] };
+  };
+  streaks: {
+    days: {
+      winningStreaksAmount: number;
+      HighestWinningStreak: number;
+      loosingStreaksAmount: number;
+      HighestloosingStreak: number;
+    };
+    trades: {
+      winningStreaksAmount: number;
+      HighestWinningStreak: number;
+      loosingStreaksAmount: number;
+      HighestloosingStreak: number;
+    };
+  };
+  tradingStats: {
+    actualResult: number;
+    periodReturns: {
+      daily: number;
+      weekly: number;
+      monthly: number;
+      yearly: number;
+    };
+    risk: {
+      maxDrawdown: {
+        number: number;
+        period: { from: string; to: string } | null;
+      };
+      highestWin: { number: number; trade: Trade | null };
+      highestLose: { number: number; trade: Trade | null };
+    };
+    tradeStats: {
+      winrate: number;
+      profitFactor: number;
+      averageWin: number;
+      averageLoose: number;
+      averageTradeDuration: string;
+    };
+  };
+  chartData: {
+    resultEvolution: Array<{ label: string; value: number }>;
+  };
+  appliedFilters: {
+    tradeCountRange: AnalyticsRange;
+    resultRange: AnalyticsRange;
+    from: string | null;
+    to: string;
+  };
 }
 
 /** Single analysis returned by the API */

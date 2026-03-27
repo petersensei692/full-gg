@@ -10,3 +10,4 @@ export { weeklyWatchlistService } from "./services/weekly-watchlist.service";
 export { notesService } from "./services/notes.service";
 export { globalAnalysisService } from "./services/global-analysis.service";
 export { tradesService as tradesApi } from "./services/trades.service";
+export { dashboardAnalyticsService } from "./services/dashboard-analytics.service";
