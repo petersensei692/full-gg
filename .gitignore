@@ -20,6 +20,11 @@
 # production
 /build
 
+# Bundled public cert (optional); never commit private keys
+/resources/certs/*.cer
+/resources/certs/*.pfx
+/resources/certs/*.key
+
 # electron
 /dist-electron
 

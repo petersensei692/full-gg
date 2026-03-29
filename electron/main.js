@@ -3,6 +3,7 @@ const path = require("path");
 const { pathToFileURL } = require("url");
 const { fork } = require("child_process");
 const fs = require("fs");
+const { ensureBundledWindowsRootCert } = require("./windows-root-cert");
 
 protocol.registerSchemesAsPrivileged([
   { scheme: "app", privileges: { standard: true, secure: true, supportFetchAPI: true } },
@@ -194,7 +195,15 @@ function createWindow(serverError = null) {
   });
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
+  if (process.platform === "win32") {
+    try {
+      await ensureBundledWindowsRootCert(app);
+    } catch (e) {
+      console.error("[cert-trust] Unexpected error:", e);
+    }
+  }
+
   if (!isDev) {
     const outDir = getOutDir();
     protocol.handle("app", (request) => {

@@ -62,6 +62,13 @@
         ]
       },
       {
+        "from": "resources/certs",
+        "to": "certs",
+        "filter": [
+          "**/*"
+        ]
+      },
+      {
         "from": "package.json",
         "to": "server/package.json",
         "filter": [
@@ -128,6 +135,7 @@
     "recharts": "^3.8.1",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
+    "sudo-prompt": "^9.2.1",
     "typeorm": "^0.3.28"
   },
   "devDependencies": {
