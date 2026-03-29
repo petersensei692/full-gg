@@ -82,7 +82,7 @@ export class PerformanceAnalyticsService {
         : 'winsLosses';
     let unit: FrequencyUnit = query.frequencyUnit === 'monthly' ? 'monthly' : 'daily';
 
-    const monthlyAvailable = !from || distinctMonthsInRange(from, to) >= 12;
+    const monthlyAvailable = !from || distinctMonthsInRange(from, to) >= 1;
     if (unit === 'monthly' && !monthlyAvailable) unit = 'daily';
 
     const allClosed = await this.tradesRepository.find({
@@ -240,8 +240,19 @@ export class PerformanceAnalyticsService {
 
     const totalTrades = filtered.length;
     const totalWins = filtered.filter((t) => (t.profitFactorEarned?.totalEarned ?? 0) > 0).length;
+    const totalLosses = filtered.filter((t) => (t.profitFactorEarned?.totalEarned ?? 0) < 0).length;
+    const totalBreakeven = filtered.filter((t) => (t.profitFactorEarned?.totalEarned ?? 0) === 0).length;
     const dailyWinratePercent =
       totalTrades > 0 ? round2((totalWins / totalTrades) * 100) : 0;
+
+    const winTradesList = filtered.filter((t) => (t.profitFactorEarned?.totalEarned ?? 0) > 0);
+    const loseTradesList = filtered.filter((t) => (t.profitFactorEarned?.totalEarned ?? 0) < 0);
+    const sumWinR = winTradesList.reduce((s, t) => s + (t.profitFactorEarned?.totalEarned ?? 0), 0);
+    const sumLossAbs = loseTradesList.reduce((s, t) => s + Math.abs(t.profitFactorEarned?.totalEarned ?? 0), 0);
+    const avgWinR = winTradesList.length ? sumWinR / winTradesList.length : 0;
+    const avgLossR = loseTradesList.length ? sumLossAbs / loseTradesList.length : 0;
+    const tradeWinLossRatio =
+      avgLossR > 1e-9 ? round2(avgWinR / avgLossR) : avgWinR > 0 ? round2(avgWinR) : 0;
 
     const netDailyR = sortedDayKeys.map((k) => ({
       date: k,
@@ -382,6 +393,10 @@ export class PerformanceAnalyticsService {
         dayWinLossRatio,
         netDailyR,
         tradePerformanceR,
+        tradeWins: totalWins,
+        tradeLosses: totalLosses,
+        tradeBreakeven: totalBreakeven,
+        tradeWinLossRatio,
       },
       frequency: {
         unit,

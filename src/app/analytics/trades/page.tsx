@@ -181,14 +181,8 @@ export default function AnalyticsTradesPage() {
 
   useEffect(() => {
     if (!selectedTrade) return;
-    const canM = selectedTrade.status === "executed" || selectedTrade.status === "partlyClosed";
-    const cancelled = selectedTrade.status === "cancelled";
-    if (cancelled) {
+    if (selectedTrade.status === "cancelled") {
       setPanelTab("metrics");
-      return;
-    }
-    if (!canM) {
-      setPanelTab((t) => (t === "management" || t === "pairWatched" ? "metrics" : t));
     }
   }, [selectedTrade?.id, selectedTrade?.status]);
 
@@ -308,11 +302,21 @@ export default function AnalyticsTradesPage() {
   const canManageTrade =
     tradeAllowsManagement && selectedTradeRemainingLots > 0.000001 && selectedTrade!.status !== "fullyClosed";
 
-  const canPostTradeNote =
+  /** Add notes (including one after the trade is fully closed). */
+  const canAddTradeNote =
+    !!selectedTrade &&
+    selectedTrade.status !== "cancelled";
+
+  /** Edit existing notes only while the trade is still open / partly closed. */
+  const canEditExistingTradeNote =
     !!selectedTrade &&
     (selectedTrade.status === "pending" ||
       selectedTrade.status === "executed" ||
       selectedTrade.status === "partlyClosed");
+
+  const pairWatchReadOnly =
+    !!selectedTrade &&
+    (selectedTrade.status === "fullyClosed" || selectedTrade.status === "cancelled");
 
   const selectedIsCancelled = selectedTrade?.status === "cancelled";
 
@@ -687,7 +691,7 @@ export default function AnalyticsTradesPage() {
                   </button>
                   <button
                     type="button"
-                    disabled={!tradeAllowsManagement || selectedIsCancelled}
+                    disabled={selectedIsCancelled}
                     onClick={() => setPanelTab("management")}
                     className={`rounded px-2 py-1 transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
                       panelTab === "management" ? "bg-primary/10 text-primary" : "text-header-foreground hover:text-primary"
@@ -707,7 +711,7 @@ export default function AnalyticsTradesPage() {
                   </button>
                   <button
                     type="button"
-                    disabled={!tradeAllowsManagement || selectedIsCancelled}
+                    disabled={selectedIsCancelled}
                     onClick={() => setPanelTab("pairWatched")}
                     className={`rounded px-2 py-1 transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
                       panelTab === "pairWatched" ? "bg-primary/10 text-primary" : "text-header-foreground hover:text-primary"
@@ -824,6 +828,11 @@ export default function AnalyticsTradesPage() {
 
                 {panelTab === "management" && (
                   <div className="space-y-6">
+                    {!canManageTrade && (
+                      <p className="text-xs text-header-muted">
+                        This trade is view-only here (fully closed, cancelled, or no open lots). SL history and closes are shown below.
+                      </p>
+                    )}
                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                       <div className="rounded-lg border border-sidebar-border bg-sidebar/30 p-3">
                         <p className="text-xs text-header-muted">Current SL</p>
@@ -972,9 +981,12 @@ export default function AnalyticsTradesPage() {
 
                 {panelTab === "notes" && (
                   <div className="flex h-full min-h-0 flex-col">
-                    {!canPostTradeNote && (
+                    {!canAddTradeNote && (
+                      <p className="mb-3 text-xs text-header-muted">Notes are view-only on cancelled trades.</p>
+                    )}
+                    {canAddTradeNote && !canEditExistingTradeNote && (
                       <p className="mb-3 text-xs text-header-muted">
-                        Notes are view-only on fully closed or cancelled trades. You can add notes on pending, executed, and partly closed trades.
+                        This trade is closed: you can add a final note below. Earlier notes are read-only.
                       </p>
                     )}
                     <div className="min-h-0 flex-1 overflow-y-auto pr-1">
@@ -983,7 +995,7 @@ export default function AnalyticsTradesPage() {
                           key={`${selectedTrade.id}-note-${idx}`}
                           className="mb-4 rounded-xl border border-sidebar-border border-l-4 border-l-blue-500 bg-sidebar/50 p-4"
                         >
-                          {noteEditIdx === idx && canPostTradeNote ? (
+                          {noteEditIdx === idx && canEditExistingTradeNote ? (
                             <div className="space-y-3">
                               <textarea
                                 value={noteEditText}
@@ -1070,7 +1082,7 @@ export default function AnalyticsTradesPage() {
                                   ))}
                                 </div>
                               )}
-                              {canPostTradeNote && (
+                              {canEditExistingTradeNote && (
                                 <button
                                   type="button"
                                   onClick={() => beginEditNote(idx)}
@@ -1085,7 +1097,7 @@ export default function AnalyticsTradesPage() {
                       ))}
                     </div>
 
-                    {canPostTradeNote && (
+                    {canAddTradeNote && (
                       <div className="shrink-0 border-t border-sidebar-border/60 pt-3">
                         <textarea
                           ref={noteEditorRef}
@@ -1151,6 +1163,9 @@ export default function AnalyticsTradesPage() {
 
                 {panelTab === "pairWatched" && (
                   <div className="space-y-4">
+                    {pairWatchReadOnly && (
+                      <p className="text-xs text-header-muted">Read-only: linking is disabled for closed or cancelled trades.</p>
+                    )}
                     <div className="flex items-center justify-between rounded-xl border border-sidebar-border bg-sidebar/40 p-4">
                       <div>
                         <p className="text-sm font-medium text-header-foreground">Linked Pair</p>
@@ -1159,7 +1174,7 @@ export default function AnalyticsTradesPage() {
                         </p>
                       </div>
                       <div className="flex flex-wrap gap-2">
-                        {selectedTrade.pairWatched && (
+                        {selectedTrade.pairWatched && !pairWatchReadOnly && (
                           <button
                             type="button"
                             onClick={async () => {
@@ -1171,16 +1186,18 @@ export default function AnalyticsTradesPage() {
                             Unlink
                           </button>
                         )}
-                        <button
-                          type="button"
-                          onClick={async () => {
-                            await loadCurrentWeekPairs();
-                            setLinkModalOpen(true);
-                          }}
-                          className="rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-                        >
-                          Link
-                        </button>
+                        {!pairWatchReadOnly && (
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              await loadCurrentWeekPairs();
+                              setLinkModalOpen(true);
+                            }}
+                            className="rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+                          >
+                            Link
+                          </button>
+                        )}
                       </div>
                     </div>
 

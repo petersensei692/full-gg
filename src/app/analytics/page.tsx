@@ -24,8 +24,8 @@ function SurfaceCard({
   );
 }
 
-function formatR(value: number | undefined, digits = 4): string {
-  if (typeof value !== "number" || Number.isNaN(value)) return "0.0000";
+function formatR(value: number | undefined, digits = 2): string {
+  if (typeof value !== "number" || Number.isNaN(value)) return (0).toFixed(digits);
   return value.toFixed(digits);
 }
 
@@ -126,7 +126,7 @@ export default function AnalyticsPage() {
             <div className="border-l-2 border-[#2196f3] pl-3">
               <p className="text-sm font-semibold text-header-foreground">Actual Result</p>
               <p className="mt-1 text-2xl font-semibold text-primary">
-                {loading ? "..." : `${headlineResult >= 0 ? "+" : ""}${headlineResult.toFixed(4)} R`}
+                {loading ? "..." : `${headlineResult >= 0 ? "+" : ""}${headlineResult.toFixed(2)} R`}
               </p>
               <p className="text-xs text-header-muted">Sum of all trade R</p>
             </div>
@@ -135,20 +135,20 @@ export default function AnalyticsPage() {
               <p className="text-xs uppercase tracking-wide text-header-muted">Period Returns</p>
               <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
                 <div className="rounded-md bg-header px-2 py-2">
-                  <p className="text-header-muted">Daily</p>
-                  <p className="text-primary">{loading ? "..." : `${formatR(data?.tradingStats.periodReturns.daily)} R`}</p>
-                </div>
-                <div className="rounded-md bg-header px-2 py-2">
                   <p className="text-header-muted">Weekly</p>
                   <p className="text-primary">{loading ? "..." : `${formatR(data?.tradingStats.periodReturns.weekly)} R`}</p>
                 </div>
                 <div className="rounded-md bg-header px-2 py-2">
-                  <p className="text-header-muted">Monthly</p>
-                  <p className="text-primary">{loading ? "..." : `${formatR(data?.tradingStats.periodReturns.monthly)} R`}</p>
+                  <p className="text-header-muted">Daily</p>
+                  <p className="text-primary">{loading ? "..." : `${formatR(data?.tradingStats.periodReturns.daily)} R`}</p>
                 </div>
                 <div className="rounded-md bg-header px-2 py-2">
                   <p className="text-header-muted">Yearly</p>
                   <p className="text-primary">{loading ? "..." : `${formatR(data?.tradingStats.periodReturns.yearly)} R`}</p>
+                </div>
+                <div className="rounded-md bg-header px-2 py-2">
+                  <p className="text-header-muted">Monthly</p>
+                  <p className="text-primary">{loading ? "..." : `${formatR(data?.tradingStats.periodReturns.monthly)} R`}</p>
                 </div>
               </div>
             </div>
@@ -159,6 +159,18 @@ export default function AnalyticsPage() {
                 <div className="flex justify-between">
                   <span className="text-header-muted">Max Drawdown</span>
                   <span className="text-[#f77786]">{loading ? "..." : `${formatR(data?.tradingStats.risk.maxDrawdown.number)} R`}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-header-muted">Max Drawdown Trades</span>
+                  <span>{loading ? "..." : (data?.tradingStats.risk.maxDrawdown.tradeCount ?? 0)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-header-muted">Max Drawup</span>
+                  <span className="text-primary">{loading ? "..." : `${formatR(data?.tradingStats.risk.maxDrawup?.number)} R`}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-header-muted">Max Drawup Trades</span>
+                  <span>{loading ? "..." : (data?.tradingStats.risk.maxDrawup?.tradeCount ?? 0)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-header-muted">Highest Win</span>

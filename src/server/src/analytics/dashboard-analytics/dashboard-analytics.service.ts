@@ -192,27 +192,62 @@ export class DashboardAnalyticsService {
       (a, b) => new Date(a.tradeCloseTime as Date).getTime() - new Date(b.tradeCloseTime as Date).getTime(),
     );
     let currentRun = 0;
+    let currentLossCount = 0;
     let currentStart: Date | null = null;
     let currentEnd: Date | null = null;
     let maxDrawdown = 0;
+    let maxDrawdownTradeCount = 0;
     let maxStart: Date | null = null;
     let maxEnd: Date | null = null;
     for (const t of chronClosed) {
       const r = t.profitFactorEarned?.totalEarned ?? 0;
       const closeAt = new Date(t.tradeCloseTime as Date);
       if (r < 0) {
-        if (currentRun === 0) currentStart = closeAt;
+        if (currentRun === 0) {
+          currentStart = closeAt;
+          currentLossCount = 0;
+        }
         currentRun += r;
+        currentLossCount += 1;
         currentEnd = closeAt;
         if (currentRun < maxDrawdown) {
           maxDrawdown = currentRun;
+          maxDrawdownTradeCount = currentLossCount;
           maxStart = currentStart;
           maxEnd = currentEnd;
         }
       } else {
         currentRun = 0;
+        currentLossCount = 0;
         currentStart = null;
         currentEnd = null;
+      }
+    }
+
+    let upRun = 0;
+    let upWinCount = 0;
+    let upStreakStart: Date | null = null;
+    let maxDrawup = 0;
+    let maxDrawupTradeCount = 0;
+    let maxUpStart: Date | null = null;
+    let maxUpEnd: Date | null = null;
+    for (const t of chronClosed) {
+      const r = t.profitFactorEarned?.totalEarned ?? 0;
+      const closeAt = new Date(t.tradeCloseTime as Date);
+      if (r > 0) {
+        if (upRun === 0) upStreakStart = closeAt;
+        upRun += r;
+        upWinCount += 1;
+        if (upRun > maxDrawup) {
+          maxDrawup = upRun;
+          maxDrawupTradeCount = upWinCount;
+          maxUpStart = upStreakStart;
+          maxUpEnd = closeAt;
+        }
+      } else {
+        upRun = 0;
+        upWinCount = 0;
+        upStreakStart = null;
       }
     }
 
@@ -239,7 +274,7 @@ export class DashboardAnalyticsService {
     const dailyResultEntries = [...byDay.entries()].sort(([a], [b]) => a.localeCompare(b));
     const dailySeries = dailyResultEntries.map(([label, value]) => ({
       label,
-      value: Number(value.toFixed(4)),
+      value: Number(value.toFixed(2)),
     }));
 
     return {
@@ -255,41 +290,47 @@ export class DashboardAnalyticsService {
         },
       },
       tradingStats: {
-        actualResult: Number(totalResult.toFixed(4)),
+        actualResult: Number(totalResult.toFixed(2)),
         periodReturns: {
-          daily: Number(safeDiv(totalResult, byDayResult.size).toFixed(4)),
-          weekly: Number(safeDiv(totalResult, byWeekResult.size).toFixed(4)),
-          monthly: Number(safeDiv(totalResult, byMonthResult.size).toFixed(4)),
-          yearly: Number(safeDiv(totalResult, byYearResult.size).toFixed(4)),
+          daily: Number(safeDiv(totalResult, byDayResult.size).toFixed(2)),
+          weekly: Number(safeDiv(totalResult, byWeekResult.size).toFixed(2)),
+          monthly: Number(safeDiv(totalResult, byMonthResult.size).toFixed(2)),
+          yearly: Number(safeDiv(totalResult, byYearResult.size).toFixed(2)),
         },
         risk: {
           maxDrawdown: {
-            number: Number(maxDrawdown.toFixed(4)),
+            number: Number(maxDrawdown.toFixed(2)),
+            tradeCount: maxDrawdownTradeCount,
             period: maxStart && maxEnd ? { from: maxStart.toISOString(), to: maxEnd.toISOString() } : null,
           },
+          maxDrawup: {
+            number: Number(maxDrawup.toFixed(2)),
+            tradeCount: maxDrawupTradeCount,
+            period: maxUpStart && maxUpEnd ? { from: maxUpStart.toISOString(), to: maxUpEnd.toISOString() } : null,
+          },
           highestWin: {
-            number: Number((highestWinTrade?.profitFactorEarned?.totalEarned ?? 0).toFixed(4)),
+            number: Number((highestWinTrade?.profitFactorEarned?.totalEarned ?? 0).toFixed(2)),
             trade: highestWinTrade ?? null,
           },
           highestLose: {
-            number: Number((highestLoseTrade?.profitFactorEarned?.totalEarned ?? 0).toFixed(4)),
+            number: Number((highestLoseTrade?.profitFactorEarned?.totalEarned ?? 0).toFixed(2)),
             trade: highestLoseTrade ?? null,
           },
         },
         tradeStats: {
           winrate: Number((safeDiv(wins.length, resultTrades.length) * 100).toFixed(2)),
-          profitFactor: Number(safeDiv(totalResult, resultTrades.length).toFixed(4)),
+          profitFactor: Number(safeDiv(totalResult, resultTrades.length).toFixed(2)),
           averageWin: Number(
             safeDiv(
               wins.reduce((sum, t) => sum + (t.profitFactorEarned?.totalEarned ?? 0), 0),
               wins.length,
-            ).toFixed(4),
+            ).toFixed(2),
           ),
           averageLoose: Number(
             safeDiv(
               losses.reduce((sum, t) => sum + (t.profitFactorEarned?.totalEarned ?? 0), 0),
               losses.length,
-            ).toFixed(4),
+            ).toFixed(2),
           ),
           averageTradeDuration: formatDuration(avgDurationMs),
         },

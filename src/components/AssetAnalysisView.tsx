@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useMemo, useRef, useEffect } from "react";
+import { useState, useCallback, useMemo, useRef, useEffect, useLayoutEffect } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { Calendar, Plus, ChevronDown, ChevronUp, Settings } from "lucide-react";
@@ -205,9 +205,6 @@ export function AssetAnalysisView({ asset }: AssetAnalysisViewProps) {
   }, []);
 
   const streamScrollRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    streamScrollRef.current?.scrollTo({ top: streamScrollRef.current.scrollHeight, behavior: "smooth" });
-  }, [analyses.length]);
 
   useEffect(() => {
     if (!resolvedAsset.id) {
@@ -398,6 +395,14 @@ export function AssetAnalysisView({ asset }: AssetAnalysisViewProps) {
       return { entry, separatorType, weekGroup, dateGroup };
     });
   }, [filteredEntries]);
+
+  /** Newest analyses are at the bottom; scroll there when opening the stream or when the list changes. */
+  useLayoutEffect(() => {
+    if (activeTab !== "stream") return;
+    const el = streamScrollRef.current;
+    if (!el) return;
+    el.scrollTop = el.scrollHeight;
+  }, [activeTab, analyses.length, filteredEntries.length]);
 
   const displayTitle = resolvedAsset.symbol
     ? `${resolvedAsset.label} (${resolvedAsset.symbol})`

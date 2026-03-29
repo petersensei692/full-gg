@@ -390,6 +390,23 @@ export class TradesService {
     return trade;
   }
 
+  /** True when the PATCH may change how earned R is derived (SL moves alone must not). */
+  private dtoAffectsEarnedR(dto: UpdateTradeDto): boolean {
+    return (
+      dto.closePrices !== undefined ||
+      dto.executionPrice !== undefined ||
+      dto.initialSlPrice !== undefined ||
+      dto.positionSize !== undefined ||
+      dto.type !== undefined ||
+      dto.pair !== undefined ||
+      dto.profitFactorEarned !== undefined
+    );
+  }
+
+  private linkedIdsKey(ids: string[] | undefined): string {
+    return JSON.stringify([...(ids ?? [])].sort());
+  }
+
   async update(id: string, dto: UpdateTradeDto): Promise<Trade> {
     const trade = await this.findOne(id);
     const prevNotesSnapshot: TradeNote[] = JSON.parse(JSON.stringify(trade.trackNotes ?? [])) as TradeNote[];
@@ -454,7 +471,9 @@ export class TradesService {
 
     trade.closePrices = this.sanitizeClosePrices(trade, trade.closePrices ?? []);
     this.applyLifecycleFields(trade);
-    await this.recalculateProfitFactorEarned(trade);
+    if (this.dtoAffectsEarnedR(dto)) {
+      await this.recalculateProfitFactorEarned(trade);
+    }
 
     if (!trade.pair?.trim()) {
       throw new BadRequestException('pair must not be empty');
@@ -465,12 +484,12 @@ export class TradesService {
 
     if (dto.trackNotes !== undefined) {
       const next = reloaded.trackNotes ?? [];
-      for (let i = 0; i < next.length; i++) {
-        const note = next[i];
+      for (const note of next) {
         const ids = note.linkedAnalysisIds ?? [];
         if (ids.length === 0) continue;
-        const prevN = prevNotesSnapshot[i];
-        if (this.notesContentChanged(prevN, note)) {
+        const key = this.linkedIdsKey(ids);
+        const prevN = prevNotesSnapshot.find((p) => this.linkedIdsKey(p?.linkedAnalysisIds) === key);
+        if (prevN != null && this.notesContentChanged(prevN, note)) {
           await this.syncLinkedTradeNoteAnalyses(note, ids);
         }
       }

@@ -26,6 +26,8 @@ import type {
   PerformanceFrequencyMode,
   PerformanceFrequencyUnit,
 } from "@/types/api";
+import { buildTradePerformanceAxisTicks } from "@/lib/analytics/trade-performance-axis";
+import { APP_DATE_LOCALE, MONTH_SHORT_GRID } from "@/lib/date-locale";
 
 function SurfaceCard({ children, className = "" }: { children: React.ReactNode; className?: string }) {
   return <div className={`rounded-xl border border-sidebar-border bg-sidebar ${className}`}>{children}</div>;
@@ -63,6 +65,7 @@ export default function PerformanceAnalyticsPage() {
 
   const fetchData = useCallback(async () => {
     setLoading(true);
+    const requestedUnit = freqUnit;
     try {
       const payload = await performanceAnalyticsService.get({
         from: appliedFrom,
@@ -70,11 +73,14 @@ export default function PerformanceAnalyticsPage() {
         calendarYear: calYear,
         calendarMonth: calMonth,
         frequencyMode: freqMode,
-        frequencyUnit: freqUnit,
+        frequencyUnit: requestedUnit,
         pairs: scope.pairs,
         currencies: scope.currencies,
       });
       setData(payload);
+      if (requestedUnit === "monthly" && payload.frequency.unit === "daily") {
+        setFreqUnit("daily");
+      }
     } catch {
       setData(null);
     } finally {
@@ -87,18 +93,20 @@ export default function PerformanceAnalyticsPage() {
     fetchData();
   }, [hydrated, scopeHydrated, fetchData]);
 
-  useEffect(() => {
-    if (data && data.frequency.unit === "daily" && freqUnit === "monthly") {
-      setFreqUnit("daily");
-    }
-  }, [data, freqUnit]);
-
   const monthTitle = useMemo(
-    () => new Date(calYear, calMonth - 1, 1).toLocaleDateString(undefined, { month: "long", year: "numeric" }),
+    () => new Date(calYear, calMonth - 1, 1).toLocaleDateString(APP_DATE_LOCALE, { month: "long", year: "numeric" }),
     [calYear, calMonth],
   );
 
   const winrate = data?.widgets.dailyWinratePercent ?? 0;
+  const tradeWins = data?.widgets.tradeWins ?? 0;
+  const tradeLosses = data?.widgets.tradeLosses ?? 0;
+  const tradeBreakeven = data?.widgets.tradeBreakeven ?? 0;
+  const tradeTotal = Math.max(0, tradeWins + tradeLosses + tradeBreakeven);
+  const lossSideCount = tradeLosses + tradeBreakeven;
+  const winPctOfTotal = tradeTotal > 0 ? (tradeWins / tradeTotal) * 100 : 0;
+  const lossPctOfTotal = tradeTotal > 0 ? (lossSideCount / tradeTotal) * 100 : 0;
+
   const pieData = useMemo(
     () => [
       { name: "Wins", value: Math.max(0, winrate), fill: "#3ea5ff" },
@@ -107,13 +115,33 @@ export default function PerformanceAnalyticsPage() {
     [winrate],
   );
 
-  const ratio = data?.widgets.dayWinLossRatio ?? 0;
-  const ratioTotal = ratio + 1;
-  const winSeg = ratioTotal > 0 ? (ratio / ratioTotal) * 100 : 50;
+  const tradeWlRatio = data?.widgets.tradeWinLossRatio ?? 0;
+  const winSeg = tradeTotal > 0 ? (tradeWins / tradeTotal) * 100 : 50;
 
   const tradePerformance = useMemo(
     () => data?.widgets.tradePerformanceR ?? [],
     [data?.widgets.tradePerformanceR],
+  );
+
+  const tradePerformanceChartRows = useMemo(
+    () => tradePerformance.map((e, idx) => ({ ...e, idx })),
+    [tradePerformance],
+  );
+
+  const performanceAxisTicks = useMemo(
+    () => buildTradePerformanceAxisTicks(tradePerformance.map((e) => e.closedAt)),
+    [tradePerformance],
+  );
+
+  const performanceTickLabelByIndex = useMemo(() => {
+    const m = new Map<number, string>();
+    for (const t of performanceAxisTicks) m.set(t.index, t.label);
+    return m;
+  }, [performanceAxisTicks]);
+
+  const performanceXTicks = useMemo(
+    () => performanceAxisTicks.map((t) => t.index),
+    [performanceAxisTicks],
   );
 
   const freqChartData = useMemo(
@@ -261,8 +289,9 @@ export default function PerformanceAnalyticsPage() {
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 min-[1260px]:grid-cols-[2fr_3fr]">
                 <SurfaceCard className="p-3">
                   <p className="text-center text-sm font-medium text-header-foreground">
-                    {formatR2(winrate)}% Daily Winrate
+                    {formatR2(winrate)}% Winrate
                   </p>
+                  <p className="mt-0.5 text-center text-[10px] text-header-muted">Closed trades in range</p>
                   <div className="mx-auto mt-2 aspect-square w-full max-w-[152px] min-h-[120px]">
                     {chartsReady ? (
                       <ResponsiveContainer width="100%" height="100%">
@@ -270,6 +299,7 @@ export default function PerformanceAnalyticsPage() {
                           <Pie
                             data={pieData}
                             dataKey="value"
+                            nameKey="name"
                             cx="50%"
                             cy="50%"
                             innerRadius="48%"
@@ -284,8 +314,26 @@ export default function PerformanceAnalyticsPage() {
                             ))}
                           </Pie>
                           <Tooltip
-                            formatter={(v) => [`${formatR2(Number(v ?? 0))}%`, ""]}
-                            contentStyle={{ background: "#0b1323", border: "1px solid #27272a", borderRadius: 8 }}
+                            content={({ active, payload }) => {
+                              if (!active || !payload?.length) return null;
+                              const name = String(payload[0].name ?? "");
+                              const winTitle =
+                                tradeTotal > 0
+                                  ? `Wins: ${tradeWins} trades (${formatR2(winPctOfTotal)}%)`
+                                  : "No trades";
+                              const lossTitle =
+                                tradeTotal > 0
+                                  ? `Non-wins: ${lossSideCount} trades (${formatR2(lossPctOfTotal)}%)`
+                                  : "No trades";
+                              const text = name === "Wins" ? winTitle : lossTitle;
+                              return (
+                                <div
+                                  className="rounded-lg border border-sidebar-border bg-[#0b1323] px-3 py-2 text-xs shadow-lg text-header-foreground"
+                                >
+                                  {text}
+                                </div>
+                              );
+                            }}
                           />
                         </PieChart>
                       </ResponsiveContainer>
@@ -296,11 +344,29 @@ export default function PerformanceAnalyticsPage() {
                 </SurfaceCard>
 
                 <SurfaceCard className="flex flex-col justify-center gap-2 p-3">
-                  <p className="text-center text-sm font-medium text-header-foreground">Day Win / Day Loss</p>
-                  <p className="text-center text-xl font-semibold text-primary">{formatR2(ratio)}</p>
+                  <p className="text-center text-sm font-medium text-header-foreground">Win / Loss</p>
+                  <p className="text-center text-xl font-semibold text-primary">{formatR2(tradeWlRatio)}</p>
+                  <p className="text-center text-[10px] text-header-muted">
+                    Bar width = win vs non-win trade counts. Center: avg win R ÷ avg loss |R|.
+                  </p>
                   <div className="flex h-6 w-full items-center overflow-hidden rounded-full bg-header">
-                    <div className="h-full bg-primary transition-all" style={{ width: `${winSeg}%` }} />
-                    <div className="h-full flex-1 bg-rose-600/80" />
+                    <div
+                      className="h-full bg-primary transition-all"
+                      style={{ width: `${winSeg}%` }}
+                      title={
+                        tradeTotal > 0
+                          ? `Wins: ${tradeWins} trades (${formatR2(winPctOfTotal)}%)`
+                          : undefined
+                      }
+                    />
+                    <div
+                      className="h-full flex-1 bg-rose-600/80"
+                      title={
+                        tradeTotal > 0
+                          ? `Non-wins: ${lossSideCount} trades (${formatR2(lossPctOfTotal)}%)`
+                          : undefined
+                      }
+                    />
                   </div>
                   <div className="flex justify-between text-[10px] text-header-muted">
                     <span>Win side</span>
@@ -308,73 +374,6 @@ export default function PerformanceAnalyticsPage() {
                   </div>
                 </SurfaceCard>
               </div>
-
-              <SurfaceCard className="p-3">
-                <div className="mb-1 flex items-center justify-between">
-                  <p className="text-sm font-semibold text-header-foreground">Performance</p>
-                  <span className="text-[10px] text-header-muted">One bar per trade (chronological)</span>
-                </div>
-                <div className="h-[150px] w-full min-w-0">
-                  {chartsReady && !loading && tradePerformance.length === 0 ? (
-                    <div className="flex h-full items-center justify-center px-2 text-center text-xs text-header-muted">
-                      No closed trades in this date range (with current filters).
-                    </div>
-                  ) : chartsReady ? (
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={tradePerformance} margin={{ top: 8, right: 8, left: 0, bottom: 4 }}>
-                        <CartesianGrid stroke="rgba(255,255,255,0.06)" vertical={false} />
-                        <XAxis
-                          dataKey="label"
-                          tick={{ fill: "#a1a1aa", fontSize: 8 }}
-                          axisLine={false}
-                          tickLine={false}
-                          interval={0}
-                          angle={-35}
-                          textAnchor="end"
-                          height={48}
-                          minTickGap={2}
-                        />
-                        <YAxis tick={{ fill: "#a1a1aa", fontSize: 10 }} axisLine={false} tickLine={false} width={36} tickFormatter={(v) => `${v}`} />
-                        <Tooltip
-                          content={({ active, payload }) => {
-                            if (!active || !payload?.length) return null;
-                            const row = payload[0].payload as {
-                              r: number;
-                              pair: string;
-                              closedAt: string;
-                            };
-                            const r = row.r;
-                            const sign = r >= 0 ? "+" : "";
-                            const when = new Date(row.closedAt).toLocaleString(undefined, {
-                              month: "short",
-                              day: "numeric",
-                              hour: "numeric",
-                              minute: "2-digit",
-                            });
-                            return (
-                              <div className="rounded-lg border border-sidebar-border bg-[#0b1323] px-3 py-2 text-xs shadow-lg">
-                                <p className="font-medium text-header-foreground">{row.pair}</p>
-                                <p className="text-header-muted">{when}</p>
-                                <p className={`mt-1 font-semibold ${r >= 0 ? "text-primary" : "text-rose-400"}`}>
-                                  {sign}
-                                  {formatR2(r)} R
-                                </p>
-                              </div>
-                            );
-                          }}
-                        />
-                        <Bar dataKey="r" radius={[2, 2, 0, 0]} maxBarSize={5}>
-                          {tradePerformance.map((e, i) => (
-                            <Cell key={e.id ?? i} fill={e.r >= 0 ? "#3ea5ff" : "#e11d48"} />
-                          ))}
-                        </Bar>
-                      </BarChart>
-                    </ResponsiveContainer>
-                  ) : (
-                    <div className="h-full w-full animate-pulse rounded-md bg-header/50" />
-                  )}
-                </div>
-              </SurfaceCard>
 
               <SurfaceCard className="p-3">
                 <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
@@ -442,6 +441,106 @@ export default function PerformanceAnalyticsPage() {
             </div>
           </div>
 
+          <SurfaceCard className="mt-4 p-3">
+            <div className="mb-1 flex items-center justify-between">
+              <p className="text-sm font-semibold text-header-foreground">Performance</p>
+              <span className="text-[10px] text-header-muted">One bar per trade (chronological)</span>
+            </div>
+            <div className="h-[min(480px,55vh)] min-h-[420px] w-full min-w-0">
+              {chartsReady && !loading && tradePerformance.length === 0 ? (
+                <div className="flex h-full items-center justify-center px-2 text-center text-xs text-header-muted">
+                  No closed trades in this date range (with current filters).
+                </div>
+              ) : chartsReady ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart
+                    data={tradePerformanceChartRows}
+                    margin={{ top: 8, right: 8, left: 0, bottom: 24 }}
+                  >
+                    <CartesianGrid stroke="rgba(255,255,255,0.06)" vertical={false} />
+                    <XAxis
+                      dataKey="idx"
+                      type="number"
+                      domain={[-0.5, Math.max(0, tradePerformanceChartRows.length - 1) + 0.5]}
+                      ticks={
+                        performanceXTicks.length > 0
+                          ? performanceXTicks
+                          : (() => {
+                              const n = tradePerformanceChartRows.length;
+                              if (n <= 1) return [0];
+                              return [0, n - 1];
+                            })()
+                      }
+                      tickFormatter={(v) => {
+                        const label = performanceTickLabelByIndex.get(Number(v));
+                        if (label) return label;
+                        const n = tradePerformanceChartRows.length;
+                        if (n <= 1) return "";
+                        const i = Number(v);
+                        if (i === 0)
+                          return new Date(tradePerformanceChartRows[0].closedAt).toLocaleDateString(APP_DATE_LOCALE, {
+                            month: "short",
+                            day: "numeric",
+                          });
+                        if (i === n - 1)
+                          return new Date(tradePerformanceChartRows[n - 1].closedAt).toLocaleDateString(APP_DATE_LOCALE, {
+                            month: "short",
+                            day: "numeric",
+                          });
+                        return "";
+                      }}
+                      tick={{ fill: "#a1a1aa", fontSize: 9 }}
+                      axisLine={false}
+                      tickLine={false}
+                    />
+                    <YAxis
+                      tick={{ fill: "#a1a1aa", fontSize: 10 }}
+                      axisLine={false}
+                      tickLine={false}
+                      width={36}
+                      tickFormatter={(v) => `${v}`}
+                    />
+                    <Tooltip
+                      content={({ active, payload }) => {
+                        if (!active || !payload?.length) return null;
+                        const row = payload[0].payload as {
+                          r: number;
+                          pair: string;
+                          closedAt: string;
+                        };
+                        const r = row.r;
+                        const sign = r >= 0 ? "+" : "";
+                        const when = new Date(row.closedAt).toLocaleString(APP_DATE_LOCALE, {
+                          month: "short",
+                          day: "numeric",
+                          hour: "numeric",
+                          minute: "2-digit",
+                        });
+                        return (
+                          <div className="rounded-lg border border-sidebar-border bg-[#0b1323] px-3 py-2 text-xs shadow-lg">
+                            <p className="font-medium text-header-foreground">{row.pair}</p>
+                            <p className="text-header-muted">{when}</p>
+                            <p className={`mt-1 font-semibold ${r >= 0 ? "text-primary" : "text-rose-400"}`}>
+                              {sign}
+                              {formatR2(r)} R
+                            </p>
+                          </div>
+                        );
+                      }}
+                    />
+                    <Bar dataKey="r" radius={[2, 2, 0, 0]} maxBarSize={5}>
+                      {tradePerformanceChartRows.map((e, i) => (
+                        <Cell key={e.id ?? i} fill={e.r >= 0 ? "#3ea5ff" : "#e11d48"} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="h-full w-full animate-pulse rounded-md bg-header/50" />
+              )}
+            </div>
+          </SurfaceCard>
+
           <SurfaceCard className="mt-4 p-4">
             <div className="mb-3 flex items-center justify-between">
               <h3 className="text-sm font-semibold text-header-foreground">Yearly Performance (R)</h3>
@@ -451,9 +550,9 @@ export default function PerformanceAnalyticsPage() {
                 <thead>
                   <tr className="border-b border-sidebar-border text-header-muted">
                     <th className="py-2 text-left font-medium">Year</th>
-                    {Array.from({ length: 12 }, (_, m) => (
+                    {MONTH_SHORT_GRID.map((label, m) => (
                       <th key={m} className="px-1 py-2 text-center font-medium">
-                        {new Date(2000, m, 1).toLocaleDateString(undefined, { month: "short" })}
+                        {label}
                       </th>
                     ))}
                     <th className="py-2 text-center font-medium text-primary">YTD</th>

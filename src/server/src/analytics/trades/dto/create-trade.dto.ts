@@ -9,8 +9,10 @@ import {
   IsString,
   IsUUID,
   Min,
+  Validate,
   ValidateNested,
 } from 'class-validator';
+import { IsSlEvolutionEntryConstraint } from './sl-evolution.validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 const TRADE_TYPE_VALUES = ['buy', 'sell'] as const;
@@ -169,6 +171,7 @@ export class CreateTradeDto {
   })
   @IsOptional()
   @IsArray()
+  @Validate(IsSlEvolutionEntryConstraint, { each: true })
   slEvolution?: Record<string, number>[];
 
   @ApiPropertyOptional({ type: CreateTradeProfitFactorEarnedDto })

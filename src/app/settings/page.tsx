@@ -10,6 +10,7 @@ declare global {
     electron?: {
       chooseDirectory: () => Promise<string | null>;
       chooseDatabaseFile: () => Promise<string | null>;
+      chooseDatabasePath: () => Promise<{ path: string; kind: "file" | "directory" } | null>;
     };
   }
 }
@@ -22,7 +23,8 @@ export default function SettingsPage() {
   const [dbValidateResult, setDbValidateResult] = useState<{ valid: boolean; error?: string } | null>(null);
   const [imagesPathInput, setImagesPathInput] = useState("");
   const [databasePathInput, setDatabasePathInput] = useState("");
-  const [newDbDirectoryInput, setNewDbDirectoryInput] = useState("");
+  /** Set when the path came from Browse: file → validate/prepare; directory → New database. */
+  const [dbBrowseKind, setDbBrowseKind] = useState<"file" | "directory" | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -80,26 +82,27 @@ export default function SettingsPage() {
     }
   };
 
-  const handleChooseDatabaseFile = async () => {
-    if (typeof window !== "undefined" && window.electron?.chooseDatabaseFile) {
-      const path = await window.electron.chooseDatabaseFile();
-      if (path != null) {
-        setDatabasePathInput(path);
-        setDbValidateResult(null);
-        try {
-          const result = await settingsService.validateDatabase(path);
-          setDbValidateResult(result);
-          if (result.valid) {
-            setSaving(true);
-            const updated = await settingsService.update({ databasePath: path });
-            setSettings(updated);
-            showMessage("success", "Database file validated and saved. Restart the app to use it.");
-          }
-        } catch {
-          setDbValidateResult({ valid: false, error: "Validation request failed." });
-        } finally {
-          setSaving(false);
+  const handleBrowseDatabase = async () => {
+    if (typeof window === "undefined" || !window.electron?.chooseDatabasePath) return;
+    const picked = await window.electron.chooseDatabasePath();
+    if (!picked) return;
+    setDatabasePathInput(picked.path);
+    setDbBrowseKind(picked.kind);
+    setDbValidateResult(null);
+    if (picked.kind === "file") {
+      try {
+        const result = await settingsService.validateDatabase(picked.path);
+        setDbValidateResult(result);
+        if (result.valid) {
+          setSaving(true);
+          const updated = await settingsService.update({ databasePath: picked.path });
+          setSettings(updated);
+          showMessage("success", "Database file validated and saved. Restart the app to use it.");
         }
+      } catch {
+        setDbValidateResult({ valid: false, error: "Validation request failed." });
+      } finally {
+        setSaving(false);
       }
     }
   };
@@ -158,7 +161,7 @@ export default function SettingsPage() {
   const runCreateDatabase = async (dir: string) => {
     const trimmed = dir.trim();
     if (!trimmed) {
-      showMessage("error", "Choose or enter a folder path for the new database.");
+      showMessage("error", "No folder path to create the database in.");
       return;
     }
     setSaving(true);
@@ -166,6 +169,7 @@ export default function SettingsPage() {
       const result = await settingsService.createDatabase(trimmed, "gg-journal.sqlite");
       if (result.ok && result.path) {
         setDatabasePathInput(result.path);
+        setDbBrowseKind("file");
         setDbValidateResult({ valid: true });
         const updated = await settingsService.update({ databasePath: result.path });
         setSettings(updated);
@@ -180,16 +184,17 @@ export default function SettingsPage() {
     }
   };
 
-  const handleCreateNewDatabase = async () => {
-    if (typeof window !== "undefined" && window.electron?.chooseDirectory) {
-      const dir = await window.electron.chooseDirectory();
-      if (dir == null) return;
-      await runCreateDatabase(dir);
+  const handleNewDatabaseInBrowsedFolder = async () => {
+    const folder = databasePathInput.trim();
+    if (!folder) {
+      showMessage("error", "Browse and select a folder first.");
+      return;
     }
-  };
-
-  const handleCreateNewDatabaseFromPath = async () => {
-    await runCreateDatabase(newDbDirectoryInput);
+    if (dbBrowseKind !== "directory") {
+      showMessage("error", "New database needs a folder from Browse (not a file).");
+      return;
+    }
+    await runCreateDatabase(folder);
   };
 
   const hasElectron = typeof window !== "undefined" && !!window.electron;
@@ -264,9 +269,9 @@ export default function SettingsPage() {
                 SQLite database file
               </h2>
               <p className="text-xs text-dashboard-foreground/60 mb-3">
-                Point to an SQLite file for the app database. Validate checks the schema read-only. Prepare database
-                creates any missing tables/columns (TypeORM sync) and inserts only missing seed rows (assets, pair pip
-                definitions) without changing existing rows. Restart the server after switching files.
+                Use Browse to pick an SQLite file (then Validate & save or Prepare) or a folder (then New database to create
+                gg-journal.sqlite there). You can still type a path manually for validate/prepare in the browser. Restart
+                the server after switching files.
               </p>
               <div className="flex flex-wrap gap-2 mb-2">
                 <input
@@ -274,65 +279,55 @@ export default function SettingsPage() {
                   value={databasePathInput}
                   onChange={(e) => {
                     setDatabasePathInput(e.target.value);
+                    setDbBrowseKind(null);
                     setDbValidateResult(null);
                   }}
-                  placeholder="e.g. journal-app.db or C:\Data\journal-app.db"
+                  placeholder="Database file path, or folder after Browse"
                   className="flex-1 min-w-[200px] max-w-full rounded-lg border border-sidebar-border bg-header-input px-3 py-2 text-sm text-dashboard-foreground placeholder:text-dashboard-foreground/50 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                 />
                 <button
                   type="button"
-                  onClick={handleChooseDatabaseFile}
+                  onClick={handleBrowseDatabase}
                   disabled={saving || !hasElectron}
-                  title={!hasElectron ? "Browse is available in the desktop app (Electron)" : undefined}
+                  title={!hasElectron ? "Browse is available in the desktop app (Electron)" : "Choose a database file or a folder"}
                   className="rounded-lg border border-sidebar-border bg-sidebar px-3 py-2 text-sm font-medium text-dashboard-foreground hover:bg-sidebar-hover disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Browse…
                 </button>
                 <button
                   type="button"
-                  onClick={hasElectron ? handleChooseDatabaseFile : handleValidateDatabase}
-                  disabled={saving}
+                  onClick={handleValidateDatabase}
+                  disabled={saving || (hasElectron && dbBrowseKind === "directory")}
+                  title={dbBrowseKind === "directory" ? "Select a database file to validate" : undefined}
                   className="rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
                 >
-                  {hasElectron ? "Choose & validate" : "Validate & save"}
+                  Validate & save
                 </button>
                 <button
                   type="button"
                   onClick={handlePrepareDatabase}
-                  disabled={saving}
+                  disabled={saving || (hasElectron && dbBrowseKind === "directory")}
+                  title={dbBrowseKind === "directory" ? "Prepare applies to a database file path" : undefined}
                   className="rounded-lg border border-primary/50 bg-primary/10 px-3 py-2 text-sm font-medium text-primary hover:bg-primary/20 disabled:opacity-50"
                 >
                   Prepare database
                 </button>
                 <button
                   type="button"
-                  onClick={handleCreateNewDatabase}
-                  disabled={saving || !hasElectron}
-                  title={!hasElectron ? "Use the folder path field below in the browser, or open the desktop app." : undefined}
+                  onClick={handleNewDatabaseInBrowsedFolder}
+                  disabled={saving || !hasElectron || dbBrowseKind !== "directory"}
+                  title={
+                    !hasElectron
+                      ? "Available in the desktop app"
+                      : dbBrowseKind !== "directory"
+                        ? "Browse and select a folder first"
+                        : "Create gg-journal.sqlite in the selected folder"
+                  }
                   className="rounded-lg border border-sidebar-border bg-sidebar px-3 py-2 text-sm font-medium text-dashboard-foreground hover:bg-sidebar-hover disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   New database…
                 </button>
               </div>
-              {!hasElectron && (
-                <div className="mt-3 flex flex-wrap gap-2">
-                  <input
-                    type="text"
-                    value={newDbDirectoryInput}
-                    onChange={(e) => setNewDbDirectoryInput(e.target.value)}
-                    placeholder="Folder path for new SQLite file (e.g. C:\Data\journal)"
-                    className="flex-1 min-w-[200px] rounded-lg border border-sidebar-border bg-header-input px-3 py-2 text-sm text-dashboard-foreground placeholder:text-dashboard-foreground/50"
-                  />
-                  <button
-                    type="button"
-                    onClick={handleCreateNewDatabaseFromPath}
-                    disabled={saving}
-                    className="rounded-lg border border-sidebar-border bg-sidebar px-3 py-2 text-sm font-medium text-dashboard-foreground hover:bg-sidebar-hover disabled:opacity-50"
-                  >
-                    Create gg-journal.sqlite here
-                  </button>
-                </div>
-              )}
               {dbValidateResult && (
                 <div
                   className={`mt-2 flex items-start gap-2 rounded-lg border px-3 py-2 text-sm ${

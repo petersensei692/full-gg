@@ -38,6 +38,23 @@ ipcMain.handle("settings:choose-database-file", async () => {
   return result.filePaths[0];
 });
 
+/** Single picker: user may choose a database file or a folder (for creating a new DB). */
+ipcMain.handle("settings:choose-database-path", async () => {
+  const result = await dialog.showOpenDialog({
+    properties: ["openFile", "openDirectory"],
+    title: "Choose database file or folder",
+    filters: [{ name: "SQLite database", extensions: ["db", "sqlite", "sqlite3"] }],
+  });
+  if (result.canceled || !result.filePaths?.length) return null;
+  const chosen = result.filePaths[0];
+  try {
+    const stat = fs.statSync(chosen);
+    return { path: chosen, kind: stat.isDirectory() ? "directory" : "file" };
+  } catch {
+    return null;
+  }
+});
+
 function waitForServer(url, maxAttempts = 30) {
   return new Promise((resolve, reject) => {
     let attempts = 0;

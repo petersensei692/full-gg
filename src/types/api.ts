@@ -307,6 +307,13 @@ export interface DashboardAnalyticsResponse {
     risk: {
       maxDrawdown: {
         number: number;
+        /** Trades in the worst consecutive losing streak (defines max drawdown). */
+        tradeCount: number;
+        period: { from: string; to: string } | null;
+      };
+      maxDrawup: {
+        number: number;
+        tradeCount: number;
         period: { from: string; to: string } | null;
       };
       highestWin: { number: number; trade: Trade | null };
@@ -364,7 +371,9 @@ export interface PerformanceAnalyticsResponse {
     weeks: PerformanceCalendarWeek[];
   };
   widgets: {
+    /** Win rate % by closed trade (same as trade winrate; name kept for API compatibility). */
     dailyWinratePercent: number;
+    /** Legacy: day-based R ratio (net R on winning days vs losing days). */
     dayWinLossRatio: number;
     netDailyR: Array<{ date: string; r: number }>;
     /** One bar per closed trade in range (chronological). */
@@ -376,6 +385,11 @@ export interface PerformanceAnalyticsResponse {
       r: number;
       closedAt: string;
     }>;
+    tradeWins: number;
+    tradeLosses: number;
+    tradeBreakeven: number;
+    /** Avg |R| on wins / avg |R| on losses (trade-based). */
+    tradeWinLossRatio: number;
   };
   frequency: {
     unit: PerformanceFrequencyUnit;
