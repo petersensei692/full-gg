@@ -13,18 +13,28 @@ export class DashboardAnalyticsController {
   @ApiQuery({ name: 'resultRange', required: false, enum: ['1D', '1W', '1M', '1Y', 'ALL'] })
   @ApiQuery({ name: 'from', required: false, description: 'Custom ISO start datetime' })
   @ApiQuery({ name: 'to', required: false, description: 'Custom ISO end datetime' })
+  @ApiQuery({ name: 'fromMs', required: false, description: 'Inclusive start epoch ms (preferred)' })
+  @ApiQuery({ name: 'toMs', required: false, description: 'Inclusive end epoch ms (preferred)' })
   @ApiResponse({ status: 200, description: 'Dashboard analytics payload.' })
   getDashboardAnalytics(
     @Query('tradeCountRange') tradeCountRange?: string,
     @Query('resultRange') resultRange?: string,
     @Query('from') from?: string,
     @Query('to') to?: string,
+    @Query('fromMs') fromMs?: string,
+    @Query('toMs') toMs?: string,
+    @Query('pairs') pairs?: string,
+    @Query('currencies') currencies?: string,
   ) {
     return this.dashboardAnalyticsService.getDashboardAnalytics({
       tradeCountRange,
       resultRange,
       from,
       to,
+      fromMs,
+      toMs,
+      pairs,
+      currencies,
     });
   }
 }

@@ -19,7 +19,13 @@ async function bootstrap() {
   // Increase body size limit for large notes (default ~100kb)
   app.use(json({ limit: '10mb' }));
   app.use(urlencoded({ extended: true, limit: '10mb' }));
-  app.useGlobalPipes(new ValidationPipe({ whitelist: true }));
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,
+      transform: true,
+      transformOptions: { enableImplicitConversion: true },
+    }),
+  );
 
   const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
   const isElectron = !!process.env.APP_DATA_PATH;

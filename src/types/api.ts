@@ -214,6 +214,16 @@ export type TradeSlEvolutionEntry = Record<string, number>;
 export interface TradeNote {
   text: string;
   images: string[];
+  imageNames?: string[];
+  linkedAnalysisIds?: string[];
+}
+
+/** Paginated GET /analytics/trades */
+export interface TradesListResponse {
+  items: Trade[];
+  total: number;
+  page: number;
+  limit: number;
 }
 
 export interface Trade {
@@ -221,7 +231,7 @@ export interface Trade {
   pair: string;
   type: TradeType;
   executionType: TradeExecutionType;
-  executionTime: string;
+  executionTime: string | null;
   executionPrice: number;
   tpPrice: number;
   initialSlPrice: number;
@@ -243,17 +253,16 @@ export interface CreateTradeDto {
   pairWatchedId?: string | null;
   type: TradeType;
   executionType: TradeExecutionType;
-  executionTime: string;
+  executionTime?: string;
   executionPrice: number;
   tpPrice: number;
   initialSlPrice: number;
   slEvolution?: TradeSlEvolutionEntry[];
-  profitFactorTargeted: number;
-  profitFactorEarned: TradeProfitFactorEarned;
+  profitFactorEarned?: TradeProfitFactorEarned;
   positionSize: number;
   closePrices?: TradeClosePrice[];
   tradeCloseTime?: string | null;
-  status: TradeStatus;
+  status?: TradeStatus;
   trackNotes?: TradeNote[];
 }
 
@@ -262,7 +271,7 @@ export interface UpdateTradeDto {
   pairWatchedId?: string | null;
   type?: TradeType;
   executionType?: TradeExecutionType;
-  executionTime?: string;
+  executionTime?: string | null;
   executionPrice?: number;
   tpPrice?: number;
   initialSlPrice?: number;
@@ -282,22 +291,10 @@ export interface DashboardAnalyticsResponse {
   tradeCount: {
     countByWeek: number;
     averageByWeek: number;
+    averageByDay: number;
+    averageByMonth: number;
     total: number;
     evolution: { labels: string[]; values: number[] };
-  };
-  streaks: {
-    days: {
-      winningStreaksAmount: number;
-      HighestWinningStreak: number;
-      loosingStreaksAmount: number;
-      HighestloosingStreak: number;
-    };
-    trades: {
-      winningStreaksAmount: number;
-      HighestWinningStreak: number;
-      loosingStreaksAmount: number;
-      HighestloosingStreak: number;
-    };
   };
   tradingStats: {
     actualResult: number;
@@ -329,6 +326,69 @@ export interface DashboardAnalyticsResponse {
   appliedFilters: {
     tradeCountRange: AnalyticsRange;
     resultRange: AnalyticsRange;
+    from: string | null;
+    to: string;
+  };
+}
+
+export interface PerformanceCalendarCell {
+  date: string | null;
+  dayOfMonth: number | null;
+  totalR: number;
+  trades: number;
+  wins: number;
+  losses: number;
+}
+
+export interface PerformanceCalendarWeek {
+  cells: PerformanceCalendarCell[];
+  weekTotalR: number;
+  weekTrades: number;
+  weekWins: number;
+  weekWinRatePercent: number;
+}
+
+export type PerformanceFrequencyMode = "winsLosses" | "buysSells" | "profitR";
+export type PerformanceFrequencyUnit = "daily" | "monthly";
+
+export interface PerformanceAnalyticsResponse {
+  calendar: {
+    year: number;
+    month: number;
+    summary: {
+      trades: number;
+      wins: number;
+      totalR: number;
+      winRatePercent: number;
+    };
+    weeks: PerformanceCalendarWeek[];
+  };
+  widgets: {
+    dailyWinratePercent: number;
+    dayWinLossRatio: number;
+    netDailyR: Array<{ date: string; r: number }>;
+    /** One bar per closed trade in range (chronological). */
+    tradePerformanceR: Array<{
+      id: string;
+      /** Calendar day of close (e.g. Mar 28) for the X-axis */
+      label: string;
+      pair: string;
+      r: number;
+      closedAt: string;
+    }>;
+  };
+  frequency: {
+    unit: PerformanceFrequencyUnit;
+    mode: PerformanceFrequencyMode;
+    monthlyAvailable: boolean;
+    series: Array<{ label: string; up: number; down: number }>;
+  };
+  yearlyPerformance: Array<{
+    year: number;
+    months: Array<{ month: number; totalR: number; trades: number }>;
+    ytd: { totalR: number; trades: number; wins: number; winRatePercent: number };
+  }>;
+  appliedFilters: {
     from: string | null;
     to: string;
   };

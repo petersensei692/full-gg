@@ -1,4 +1,10 @@
 import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+
+const TRADE_NOTE_MARKER = '<!--analysis-type:tradeNote-->';
+
+function isTradeNoteAnalysisNotes(notes: string | null | undefined): boolean {
+  return (notes ?? '').includes(TRADE_NOTE_MARKER);
+}
 import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, Not, Repository } from 'typeorm';
 import { Analysis } from './entities/analysis.entity';
@@ -82,11 +88,28 @@ export class AnalysisService {
     return analysis;
   }
 
+  /** Sync content from trade journal (bypasses trade-note edit lock on analysis UI). */
+  async updateFromTradeJournal(
+    id: string,
+    data: { notes: string; images: string[] | null; imageNames: string[] | null },
+  ): Promise<void> {
+    await this.analysisRepository.update(id, {
+      notes: data.notes,
+      images: data.images,
+      imageNames: data.imageNames,
+    });
+  }
+
   async update(id: string, updateDto: UpdateAnalysisDto): Promise<Analysis> {
     const analysis = await this.findOne(id);
     if (analysis.globalAnalysisId) {
       throw new ForbiddenException(
         'This analysis was created from a global analysis. Edit it from the Global Analysis page.',
+      );
+    }
+    if (isTradeNoteAnalysisNotes(analysis.notes)) {
+      throw new ForbiddenException(
+        'This entry was created from a trade note. Edit it from the trade journal (Analytics → Trades).',
       );
     }
 
@@ -111,6 +134,11 @@ export class AnalysisService {
     if (analysis.globalAnalysisId) {
       throw new ForbiddenException(
         'This analysis was created from a global analysis. Delete it from the Global Analysis page.',
+      );
+    }
+    if (isTradeNoteAnalysisNotes(analysis.notes)) {
+      throw new ForbiddenException(
+        'This entry was created from a trade note. Remove or edit it from the trade journal.',
       );
     }
     await this.analysisRepository.remove(analysis);

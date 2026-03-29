@@ -7,6 +7,7 @@ import {
   BarChart3,
   LayoutDashboard,
   ArrowLeftRight,
+  PieChart,
   Eye,
   Calendar,
   Settings,
@@ -65,6 +66,7 @@ const otherNavItems: NavItemSimple[] = [
 const analyticsNavItems: NavItemSimple[] = [
   { href: "/analytics", label: "Dashboard", icon: LayoutDashboard },
   { href: "/analytics/trades", label: "Trades", icon: ArrowLeftRight },
+  { href: "/analytics/analytics", label: "Analytics", icon: PieChart },
 ];
 
 interface SidebarProps {
@@ -210,10 +212,16 @@ export function Sidebar({
       <nav className="flex-1 overflow-y-auto py-3">
         <ul className={`space-y-0.5 ${isExpanded ? "px-2" : "px-2 flex flex-col items-center"}`}>
           {topLevelNav.map((item) => {
-            const isActive =
-              isAnalytics && item.href === "/analytics"
-                ? pathname === "/analytics"
-                : pathname === item.href || pathname.startsWith(item.href + "/");
+            const isActive = (() => {
+              if (!isAnalytics) {
+                return pathname === item.href || pathname.startsWith(item.href + "/");
+              }
+              if (item.href === "/analytics") return pathname === "/analytics";
+              if (item.href === "/analytics/analytics") {
+                return pathname === "/analytics/analytics" || pathname.startsWith("/analytics/analytics/");
+              }
+              return pathname === item.href || pathname.startsWith(item.href + "/");
+            })();
             const Icon = item.icon;
 
             if ("assets" in item) {

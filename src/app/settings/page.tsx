@@ -22,6 +22,7 @@ export default function SettingsPage() {
   const [dbValidateResult, setDbValidateResult] = useState<{ valid: boolean; error?: string } | null>(null);
   const [imagesPathInput, setImagesPathInput] = useState("");
   const [databasePathInput, setDatabasePathInput] = useState("");
+  const [newDbDirectoryInput, setNewDbDirectoryInput] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -126,6 +127,71 @@ export default function SettingsPage() {
     }
   };
 
+  const handlePrepareDatabase = async () => {
+    const path = databasePathInput.trim();
+    if (!path) {
+      setDbValidateResult({ valid: false, error: "Enter a database file path." });
+      return;
+    }
+    setDbValidateResult(null);
+    setSaving(true);
+    try {
+      const result = await settingsService.prepareDatabase(path);
+      if (result.ok) {
+        setDbValidateResult({ valid: true });
+        const updated = await settingsService.update({ databasePath: path });
+        setSettings(updated);
+        showMessage(
+          "success",
+          "Database prepared: missing tables/columns were added and essential seeds inserted where missing. Restart the app if it was already running.",
+        );
+      } else {
+        setDbValidateResult({ valid: false, error: result.error ?? "Prepare failed." });
+      }
+    } catch {
+      setDbValidateResult({ valid: false, error: "Prepare request failed." });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const runCreateDatabase = async (dir: string) => {
+    const trimmed = dir.trim();
+    if (!trimmed) {
+      showMessage("error", "Choose or enter a folder path for the new database.");
+      return;
+    }
+    setSaving(true);
+    try {
+      const result = await settingsService.createDatabase(trimmed, "gg-journal.sqlite");
+      if (result.ok && result.path) {
+        setDatabasePathInput(result.path);
+        setDbValidateResult({ valid: true });
+        const updated = await settingsService.update({ databasePath: result.path });
+        setSettings(updated);
+        showMessage("success", "New database created and saved to settings. Restart the app to use it.");
+      } else {
+        showMessage("error", result.error ?? "Could not create database.");
+      }
+    } catch {
+      showMessage("error", "Create database request failed.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleCreateNewDatabase = async () => {
+    if (typeof window !== "undefined" && window.electron?.chooseDirectory) {
+      const dir = await window.electron.chooseDirectory();
+      if (dir == null) return;
+      await runCreateDatabase(dir);
+    }
+  };
+
+  const handleCreateNewDatabaseFromPath = async () => {
+    await runCreateDatabase(newDbDirectoryInput);
+  };
+
   const hasElectron = typeof window !== "undefined" && !!window.electron;
 
   return (
@@ -198,7 +264,9 @@ export default function SettingsPage() {
                 SQLite database file
               </h2>
               <p className="text-xs text-dashboard-foreground/60 mb-3">
-                Choose an SQLite file to use as the app database. The file will be checked for the required tables and columns. If valid, it will be used as the data source (restart required).
+                Point to an SQLite file for the app database. Validate checks the schema read-only. Prepare database
+                creates any missing tables/columns (TypeORM sync) and inserts only missing seed rows (assets, pair pip
+                definitions) without changing existing rows. Restart the server after switching files.
               </p>
               <div className="flex flex-wrap gap-2 mb-2">
                 <input
@@ -228,7 +296,43 @@ export default function SettingsPage() {
                 >
                   {hasElectron ? "Choose & validate" : "Validate & save"}
                 </button>
+                <button
+                  type="button"
+                  onClick={handlePrepareDatabase}
+                  disabled={saving}
+                  className="rounded-lg border border-primary/50 bg-primary/10 px-3 py-2 text-sm font-medium text-primary hover:bg-primary/20 disabled:opacity-50"
+                >
+                  Prepare database
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCreateNewDatabase}
+                  disabled={saving || !hasElectron}
+                  title={!hasElectron ? "Use the folder path field below in the browser, or open the desktop app." : undefined}
+                  className="rounded-lg border border-sidebar-border bg-sidebar px-3 py-2 text-sm font-medium text-dashboard-foreground hover:bg-sidebar-hover disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  New database…
+                </button>
               </div>
+              {!hasElectron && (
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <input
+                    type="text"
+                    value={newDbDirectoryInput}
+                    onChange={(e) => setNewDbDirectoryInput(e.target.value)}
+                    placeholder="Folder path for new SQLite file (e.g. C:\Data\journal)"
+                    className="flex-1 min-w-[200px] rounded-lg border border-sidebar-border bg-header-input px-3 py-2 text-sm text-dashboard-foreground placeholder:text-dashboard-foreground/50"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleCreateNewDatabaseFromPath}
+                    disabled={saving}
+                    className="rounded-lg border border-sidebar-border bg-sidebar px-3 py-2 text-sm font-medium text-dashboard-foreground hover:bg-sidebar-hover disabled:opacity-50"
+                  >
+                    Create gg-journal.sqlite here
+                  </button>
+                </div>
+              )}
               {dbValidateResult && (
                 <div
                   className={`mt-2 flex items-start gap-2 rounded-lg border px-3 py-2 text-sm ${

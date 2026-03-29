@@ -5,7 +5,8 @@ export type StreamEntryTag =
   | "QoQ OUTLOOK"
   | "YEARLY OUTLOOK"
   | "POLICY NOTE"
-  | "MARKET PULSE";
+  | "MARKET PULSE"
+  | "TRADE NOTE";
 
 export type StreamEntryTagColor =
   | "red"

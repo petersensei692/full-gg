@@ -2,7 +2,8 @@
 
 import { useState, useCallback, useMemo, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
-import { Calendar, Plus, ChevronDown, ChevronUp } from "lucide-react";
+import Link from "next/link";
+import { Calendar, Plus, ChevronDown, ChevronUp, Settings } from "lucide-react";
 import type { AssetConfig, StreamEntry } from "@/types/asset";
 import type { Analysis, AssetCalendar, AssetWatchlist, Event, WatchItem, CreateWatchItemDto } from "@/types/api";
 import { analysisService, assetCalendarService, assetWatchlistService } from "@/lib/api";
@@ -30,6 +31,7 @@ const ANALYSIS_TYPE_TO_TAG: Record<
   monthly: { tag: "MONTHLY OUTLOOK", tagColor: "yellow" },
   qoq: { tag: "QoQ OUTLOOK", tagColor: "green" },
   yearly: { tag: "YEARLY OUTLOOK", tagColor: "maroon" },
+  tradeNote: { tag: "TRADE NOTE", tagColor: "blue" },
 };
 
 function formatTime(date: Date): string {
@@ -54,6 +56,7 @@ const ANALYSIS_FILTER_OPTIONS = [
   { value: "monthly", label: "Monthly" },
   { value: "qoq", label: "QoQ" },
   { value: "yearly", label: "Yearly" },
+  { value: "tradeNote", label: "Trade note" },
 ] as const;
 
 function formatDateGroup(ts: number): string {
@@ -410,6 +413,14 @@ export function AssetAnalysisView({ asset }: AssetAnalysisViewProps) {
         {/* Header bar: hamburger (mobile) + title + tabs; reduced height */}
         <div className="h-11 shrink-0 flex items-center gap-3 px-4 sm:px-6 border-b border-sidebar-border overflow-hidden">
           <SidebarTrigger />
+          <Link
+            href="/settings"
+            className="shrink-0 rounded-lg border border-sidebar-border p-2 text-header-muted hover:bg-sidebar-hover hover:text-primary"
+            title="Settings"
+            aria-label="Open settings"
+          >
+            <Settings className="h-4 w-4" />
+          </Link>
           <div className="flex-grow-0 min-w-0 overflow-hidden flex items-center shrink">
             <AssetHeader title={fullTitle} />
           </div>
@@ -506,6 +517,9 @@ export function AssetAnalysisView({ asset }: AssetAnalysisViewProps) {
                   {entriesWithGroups.map(({ entry, separatorType, weekGroup, dateGroup }) => {
                     const analysis = analyses.find((a) => a.id === entry.id);
                     const fromGlobalAnalysis = !!analysis?.globalAnalysisId;
+                    const fromTradeNote =
+                      !!analysis?.notes?.includes("<!--analysis-type:tradeNote-->");
+                    const streamReadOnly = fromGlobalAnalysis || fromTradeNote;
                     return (
                       <StreamEntryComponent
                         key={entry.id}
@@ -513,10 +527,10 @@ export function AssetAnalysisView({ asset }: AssetAnalysisViewProps) {
                         separatorType={separatorType}
                         weekGroup={weekGroup}
                         dateGroup={dateGroup}
-                        onDelete={fromGlobalAnalysis ? undefined : () => handleDeleteAnalysis(entry.id, entry.images ?? [])}
-                        onDeleteImage={fromGlobalAnalysis ? undefined : (path) => handleDeleteImage(entry.id, path)}
-                        onUpdateImageName={fromGlobalAnalysis ? undefined : (path, name) => handleUpdateImageName(entry.id, path, name)}
-                        onEdit={fromGlobalAnalysis ? undefined : () => analysis && handleEditAnalysis(analysis)}
+                        onDelete={streamReadOnly ? undefined : () => handleDeleteAnalysis(entry.id, entry.images ?? [])}
+                        onDeleteImage={streamReadOnly ? undefined : (path) => handleDeleteImage(entry.id, path)}
+                        onUpdateImageName={streamReadOnly ? undefined : (path, name) => handleUpdateImageName(entry.id, path, name)}
+                        onEdit={streamReadOnly ? undefined : () => analysis && handleEditAnalysis(analysis)}
                       />
                     );
                   })}

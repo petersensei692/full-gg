@@ -45,10 +45,52 @@ export interface TradeClosePrice {
 export interface TradeNote {
   text: string;
   images: string[];
+  /** Captions for images (same order as images). */
+  imageNames?: string[];
+  /** Analysis row IDs on base/quote assets; managed by the server when posting from the journal. */
+  linkedAnalysisIds?: string[];
 }
 
 export interface TradeSlEvolutionEntry {
   [key: string]: number;
+}
+
+function parseJsonArray<T>(v: unknown, fallback: T[]): T[] {
+  if (v == null) return fallback;
+  if (typeof v !== 'string') return fallback;
+  const s = v.trim();
+  if (!s) return fallback;
+  try {
+    const parsed = JSON.parse(s) as unknown;
+    return Array.isArray(parsed) ? (parsed as T[]) : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function parseJsonObject<T>(v: unknown, fallback: T): T {
+  if (v == null) return fallback;
+  if (typeof v !== 'string') return fallback;
+  const s = v.trim();
+  if (!s) return fallback;
+  try {
+    const parsed = JSON.parse(s) as unknown;
+    if (parsed == null || typeof parsed !== 'object') return fallback;
+    return parsed as T;
+  } catch {
+    return fallback;
+  }
+}
+
+function normalizeProfitFactorEarned(raw: Partial<TradeProfitFactorEarned> | null | undefined): TradeProfitFactorEarned {
+  const earnings = Array.isArray(raw?.earnings)
+    ? raw!.earnings!.filter((e) => e && typeof e.earnedR === 'number')
+    : [];
+  return {
+    earnings,
+    earningsNumber: typeof raw?.earningsNumber === 'number' ? raw.earningsNumber : earnings.length,
+    totalEarned: typeof raw?.totalEarned === 'number' ? raw.totalEarned : 0,
+  };
 }
 
 @Entity('analytics_trades')
@@ -65,8 +107,8 @@ export class Trade {
   @Column({ type: 'varchar', name: 'execution_type', length: 20 })
   executionType: TradeExecutionType;
 
-  @Column({ type: 'datetime', name: 'execution_time' })
-  executionTime: Date;
+  @Column({ type: 'datetime', name: 'execution_time', nullable: true })
+  executionTime: Date | null;
 
   @Column({ type: 'float', name: 'execution_price' })
   executionPrice: number;
@@ -83,7 +125,7 @@ export class Trade {
     default: '[]',
     transformer: {
       to: (v: TradeSlEvolutionEntry[]) => JSON.stringify(v ?? []),
-      from: (v: string) => (v ? (JSON.parse(v) as TradeSlEvolutionEntry[]) : []),
+      from: (v: string) => parseJsonArray<TradeSlEvolutionEntry>(v, []),
     },
   })
   slEvolution: TradeSlEvolutionEntry[];
@@ -95,8 +137,9 @@ export class Trade {
     type: 'text',
     name: 'profit_factor_earned',
     transformer: {
-      to: (v: TradeProfitFactorEarned) => JSON.stringify(v),
-      from: (v: string) => JSON.parse(v) as TradeProfitFactorEarned,
+      to: (v: TradeProfitFactorEarned) =>
+        JSON.stringify(normalizeProfitFactorEarned(v ?? { earnings: [], earningsNumber: 0, totalEarned: 0 })),
+      from: (v: string) => normalizeProfitFactorEarned(parseJsonObject<Partial<TradeProfitFactorEarned>>(v, {})),
     },
   })
   profitFactorEarned: TradeProfitFactorEarned;
@@ -109,7 +152,7 @@ export class Trade {
     name: 'close_prices',
     transformer: {
       to: (v: TradeClosePrice[]) => JSON.stringify(v ?? []),
-      from: (v: string) => (v ? (JSON.parse(v) as TradeClosePrice[]) : []),
+      from: (v: string) => parseJsonArray<TradeClosePrice>(v, []),
     },
   })
   closePrices: TradeClosePrice[];
@@ -125,7 +168,7 @@ export class Trade {
     name: 'track_notes',
     transformer: {
       to: (v: TradeNote[]) => JSON.stringify(v ?? []),
-      from: (v: string) => (v ? (JSON.parse(v) as TradeNote[]) : []),
+      from: (v: string) => parseJsonArray<TradeNote>(v, []),
     },
   })
   trackNotes: TradeNote[];

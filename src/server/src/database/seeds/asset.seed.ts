@@ -23,9 +23,6 @@ export async function seedAssets(dataSource: DataSource): Promise<void> {
     if (!existing) {
       await repository.insert({ name, type, sortOrder, place });
       console.log(`  ✓ Asset "${name}" seeded (${type}, place ${place})`);
-    } else {
-      await repository.update(existing.id, { type, sortOrder, place });
-      console.log(`  - Asset "${name}" updated (${type}, place ${place})`);
     }
   }
 }

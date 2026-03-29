@@ -7,11 +7,13 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  Query,
 } from '@nestjs/common';
 import { ApiBody, ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { TradesService } from './trades.service';
 import { CreateTradeDto } from './dto/create-trade.dto';
 import { UpdateTradeDto } from './dto/update-trade.dto';
+import { QueryTradesDto } from './dto/query-trades.dto';
 
 @ApiTags('analytics')
 @Controller('analytics/trades')
@@ -27,11 +29,18 @@ export class TradesController {
     return this.tradesService.create(dto);
   }
 
+  @Get('pairs')
+  @ApiOperation({ summary: 'Distinct pair symbols (for filter dropdowns)' })
+  @ApiResponse({ status: 200, description: 'Sorted pair strings.' })
+  distinctPairs() {
+    return this.tradesService.distinctPairs();
+  }
+
   @Get()
-  @ApiOperation({ summary: 'Get all trades' })
-  @ApiResponse({ status: 200, description: 'List of all trades.' })
-  findAll() {
-    return this.tradesService.findAll();
+  @ApiOperation({ summary: 'List trades with filters and pagination' })
+  @ApiResponse({ status: 200, description: 'Paginated trades.' })
+  findMany(@Query() query: QueryTradesDto) {
+    return this.tradesService.findManyPaginated(query);
   }
 
   @Get(':id')

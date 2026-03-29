@@ -1,4 +1,4 @@
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
   IsArray,
   IsDateString,
@@ -8,6 +8,7 @@ import {
   IsString,
   IsUUID,
   Min,
+  ValidateIf,
   ValidateNested,
 } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
@@ -95,6 +96,18 @@ class TradeNoteDto {
   @IsArray()
   @IsString({ each: true })
   images?: string[];
+
+  @ApiPropertyOptional({ type: [String] })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  imageNames?: string[];
+
+  @ApiPropertyOptional({ type: [String] })
+  @IsOptional()
+  @IsArray()
+  @IsUUID('4', { each: true })
+  linkedAnalysisIds?: string[];
 }
 
 export class UpdateTradeDto {
@@ -105,6 +118,7 @@ export class UpdateTradeDto {
 
   @ApiPropertyOptional({ description: 'Linked watch item ID', nullable: true })
   @IsOptional()
+  @ValidateIf((_, v) => v != null && v !== '')
   @IsUUID()
   pairWatchedId?: string | null;
 
@@ -118,10 +132,11 @@ export class UpdateTradeDto {
   @IsEnum(TRADE_EXECUTION_TYPE_VALUES)
   executionType?: (typeof TRADE_EXECUTION_TYPE_VALUES)[number];
 
-  @ApiPropertyOptional({ example: '2026-03-21T01:35:00.000Z' })
+  @ApiPropertyOptional({ example: '2026-03-21T01:35:00.000Z', nullable: true })
   @IsOptional()
+  @ValidateIf((_, v) => v != null && v !== '')
   @IsDateString()
-  executionTime?: string;
+  executionTime?: string | null;
 
   @ApiPropertyOptional({ example: 1.1405 })
   @IsOptional()
@@ -147,6 +162,12 @@ export class UpdateTradeDto {
   slEvolution?: Record<string, number>[];
 
   @ApiPropertyOptional({ example: 2.5 })
+  @Transform(({ value }) => {
+    if (value === undefined || value === null || value === '') return undefined;
+    if (typeof value === 'number' && Number.isFinite(value)) return value;
+    const n = Number(value);
+    return Number.isFinite(n) ? n : undefined;
+  })
   @IsOptional()
   @IsNumber()
   profitFactorTargeted?: number;

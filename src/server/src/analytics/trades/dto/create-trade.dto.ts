@@ -56,6 +56,25 @@ class TradeProfitFactorEarnedDto {
   totalEarned: number;
 }
 
+class CreateTradeProfitFactorEarnedDto {
+  @ApiPropertyOptional({ type: [TradeProfitEarningDto] })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => TradeProfitEarningDto)
+  earnings?: TradeProfitEarningDto[];
+
+  @ApiPropertyOptional({ example: 0 })
+  @IsOptional()
+  @IsNumber()
+  earningsNumber?: number;
+
+  @ApiPropertyOptional({ example: 0 })
+  @IsOptional()
+  @IsNumber()
+  totalEarned?: number;
+}
+
 class TradeClosePriceDto {
   @ApiProperty({ example: 1.1425 })
   @IsNumber()
@@ -91,6 +110,18 @@ class TradeNoteDto {
   @IsArray()
   @IsString({ each: true })
   images?: string[];
+
+  @ApiPropertyOptional({ type: [String], description: 'Captions aligned with images' })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  imageNames?: string[];
+
+  @ApiPropertyOptional({ type: [String], description: 'Usually set by server when mirroring to analysis' })
+  @IsOptional()
+  @IsArray()
+  @IsUUID('4', { each: true })
+  linkedAnalysisIds?: string[];
 }
 
 export class CreateTradeDto {
@@ -112,9 +143,13 @@ export class CreateTradeDto {
   @IsEnum(TRADE_EXECUTION_TYPE_VALUES)
   executionType: TradeExecutionType;
 
-  @ApiProperty({ example: '2026-03-21T01:35:00.000Z' })
+  @ApiPropertyOptional({
+    description: 'If omitted, trade is pending until executed with a time.',
+    example: '2026-03-21T01:35:00.000Z',
+  })
+  @IsOptional()
   @IsDateString()
-  executionTime: string;
+  executionTime?: string;
 
   @ApiProperty({ example: 1.1405 })
   @IsNumber()
@@ -136,14 +171,11 @@ export class CreateTradeDto {
   @IsArray()
   slEvolution?: Record<string, number>[];
 
-  @ApiProperty({ example: 2.5 })
-  @IsNumber()
-  profitFactorTargeted: number;
-
-  @ApiProperty({ type: TradeProfitFactorEarnedDto })
+  @ApiPropertyOptional({ type: CreateTradeProfitFactorEarnedDto })
+  @IsOptional()
   @ValidateNested()
-  @Type(() => TradeProfitFactorEarnedDto)
-  profitFactorEarned: TradeProfitFactorEarnedDto;
+  @Type(() => CreateTradeProfitFactorEarnedDto)
+  profitFactorEarned?: CreateTradeProfitFactorEarnedDto;
 
   @ApiProperty({ example: 1.5 })
   @IsNumber()
@@ -162,9 +194,10 @@ export class CreateTradeDto {
   @IsDateString()
   tradeCloseTime?: string | null;
 
-  @ApiProperty({ enum: TRADE_STATUS_VALUES })
+  @ApiPropertyOptional({ enum: TRADE_STATUS_VALUES })
+  @IsOptional()
   @IsEnum(TRADE_STATUS_VALUES)
-  status: TradeStatus;
+  status?: TradeStatus;
 
   @ApiPropertyOptional({ type: [TradeNoteDto] })
   @IsOptional()

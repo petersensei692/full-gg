@@ -2,6 +2,10 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Trade } from '../trades/entities/trade.entity';
+import {
+  parsePairCurrencyListParam,
+  tradeMatchesPairCurrencyScope,
+} from '../analytics-pair-filters';
 
 export type AnalyticsRange = '1D' | '1W' | '1M' | '1Y' | 'ALL';
 
@@ -62,53 +66,6 @@ function coerceRange(v?: string): AnalyticsRange {
   return 'ALL';
 }
 
-function computeStreakStats(sequence: number[]): {
-  winningStreaksAmount: number;
-  HighestWinningStreak: number;
-  loosingStreaksAmount: number;
-  HighestloosingStreak: number;
-} {
-  let winningStreaksAmount = 0;
-  let loosingStreaksAmount = 0;
-  let highestWinning = 0;
-  let highestLoosing = 0;
-  let idx = 0;
-  while (idx < sequence.length) {
-    const value = sequence[idx];
-    if (value > 0) {
-      let run = 0;
-      while (idx < sequence.length && sequence[idx] > 0) {
-        run += 1;
-        idx += 1;
-      }
-      if (run >= 3) {
-        winningStreaksAmount += 1;
-        if (run > highestWinning) highestWinning = run;
-      }
-      continue;
-    }
-    if (value < 0) {
-      let run = 0;
-      while (idx < sequence.length && sequence[idx] < 0) {
-        run += 1;
-        idx += 1;
-      }
-      if (run >= 3) {
-        loosingStreaksAmount += 1;
-        if (run > highestLoosing) highestLoosing = run;
-      }
-      continue;
-    }
-    idx += 1;
-  }
-  return {
-    winningStreaksAmount,
-    HighestWinningStreak: highestWinning,
-    loosingStreaksAmount,
-    HighestloosingStreak: highestLoosing,
-  };
-}
-
 @Injectable()
 export class DashboardAnalyticsService {
   constructor(
@@ -120,28 +77,81 @@ export class DashboardAnalyticsService {
     return (!from || date >= from) && date <= to;
   }
 
+  private tradeTimeForRange(t: Trade): Date {
+    if (t.executionTime) return new Date(t.executionTime);
+    return new Date(t.createdAt);
+  }
+
+  private inclusiveDayCountForTradeStats(from: Date | null, to: Date, tradeTimes: Date[]): number {
+    if (from) {
+      const a = startOfDay(from).getTime();
+      const b = startOfDay(to).getTime();
+      return Math.max(1, Math.floor((b - a) / 86400000) + 1);
+    }
+    if (tradeTimes.length === 0) return 1;
+    const min = Math.min(...tradeTimes.map((d) => startOfDay(d).getTime()));
+    const max = startOfDay(to).getTime();
+    return Math.max(1, Math.floor((max - min) / 86400000) + 1);
+  }
+
+  private inclusiveMonthCountForTradeStats(from: Date | null, to: Date, tradeTimes: Date[]): number {
+    const keys = new Set<string>();
+    if (from) {
+      let d = new Date(from.getFullYear(), from.getMonth(), 1);
+      const endM = new Date(to.getFullYear(), to.getMonth(), 1);
+      while (d <= endM) {
+        keys.add(`${d.getFullYear()}-${d.getMonth()}`);
+        d.setMonth(d.getMonth() + 1);
+      }
+      return Math.max(1, keys.size);
+    }
+    for (const td of tradeTimes) {
+      keys.add(`${td.getFullYear()}-${td.getMonth()}`);
+    }
+    keys.add(`${to.getFullYear()}-${to.getMonth()}`);
+    return Math.max(1, keys.size);
+  }
+
   async getDashboardAnalytics(query: {
     tradeCountRange?: string;
     resultRange?: string;
     from?: string;
     to?: string;
+    fromMs?: string;
+    toMs?: string;
+    pairs?: string;
+    currencies?: string;
   }) {
     const now = new Date();
-    const to = query.to ? new Date(query.to) : now;
-    const customFrom = query.from ? new Date(query.from) : null;
+    const to =
+      query.toMs != null && query.toMs !== '' && Number.isFinite(Number(query.toMs))
+        ? new Date(Number(query.toMs))
+        : query.to
+          ? new Date(query.to)
+          : now;
+    const customFrom =
+      query.fromMs != null && query.fromMs !== '' && Number.isFinite(Number(query.fromMs))
+        ? new Date(Number(query.fromMs))
+        : query.from
+          ? new Date(query.from)
+          : null;
     const tradeCountRange = coerceRange(query.tradeCountRange);
     const resultRange = coerceRange(query.resultRange);
     const tradeCountFrom = customFrom ?? toRangeStart(to, tradeCountRange);
     const resultFrom = customFrom ?? toRangeStart(to, resultRange);
 
     const allTrades = await this.tradesRepository.find({
-      order: { executionTime: 'ASC' },
+      order: { createdAt: 'ASC' },
     });
 
-    const closedTrades = allTrades.filter((t) => t.closePrices.length > 0 && !!t.tradeCloseTime);
-    const tradeCountTrades = allTrades.filter((t) =>
-      this.inRange(new Date(t.executionTime), tradeCountFrom, to),
-    );
+    const pairsFilter = parsePairCurrencyListParam(query.pairs);
+    const currenciesFilter = parsePairCurrencyListParam(query.currencies);
+    const scope = (t: Trade) =>
+      tradeMatchesPairCurrencyScope(t.pair, pairsFilter, currenciesFilter);
+
+    const scopedAll = allTrades.filter(scope);
+    const closedTrades = scopedAll.filter((t) => t.closePrices.length > 0 && !!t.tradeCloseTime);
+    const tradeCountTrades = scopedAll.filter((t) => this.inRange(this.tradeTimeForRange(t), tradeCountFrom, to));
     const resultTrades = closedTrades.filter((t) =>
       this.inRange(new Date(t.tradeCloseTime as Date), resultFrom, to),
     );
@@ -149,7 +159,7 @@ export class DashboardAnalyticsService {
     // Trade count evolution (weekly buckets)
     const weekMap = new Map<string, number>();
     for (const t of tradeCountTrades) {
-      const wk = startOfWeek(new Date(t.executionTime)).toISOString().slice(0, 10);
+      const wk = startOfWeek(this.tradeTimeForRange(t)).toISOString().slice(0, 10);
       weekMap.set(wk, (weekMap.get(wk) ?? 0) + 1);
     }
     const tradeCountWeeks = [...weekMap.entries()].sort(([a], [b]) => a.localeCompare(b));
@@ -158,20 +168,17 @@ export class DashboardAnalyticsService {
       ? Number((tradeCountTrades.length / tradeCountWeeks.length).toFixed(2))
       : 0;
 
+    const tradeTimesForCount = tradeCountTrades.map((t) => this.tradeTimeForRange(t));
+    const dayCountForAvg = this.inclusiveDayCountForTradeStats(tradeCountFrom, to, tradeTimesForCount);
+    const monthCountForAvg = this.inclusiveMonthCountForTradeStats(tradeCountFrom, to, tradeTimesForCount);
+    const averageByDay = Number((tradeCountTrades.length / dayCountForAvg).toFixed(2));
+    const averageByMonth = Number((tradeCountTrades.length / monthCountForAvg).toFixed(2));
+
     const byDay = new Map<string, number>();
     for (const t of resultTrades) {
       const dayKey = startOfDay(new Date(t.tradeCloseTime as Date)).toISOString().slice(0, 10);
       byDay.set(dayKey, (byDay.get(dayKey) ?? 0) + (t.profitFactorEarned?.totalEarned ?? 0));
     }
-    const tradeSequence = [...resultTrades]
-      .sort((a, b) => new Date(a.tradeCloseTime as Date).getTime() - new Date(b.tradeCloseTime as Date).getTime())
-      .map((t) => t.profitFactorEarned?.totalEarned ?? 0);
-    const daySequence = [...byDay.entries()]
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([, v]) => v);
-    const tradeStreaks = computeStreakStats(tradeSequence);
-    const dayStreaks = computeStreakStats(daySequence);
-
     // Trading stats
     const totalResult = resultTrades.reduce((sum, t) => sum + (t.profitFactorEarned?.totalEarned ?? 0), 0);
     const byDayResult = new Set(resultTrades.map((t) => startOfDay(new Date(t.tradeCloseTime as Date)).toISOString().slice(0, 10)));
@@ -218,13 +225,14 @@ export class DashboardAnalyticsService {
 
     const wins = resultTrades.filter((t) => (t.profitFactorEarned?.totalEarned ?? 0) > 0);
     const losses = resultTrades.filter((t) => (t.profitFactorEarned?.totalEarned ?? 0) < 0);
+    const withExec = resultTrades.filter((t) => t.executionTime != null);
     const avgDurationMs = safeDiv(
-      resultTrades.reduce((sum, t) => {
-        const open = new Date(t.executionTime).getTime();
+      withExec.reduce((sum, t) => {
+        const open = new Date(t.executionTime as Date).getTime();
         const close = new Date(t.tradeCloseTime as Date).getTime();
         return sum + Math.max(0, close - open);
       }, 0),
-      resultTrades.length,
+      withExec.length,
     );
 
     // Big graph day-to-day R (single point per day; no repeated day labels)
@@ -238,15 +246,13 @@ export class DashboardAnalyticsService {
       tradeCount: {
         countByWeek,
         averageByWeek,
+        averageByDay,
+        averageByMonth,
         total: tradeCountTrades.length,
         evolution: {
           labels: tradeCountWeeks.map(([label]) => label),
           values: tradeCountWeeks.map(([, value]) => value),
         },
-      },
-      streaks: {
-        days: dayStreaks,
-        trades: tradeStreaks,
       },
       tradingStats: {
         actualResult: Number(totalResult.toFixed(4)),

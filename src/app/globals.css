@@ -19,6 +19,10 @@
   --header-input: #18181b;
   --primary: #3b82f6;
   --primary-foreground: #ffffff;
+  --scrollbar-track: #050506;
+  --scrollbar-thumb: var(--primary);
+  --scrollbar-size: 10px;
+  --scrollbar-button-size: 11px;
 }
 
 @theme inline {
@@ -49,31 +53,104 @@ body {
   font-family: var(--font-sans), system-ui, sans-serif;
 }
 
-/* Modal / dialog scrollbar: visible thumb, no horizontal scroll when not needed */
+/* ---------- Global scrollbars: dark track, pill thumb & arrows (primary blue) ---------- */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+}
+
+*::-webkit-scrollbar {
+  width: var(--scrollbar-size);
+  height: var(--scrollbar-size);
+}
+
+*::-webkit-scrollbar-track {
+  background: var(--scrollbar-track);
+  margin: 2px 0;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: 9999px;
+  border: 2px solid var(--scrollbar-track);
+  min-height: 36px;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: #60a5fa;
+}
+
+*::-webkit-scrollbar-corner {
+  background: var(--scrollbar-track);
+}
+
+/* Vertical / horizontal scrollbar arrow buttons (primary blue triangles on dark track) */
+*::-webkit-scrollbar-button:single-button:vertical:decrement {
+  display: block;
+  height: var(--scrollbar-button-size);
+  background-color: var(--scrollbar-track);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'%3E%3Cpath fill='%233b82f6' d='M5 2.5 L8.5 8 H1.5 Z'/%3E%3C/svg%3E");
+  background-position: center 3px;
+  background-repeat: no-repeat;
+  background-size: 9px 9px;
+}
+
+*::-webkit-scrollbar-button:single-button:vertical:increment {
+  display: block;
+  height: var(--scrollbar-button-size);
+  background-color: var(--scrollbar-track);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'%3E%3Cpath fill='%233b82f6' d='M5 7.5 L1.5 2 H8.5 Z'/%3E%3C/svg%3E");
+  background-position: center 2px;
+  background-repeat: no-repeat;
+  background-size: 9px 9px;
+}
+
+*::-webkit-scrollbar-button:single-button:horizontal:decrement {
+  display: block;
+  width: var(--scrollbar-button-size);
+  background-color: var(--scrollbar-track);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'%3E%3Cpath fill='%233b82f6' d='M2.5 5 L8 1.5 V8.5 Z'/%3E%3C/svg%3E");
+  background-position: 3px center;
+  background-repeat: no-repeat;
+  background-size: 9px 9px;
+}
+
+*::-webkit-scrollbar-button:single-button:horizontal:increment {
+  display: block;
+  width: var(--scrollbar-button-size);
+  background-color: var(--scrollbar-track);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'%3E%3Cpath fill='%233b82f6' d='M7.5 5 L2 8.5 V1.5 Z'/%3E%3C/svg%3E");
+  background-position: 2px center;
+  background-repeat: no-repeat;
+  background-size: 9px 9px;
+}
+
+/* Modal / dialog scrollbar: same theme, stable gutter */
 .scrollbar-modal {
   overflow-x: hidden;
   scrollbar-gutter: stable;
-  scrollbar-width: auto;
-  scrollbar-color: #52525b var(--sidebar-border);
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
 }
 .scrollbar-modal::-webkit-scrollbar {
-  width: 10px;
+  width: var(--scrollbar-size);
+  height: var(--scrollbar-size);
 }
 .scrollbar-modal::-webkit-scrollbar-track {
-  background: var(--sidebar-border);
-  border-radius: 5px;
+  background: var(--scrollbar-track);
   margin: 2px 0;
 }
 .scrollbar-modal::-webkit-scrollbar-thumb {
-  background: #52525b;
-  border-radius: 5px;
-  min-height: 40px;
+  background: var(--scrollbar-thumb);
+  border-radius: 9999px;
+  border: 2px solid var(--scrollbar-track);
+  min-height: 36px;
 }
 .scrollbar-modal::-webkit-scrollbar-thumb:hover {
-  background: #71717a;
+  background: #60a5fa;
 }
 .scrollbar-modal::-webkit-scrollbar-corner {
-  background: var(--sidebar-border);
+  background: var(--scrollbar-track);
 }
 
 /* Hide visual scrollbar while preserving horizontal scroll behavior */

@@ -10,6 +10,10 @@ import {
   type AppConfig,
 } from '../database/app-config';
 import { EXPECTED_SQLITE_SCHEMA } from './expected-schema';
+import {
+  createNewDatabaseFile,
+  synchronizeAndSeedDatabaseFile,
+} from '../database/prepare-database-file';
 
 @Injectable()
 export class SettingsService {
@@ -71,6 +75,39 @@ export class SettingsService {
       return { valid: false, error: `Cannot open database: ${message}` };
     } finally {
       if (db) db.close();
+    }
+  }
+
+  /**
+   * Apply TypeORM synchronize on the file and insert only missing seed rows (assets, pair pips).
+   * Safe for existing data: does not clear tables.
+   */
+  async prepareDatabaseFile(
+    filePath: string,
+  ): Promise<{ ok: true } | { ok: false; error: string }> {
+    const normalized = filePath.trim();
+    if (!normalized) {
+      return { ok: false, error: 'Database path is required.' };
+    }
+    try {
+      await synchronizeAndSeedDatabaseFile(normalized);
+      return { ok: true };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      return { ok: false, error: message };
+    }
+  }
+
+  async createDatabaseInDirectory(
+    directory: string,
+    fileName?: string,
+  ): Promise<{ ok: true; path: string } | { ok: false; error: string }> {
+    try {
+      const absPath = await createNewDatabaseFile(directory, fileName);
+      return { ok: true, path: absPath };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      return { ok: false, error: message };
     }
   }
 }

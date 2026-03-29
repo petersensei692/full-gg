@@ -11,6 +11,15 @@ class ValidateDatabaseDto {
   path!: string;
 }
 
+class PrepareDatabaseDto {
+  path!: string;
+}
+
+class CreateDatabaseDto {
+  directory!: string;
+  fileName?: string;
+}
+
 @ApiTags('settings')
 @Controller('api/settings')
 export class SettingsController {
@@ -41,5 +50,23 @@ export class SettingsController {
   validateDatabase(@Body() body: { path?: string }) {
     const path = body?.path;
     return this.settings.validateDatabasePath(path ?? '');
+  }
+
+  @Post('prepare-database')
+  @ApiOperation({
+    summary: 'Create missing tables/columns and seed only missing assets & pair pips (SQLite)',
+  })
+  @ApiBody({ type: PrepareDatabaseDto })
+  @ApiResponse({ status: 201, description: 'Prepare result.' })
+  prepareDatabase(@Body() body: { path?: string }) {
+    return this.settings.prepareDatabaseFile(body?.path ?? '');
+  }
+
+  @Post('create-database')
+  @ApiOperation({ summary: 'Create a new SQLite file in a directory with full schema + seeds' })
+  @ApiBody({ type: CreateDatabaseDto })
+  @ApiResponse({ status: 201, description: 'Create result.' })
+  createDatabase(@Body() body: { directory?: string; fileName?: string }) {
+    return this.settings.createDatabaseInDirectory(body?.directory ?? '', body?.fileName);
   }
 }
