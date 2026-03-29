@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Filter, Plus, X } from "lucide-react";
+import { Filter, Plus, Trash2, X } from "lucide-react";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { AnalyticsDateRangePicker } from "@/components/analytics/AnalyticsDateRangePicker";
 import { tradesApi, watchItemsService, weeklyWatchlistService } from "@/lib/api";
@@ -131,6 +131,12 @@ function formatCreatedAt(iso: string): string {
 
 const PAGE_SIZE = 25;
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function isPersistedTradeId(id: string): boolean {
+  return UUID_RE.test(id);
+}
+
 export default function AnalyticsTradesPage() {
   type PanelTab = "metrics" | "management" | "notes" | "pairWatched";
   const { assets: assetOptions } = useAssets();
@@ -178,6 +184,7 @@ export default function AnalyticsTradesPage() {
   const [noteEditImages, setNoteEditImages] = useState<string[]>([]);
   const [noteEditNames, setNoteEditNames] = useState<string[]>([]);
   const [pairOptionsFromApi, setPairOptionsFromApi] = useState<string[]>([]);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!selectedTrade) return;
@@ -509,7 +516,9 @@ export default function AnalyticsTradesPage() {
                     <th className="min-w-[168px] px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-header-muted">
                       Date &amp; Time
                     </th>
-                    <th className="w-14 px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-header-muted" />
+                    <th className="min-w-[4.5rem] px-2 py-3 text-left text-xs font-semibold uppercase tracking-wide text-header-muted">
+                      <span className="sr-only">Open / delete</span>
+                    </th>
                     <th className="min-w-[150px] px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-header-muted">Pair</th>
                     <th className="min-w-[110px] px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-header-muted">Type</th>
                     <th className="min-w-[130px] px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-header-muted">Entry Price</th>
@@ -534,19 +543,61 @@ export default function AnalyticsTradesPage() {
                       return (
                         <tr key={trade.id} className="border-b border-sidebar-border/70 hover:bg-header/40">
                           <Cell className="whitespace-nowrap text-xs text-header-muted">{formatCreatedAt(trade.createdAt)}</Cell>
-                          <Cell className="w-14 px-3">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setSelectedTrade(trade);
-                                setPanelOpen(true);
-                                setPanelTab("metrics");
-                              }}
-                              className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-primary/40 bg-primary/10 text-[11px] text-primary transition-colors hover:bg-primary/20"
-                              aria-label={`Open trade journal for ${trade.pair}`}
-                            >
-                              ↗
-                            </button>
+                          <Cell className="min-w-[4.5rem] px-2">
+                            <div className="flex items-center gap-1">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setSelectedTrade(trade);
+                                  setPanelOpen(true);
+                                  setPanelTab("metrics");
+                                }}
+                                className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-primary/40 bg-primary/10 text-[11px] text-primary transition-colors hover:bg-primary/20"
+                                aria-label={`Open trade journal for ${trade.pair}`}
+                              >
+                                ↗
+                              </button>
+                              {isPersistedTradeId(trade.id) && (
+                                <button
+                                  type="button"
+                                  disabled={deletingId === trade.id}
+                                  onClick={async () => {
+                                    if (
+                                      !window.confirm(
+                                        `Delete trade ${trade.pair} (${trade.type})? This cannot be undone.`,
+                                      )
+                                    ) {
+                                      return;
+                                    }
+                                    setDeletingId(trade.id);
+                                    try {
+                                      await tradesApi.delete(trade.id);
+                                      const remainingOnPage = trades.filter((t) => t.id !== trade.id).length;
+                                      setTrades((prev) => (Array.isArray(prev) ? prev : []).filter((t) => t.id !== trade.id));
+                                      setTotal((t) => Math.max(0, t - 1));
+                                      if (remainingOnPage === 0 && page > 1) {
+                                        setPage((p) => Math.max(1, p - 1));
+                                      }
+                                      if (selectedTrade?.id === trade.id) {
+                                        setPanelOpen(false);
+                                        setSelectedTrade(null);
+                                      }
+                                    } catch (e) {
+                                      window.alert(
+                                        e instanceof Error ? e.message : "Could not delete trade. Try again.",
+                                      );
+                                    } finally {
+                                      setDeletingId(null);
+                                    }
+                                  }}
+                                  className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-rose-500/40 bg-rose-500/10 text-rose-400 transition-colors hover:bg-rose-500/20 disabled:opacity-50"
+                                  aria-label={`Delete trade ${trade.pair}`}
+                                  title="Delete trade"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </button>
+                              )}
+                            </div>
                           </Cell>
                           <Cell className="font-medium">{trade.pair}</Cell>
                           <Cell className="uppercase">{trade.type}</Cell>
