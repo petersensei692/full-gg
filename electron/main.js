@@ -39,7 +39,16 @@ ipcMain.handle("settings:choose-database-file", async () => {
   return result.filePaths[0];
 });
 
-/** Single picker: user may choose a database file or a folder (for creating a new DB). */
+ipcMain.handle("settings:choose-database-folder", async () => {
+  const result = await dialog.showOpenDialog({
+    properties: ["openDirectory"],
+    title: "Choose folder for database",
+  });
+  if (result.canceled || !result.filePaths?.length) return null;
+  return result.filePaths[0];
+});
+
+/** @deprecated Use choose-database-file + choose-database-folder from the renderer. */
 ipcMain.handle("settings:choose-database-path", async () => {
   const result = await dialog.showOpenDialog({
     properties: ["openFile", "openDirectory"],
@@ -115,7 +124,7 @@ function startServer() {
         ...process.env,
         NODE_PATH: nodeModulesPath,
         APP_DATA_PATH: userData,
-        PORT: "5000",
+        PORT: "47391",
         NODE_ENV: "production",
       },
       stdio: ["ignore", "pipe", "pipe", "ipc"],
@@ -139,7 +148,7 @@ function startServer() {
       }
     });
 
-    waitForServer("http://127.0.0.1:5000/")
+    waitForServer("http://127.0.0.1:47391/")
       .then(resolve)
       .catch(() => {
         const detail = stderrChunks.length ? stderrChunks.join("").trim().slice(-800) : "";
@@ -171,7 +180,7 @@ function createWindow(serverError = null) {
   });
 
   if (isDev) {
-    mainWindow.loadURL("http://localhost:3000");
+    mainWindow.loadURL("http://localhost:3047");
   } else if (serverError) {
     const escape = (s) => String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/\n/g, "<br>");
     const errorHtml = `

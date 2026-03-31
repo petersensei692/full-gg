@@ -10,7 +10,7 @@ declare global {
     electron?: {
       chooseDirectory: () => Promise<string | null>;
       chooseDatabaseFile: () => Promise<string | null>;
-      chooseDatabasePath: () => Promise<{ path: string; kind: "file" | "directory" } | null>;
+      chooseDatabaseFolder: () => Promise<string | null>;
     };
   }
 }
@@ -82,29 +82,40 @@ export default function SettingsPage() {
     }
   };
 
-  const handleBrowseDatabase = async () => {
-    if (typeof window === "undefined" || !window.electron?.chooseDatabasePath) return;
-    const picked = await window.electron.chooseDatabasePath();
-    if (!picked) return;
-    setDatabasePathInput(picked.path);
-    setDbBrowseKind(picked.kind);
-    setDbValidateResult(null);
-    if (picked.kind === "file") {
-      try {
-        const result = await settingsService.validateDatabase(picked.path);
-        setDbValidateResult(result);
-        if (result.valid) {
-          setSaving(true);
-          const updated = await settingsService.update({ databasePath: picked.path });
-          setSettings(updated);
-          showMessage("success", "Database file validated and saved. Restart the app to use it.");
-        }
-      } catch {
-        setDbValidateResult({ valid: false, error: "Validation request failed." });
-      } finally {
-        setSaving(false);
+  const validateAndSaveDatabaseFile = async (filePath: string) => {
+    try {
+      const result = await settingsService.validateDatabase(filePath);
+      setDbValidateResult(result);
+      if (result.valid) {
+        setSaving(true);
+        const updated = await settingsService.update({ databasePath: filePath });
+        setSettings(updated);
+        showMessage("success", "Database file validated and saved. Restart the app to use it.");
       }
+    } catch {
+      setDbValidateResult({ valid: false, error: "Validation request failed." });
+    } finally {
+      setSaving(false);
     }
+  };
+
+  const handleBrowseDatabaseFile = async () => {
+    if (typeof window === "undefined" || !window.electron?.chooseDatabaseFile) return;
+    const filePath = await window.electron.chooseDatabaseFile();
+    if (!filePath) return;
+    setDatabasePathInput(filePath);
+    setDbBrowseKind("file");
+    setDbValidateResult(null);
+    await validateAndSaveDatabaseFile(filePath);
+  };
+
+  const handleBrowseDatabaseFolder = async () => {
+    if (typeof window === "undefined" || !window.electron?.chooseDatabaseFolder) return;
+    const folderPath = await window.electron.chooseDatabaseFolder();
+    if (!folderPath) return;
+    setDatabasePathInput(folderPath);
+    setDbBrowseKind("directory");
+    setDbValidateResult(null);
   };
 
   const handleValidateDatabase = async () => {
@@ -269,9 +280,9 @@ export default function SettingsPage() {
                 SQLite database file
               </h2>
               <p className="text-xs text-dashboard-foreground/60 mb-3">
-                Use Browse to pick an SQLite file (then Validate & save or Prepare) or a folder (then New database to create
-                gg-journal.sqlite there). You can still type a path manually for validate/prepare in the browser. Restart
-                the server after switching files.
+                Use <strong>Browse file</strong> for an existing .db / .sqlite, or <strong>Browse folder</strong> then New
+                database to create gg-journal.sqlite there. You can still type a path manually. Restart the server after
+                switching files.
               </p>
               <div className="flex flex-wrap gap-2 mb-2">
                 <input
@@ -282,17 +293,26 @@ export default function SettingsPage() {
                     setDbBrowseKind(null);
                     setDbValidateResult(null);
                   }}
-                  placeholder="Database file path, or folder after Browse"
+                  placeholder="Database file path, or folder after Browse folder"
                   className="flex-1 min-w-[200px] max-w-full rounded-lg border border-sidebar-border bg-header-input px-3 py-2 text-sm text-dashboard-foreground placeholder:text-dashboard-foreground/50 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                 />
                 <button
                   type="button"
-                  onClick={handleBrowseDatabase}
+                  onClick={handleBrowseDatabaseFile}
                   disabled={saving || !hasElectron}
-                  title={!hasElectron ? "Browse is available in the desktop app (Electron)" : "Choose a database file or a folder"}
+                  title={!hasElectron ? "Available in the desktop app (Electron)" : "Choose .db or .sqlite file"}
                   className="rounded-lg border border-sidebar-border bg-sidebar px-3 py-2 text-sm font-medium text-dashboard-foreground hover:bg-sidebar-hover disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  Browse…
+                  Browse file…
+                </button>
+                <button
+                  type="button"
+                  onClick={handleBrowseDatabaseFolder}
+                  disabled={saving || !hasElectron}
+                  title={!hasElectron ? "Available in the desktop app (Electron)" : "Choose folder for a new database"}
+                  className="rounded-lg border border-sidebar-border bg-sidebar px-3 py-2 text-sm font-medium text-dashboard-foreground hover:bg-sidebar-hover disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Browse folder…
                 </button>
                 <button
                   type="button"

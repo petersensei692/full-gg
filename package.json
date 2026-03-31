@@ -6,10 +6,10 @@
   "private": true,
   "scripts": {
     "postinstall": "node scripts/patch-better-sqlite3.js",
-    "dev": "next dev",
-    "dev:webpack": "next dev --webpack",
+    "dev": "next dev -p 3047",
+    "dev:webpack": "next dev --webpack -p 3047",
     "build": "next build --webpack",
-    "start": "next start",
+    "start": "next start -p 3047",
     "lint": "eslint .",
     "dev:server": "cd src/server && nest start --watch",
     "build:server": "cd src/server && nest build",
@@ -32,7 +32,7 @@
     "electron:build": "node scripts/clean-electron-build.js && npm run build && npm run build:server && node scripts/patch-better-sqlite3.js && electron-builder && npx @electron/rebuild -f -w better-sqlite3 -m dist-electron/win-unpacked/resources/server",
     "electron:build:dir": "node scripts/clean-electron-build.js && npm run build && npm run build:server && node scripts/patch-better-sqlite3.js && electron-builder --dir && npx @electron/rebuild -f -w better-sqlite3 -m dist-electron/win-unpacked/resources/server",
     "electron:start": "cross-env NODE_ENV=production electron .",
-    "electron-pack": "cross-env NEXT_PUBLIC_API_URL=http://127.0.0.1:5000 node scripts/clean-electron-build.js && npm run build && npm run build:server && node scripts/patch-better-sqlite3.js && electron-builder && npx @electron/rebuild -f -w better-sqlite3 -m dist-electron/win-unpacked/resources/server"
+    "electron-pack": "cross-env NEXT_PUBLIC_API_URL=http://127.0.0.1:47391 node scripts/clean-electron-build.js && npm run build && npm run build:server && node scripts/patch-better-sqlite3.js && electron-builder && npx @electron/rebuild -f -w better-sqlite3 -m dist-electron/win-unpacked/resources/server"
   },
   "main": "electron/main.js",
   "build": {

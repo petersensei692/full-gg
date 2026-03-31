@@ -27,7 +27,7 @@ async function bootstrap() {
     }),
   );
 
-  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3047';
   const isElectron = !!process.env.APP_DATA_PATH;
   app.enableCors({
     origin: isElectron ? true : frontendUrl,
@@ -35,7 +35,7 @@ async function bootstrap() {
   });
 
   // In production (Electron), bind to loopback only for internal routing
-  const port = parseInt(process.env.PORT ?? '5000', 10);
+  const port = parseInt(process.env.PORT ?? '47391', 10);
   const host = process.env.APP_DATA_PATH ? '127.0.0.1' : undefined;
 
   const config = new DocumentBuilder()

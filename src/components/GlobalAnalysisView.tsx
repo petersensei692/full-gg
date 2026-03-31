@@ -158,10 +158,10 @@ export function GlobalAnalysisView() {
       setList((prev) =>
         prev.map((g) => (g.id === gaId ? { ...g, imageNames: nextImageNames } : g))
       );
-      await globalAnalysisService.update(gaId, { imageNames: nextImageNames });
-      await fetchList();
+      const updated = await globalAnalysisService.update(gaId, { imageNames: nextImageNames });
+      setList((prev) => prev.map((g) => (g.id === gaId ? { ...g, ...updated } : g)));
     },
-    [list, fetchList]
+    [list]
   );
 
   const mappedEntries = useMemo((): StreamEntry[] => {
