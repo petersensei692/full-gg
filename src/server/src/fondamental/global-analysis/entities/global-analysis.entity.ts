@@ -41,6 +41,9 @@ export class GlobalAnalysis {
   @Column({ type: 'varchar', length: 20, name: 'analysis_type', default: 'daily' })
   analysisType: string;
 
+  @Column({ type: 'boolean', default: false })
+  favorite: boolean;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 

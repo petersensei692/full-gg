@@ -12,6 +12,7 @@ import type {
 import type { WatchlistBias } from "@/types/calendar";
 import { useImagePaste } from "@/hooks/useImagePaste";
 import { deleteStoredImage } from "@/lib/imageUpload";
+import { ConfirmDeleteDialog } from "@/components/ui/ConfirmDeleteDialog";
 import { getImageUrl } from "@/lib/imageUrls";
 import { useAssets } from "@/context/AssetsContext";
 import { assetWatchlistService } from "@/lib/api";
@@ -58,6 +59,8 @@ export function CreatePairModal({
   const [zoomedImageSrc, setZoomedImageSrc] = useState<string | null>(null);
   const [thesisImages, setThesisImages] = useState<Array<{ path: string; url: string }>>([]);
   const [error, setError] = useState("");
+  const [imagePendingRemove, setImagePendingRemove] = useState<string | null>(null);
+  const [discardConfirmOpen, setDiscardConfirmOpen] = useState(false);
   const thesisRef = useRef<HTMLDivElement>(null);
 
   const selectedAssetWatchlist = assetWatchlists.find(
@@ -278,18 +281,19 @@ export function CreatePairModal({
     onOpenChange(false);
   };
 
-  const handleDiscard = () => {
+  const runDiscard = () => {
     setThesisHtml("");
     thesisImages.forEach((img) => {
       deleteStoredImage(img.path).catch(() => undefined);
     });
     setThesisImages([]);
     setError("");
+    setDiscardConfirmOpen(false);
     onOpenChange(false);
   };
 
-
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         showClose={true}
@@ -502,10 +506,7 @@ export function CreatePairModal({
                     </button>
                     <button
                       type="button"
-                      onClick={async () => {
-                        setThesisImages((prev) => prev.filter((p) => p.path !== img.path));
-                        await deleteStoredImage(img.path).catch(() => undefined);
-                      }}
+                      onClick={() => setImagePendingRemove(img.path)}
                       className="absolute -top-2 -right-2 rounded-full bg-red-500 text-white text-xs w-5 h-5 flex items-center justify-center shadow"
                       aria-label="Remove image"
                       title="Remove image"
@@ -526,7 +527,7 @@ export function CreatePairModal({
           <div className="flex justify-end gap-2 pt-2 border-t border-sidebar-border">
             <button
               type="button"
-              onClick={handleDiscard}
+              onClick={() => setDiscardConfirmOpen(true)}
               className="rounded-lg border border-sidebar-border px-4 py-2 text-sm font-medium text-dashboard-foreground hover:bg-sidebar-hover transition-colors"
             >
               Discard
@@ -559,5 +560,37 @@ export function CreatePairModal({
         )}
       </DialogContent>
     </Dialog>
+
+    <ConfirmDeleteDialog
+      open={imagePendingRemove != null}
+      onOpenChange={(o) => !o && setImagePendingRemove(null)}
+      title="Remove this thesis image?"
+      description="It will be removed from this draft and deleted from storage."
+      details={imagePendingRemove ? `Storage path: ${imagePendingRemove}` : undefined}
+      confirmLabel="Remove image"
+      onConfirm={async () => {
+        if (imagePendingRemove) {
+          const path = imagePendingRemove;
+          setThesisImages((prev) => prev.filter((p) => p.path !== path));
+          await deleteStoredImage(path).catch(() => undefined);
+        }
+      }}
+    />
+    <ConfirmDeleteDialog
+      open={discardConfirmOpen}
+      onOpenChange={setDiscardConfirmOpen}
+      title="Discard this watchlist pair draft?"
+      description="You will lose any unsaved pair and thesis. Uploaded images still in this draft will be deleted from storage."
+      details={[
+        `Pair: ${baseAsset.toUpperCase()} / ${quoteAsset.toUpperCase()}`,
+        `Mode: ${mode === "edit" ? "Edit" : "Create"}`,
+        `Thesis images in draft: ${thesisImages.length}`,
+      ].join("\n")}
+      confirmLabel="Discard"
+      onConfirm={async () => {
+        runDiscard();
+      }}
+    />
+    </>
   );
 }

@@ -1,10 +1,11 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsNotEmpty, IsString, IsOptional, IsArray } from 'class-validator';
+import { IsNotEmpty, IsString, IsOptional, IsArray, ValidateIf } from 'class-validator';
 
 export class CreateGlobalAnalysisDto {
-  @ApiProperty({ description: 'Analysis notes (HTML or plain text)' })
-  @IsString()
+  @ApiProperty({ description: 'Analysis notes (HTML or plain text); optional when images are provided' })
+  @ValidateIf((o: CreateGlobalAnalysisDto) => !o.images?.length)
   @IsNotEmpty()
+  @IsString()
   notes: string;
 
   @ApiPropertyOptional({ description: 'Array of image paths', type: [String] })

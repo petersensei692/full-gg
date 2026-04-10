@@ -8,6 +8,7 @@ import type { EventImpact } from "@/types/calendar";
 import { useWatchlistCalendar } from "@/context/WatchlistCalendarContext";
 import { assetCalendarService } from "@/lib/api";
 import { CreateEventModal } from "./CreateEventModal";
+import { ConfirmDeleteDialog } from "@/components/ui/ConfirmDeleteDialog";
 
 interface EconomicEventsViewProps {
   asset: AssetConfig;
@@ -156,6 +157,7 @@ export function EconomicEventsView({
   const [editingEvent, setEditingEvent] = useState<Event | null>(null);
   const [calendarDropdownOpen, setCalendarDropdownOpen] = useState(false);
   const [eventModalOpen, setEventModalOpen] = useState(false);
+  const [pendingEventDelete, setPendingEventDelete] = useState<Event | null>(null);
   const { createEvent, updateEvent, refetchAll } = useWatchlistCalendar();
   const handleEventSubmit = async (dto: {
     assetCalendarId?: string;
@@ -356,7 +358,7 @@ export function EconomicEventsView({
                                   </button>
                                   <button
                                     type="button"
-                                    onClick={() => deleteEvent(ev.id)}
+                                    onClick={() => setPendingEventDelete(ev)}
                                     className="text-dashboard-foreground/50 hover:text-red-400 transition-colors"
                                     aria-label="Delete event"
                                     title="Delete event"
@@ -392,6 +394,31 @@ export function EconomicEventsView({
           onSubmit={handleEventSubmit}
         />
       )}
+
+      <ConfirmDeleteDialog
+        open={pendingEventDelete != null}
+        onOpenChange={(o) => !o && setPendingEventDelete(null)}
+        title="Delete this economic event?"
+        details={
+          pendingEventDelete
+            ? [
+                `Name: ${pendingEventDelete.name}`,
+                `Day: ${pendingEventDelete.day} • Time: ${pendingEventDelete.time || "—"}`,
+                `Currency: ${pendingEventDelete.asset?.name ?? asset.label}`,
+                `Impact: ${pendingEventDelete.impact}`,
+                selectedAssetCalendar
+                  ? `Calendar week: ${selectedAssetCalendar.startDate} → ${selectedAssetCalendar.endDate}`
+                  : null,
+                `ID: ${pendingEventDelete.id}`,
+              ]
+                .filter(Boolean)
+                .join("\n")
+            : undefined
+        }
+        onConfirm={async () => {
+          if (pendingEventDelete) await deleteEvent(pendingEventDelete.id);
+        }}
+      />
     </div>
   );
 }

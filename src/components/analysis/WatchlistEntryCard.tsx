@@ -6,6 +6,26 @@ import { useWatchlistCalendar } from "@/context/WatchlistCalendarContext";
 import { getImageUrl } from "@/lib/imageUrls";
 import { Check, Trash2 } from "lucide-react";
 import { WatchlistFocusDialog } from "./WatchlistFocusDialog";
+import { ConfirmDeleteDialog } from "@/components/ui/ConfirmDeleteDialog";
+
+function watchItemDeleteDetails(entry: WatchItem): string {
+  const wl =
+    entry.watchlist ??
+    entry.baseAssetWatchlist?.weeklyWatchlist ??
+    entry.quoteAssetWatchlist?.weeklyWatchlist ??
+    null;
+  const week =
+    wl != null
+      ? `${wl.startDate} → ${wl.endDate}`
+      : "—";
+  return [
+    `Pair: ${entry.pairName}`,
+    `Bias: ${entry.bias}`,
+    `Watchlist week: ${week}`,
+    `Thesis images: ${entry.thesis?.images?.length ?? 0}`,
+    `ID: ${entry.id}`,
+  ].join("\n");
+}
 
 interface WatchlistEntryCardProps {
   entry: WatchItem;
@@ -19,6 +39,7 @@ const BORDER_CLASS = {
 
 export function WatchlistEntryCard({ entry, onEdit }: WatchlistEntryCardProps) {
   const [focusOpen, setFocusOpen] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState<WatchItem | null>(null);
   const { deleteWatchItem, updateWatchItem } = useWatchlistCalendar();
 
   const bias = (entry.bias as "bullish" | "bearish") ?? "bullish";
@@ -70,7 +91,7 @@ export function WatchlistEntryCard({ entry, onEdit }: WatchlistEntryCardProps) {
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
-                deleteWatchItem(entry.id);
+                setPendingDelete(entry);
               }}
               className="text-dashboard-foreground/50 hover:text-red-400 transition-colors p-1"
               aria-label="Delete watch item"
@@ -120,6 +141,16 @@ export function WatchlistEntryCard({ entry, onEdit }: WatchlistEntryCardProps) {
           onEdit?.();
         }}
         onDelete={() => setFocusOpen(false)}
+      />
+
+      <ConfirmDeleteDialog
+        open={pendingDelete != null}
+        onOpenChange={(o) => !o && setPendingDelete(null)}
+        title="Delete this watchlist pair?"
+        details={pendingDelete ? watchItemDeleteDetails(pendingDelete) : undefined}
+        onConfirm={async () => {
+          if (pendingDelete) await deleteWatchItem(pendingDelete.id);
+        }}
       />
     </>
   );

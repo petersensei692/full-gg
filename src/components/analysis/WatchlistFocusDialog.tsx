@@ -7,6 +7,23 @@ import { useWatchlistCalendar } from "@/context/WatchlistCalendarContext";
 import { deleteStoredImage } from "@/lib/imageUpload";
 import { getImageUrl } from "@/lib/imageUrls";
 import { Trash2, X } from "lucide-react";
+import { ConfirmDeleteDialog } from "@/components/ui/ConfirmDeleteDialog";
+
+function watchItemDeleteDetails(entry: WatchItem): string {
+  const wl =
+    entry.watchlist ??
+    entry.baseAssetWatchlist?.weeklyWatchlist ??
+    entry.quoteAssetWatchlist?.weeklyWatchlist ??
+    null;
+  const week = wl != null ? `${wl.startDate} → ${wl.endDate}` : "—";
+  return [
+    `Pair: ${entry.pairName}`,
+    `Bias: ${entry.bias}`,
+    `Watchlist week: ${week}`,
+    `Thesis images: ${entry.thesis?.images?.length ?? 0}`,
+    `ID: ${entry.id}`,
+  ].join("\n");
+}
 
 interface WatchlistFocusDialogProps {
   entry: WatchItem | null;
@@ -33,6 +50,12 @@ export function WatchlistFocusDialog({
   const [saveError, setSaveError] = useState<string | null>(null);
   const { deleteWatchItem, updateWatchItem } = useWatchlistCalendar();
   const [entryToShow, setEntryToShow] = useState<WatchItem | null>(null);
+  const [pendingDeleteEntry, setPendingDeleteEntry] = useState<WatchItem | null>(null);
+  const [pendingDeleteImage, setPendingDeleteImage] = useState<{
+    path: string;
+    pairName: string;
+    caption: string;
+  } | null>(null);
 
   useEffect(() => {
     if (entry && open) {
@@ -106,20 +129,13 @@ export function WatchlistFocusDialog({
     await deleteStoredImage(path).catch(() => undefined);
   };
 
-  const handleDelete = () => {
-    if (!displayEntry) return;
-    deleteWatchItem(displayEntry.id);
-    onOpenChange(false);
-    onDelete?.(displayEntry);
-  };
-
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent
           showClose
           containToMain
-          className={`bg-sidebar border border-sidebar-border rounded-xl w-full max-w-[min(56rem,calc(100vw-280px))] max-h-[85dvh] flex flex-col overflow-hidden p-0 min-w-0 ${BORDER_CLASS[bias]}`}
+          className={`bg-sidebar border border-sidebar-border rounded-xl w-full max-w-[min(56rem,calc(100dvw-var(--sidebar-width,0px)-2rem))] max-h-[85dvh] flex flex-col overflow-hidden p-0 min-w-0 ${BORDER_CLASS[bias]}`}
         >
           {showContent && displayEntry && (
           <>
@@ -152,7 +168,7 @@ export function WatchlistFocusDialog({
               )}
               <button
                 type="button"
-                onClick={handleDelete}
+                onClick={() => displayEntry && setPendingDeleteEntry(displayEntry)}
                 className="rounded p-2 text-dashboard-foreground/60 hover:bg-red-500/20 hover:text-red-400 transition-colors"
                 aria-label="Delete watch item"
                 title="Delete watch item"
@@ -229,7 +245,13 @@ export function WatchlistFocusDialog({
                         </button>
                         <button
                           type="button"
-                          onClick={() => handleDeleteImage(path)}
+                          onClick={() =>
+                            setPendingDeleteImage({
+                              path,
+                              pairName: displayEntry.pairName,
+                              caption: displayName || fallbackLabel,
+                            })
+                          }
                           className="absolute top-2 right-2 rounded-full bg-red-500 text-white w-7 h-7 flex items-center justify-center shadow hover:bg-red-600 transition-colors"
                           aria-label="Delete image"
                           title="Delete image"
@@ -273,6 +295,40 @@ export function WatchlistFocusDialog({
           </DialogContent>
         </Dialog>
       )}
+
+      <ConfirmDeleteDialog
+        open={pendingDeleteEntry != null}
+        onOpenChange={(o) => !o && setPendingDeleteEntry(null)}
+        title="Delete this watchlist pair?"
+        details={pendingDeleteEntry ? watchItemDeleteDetails(pendingDeleteEntry) : undefined}
+        onConfirm={async () => {
+          const e = pendingDeleteEntry;
+          if (e) {
+            await deleteWatchItem(e.id);
+            onOpenChange(false);
+            onDelete?.(e);
+          }
+        }}
+      />
+      <ConfirmDeleteDialog
+        open={pendingDeleteImage != null}
+        onOpenChange={(o) => !o && setPendingDeleteImage(null)}
+        title="Remove this thesis image?"
+        description="The image will be removed from this pair and deleted from storage."
+        details={
+          pendingDeleteImage
+            ? [
+                `Pair: ${pendingDeleteImage.pairName}`,
+                `Caption: ${pendingDeleteImage.caption}`,
+                `Storage path: ${pendingDeleteImage.path}`,
+              ].join("\n")
+            : undefined
+        }
+        confirmLabel="Remove image"
+        onConfirm={async () => {
+          if (pendingDeleteImage) await handleDeleteImage(pendingDeleteImage.path);
+        }}
+      />
     </>
   );
 }

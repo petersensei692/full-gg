@@ -5,6 +5,8 @@ import { Bold, Italic, Underline, PenSquare, Check, ChevronDown } from "lucide-r
 import { useImagePaste } from "@/hooks/useImagePaste";
 import { Dialog, DialogContent } from "@/components/ui/Dialog";
 import { deleteStoredImage } from "@/lib/imageUpload";
+import { ConfirmDeleteDialog } from "@/components/ui/ConfirmDeleteDialog";
+import { isHtmlEffectivelyEmpty } from "@/lib/html-empty";
 import type { AssetConfig } from "@/types/asset";
 
 const ASSET_TYPE_ORDER = ["currency", "commodity", "stocks", "crypto", "bond"] as const;
@@ -60,10 +62,15 @@ export function PostGlobalAnalysisInput({
   const [analysisType, setAnalysisType] = useState<string>("daily");
   const [assetsDropdownOpen, setAssetsDropdownOpen] = useState(false);
   const [images, setImages] = useState<Array<{ path: string; url: string }>>([]);
+  const [, setEditorBump] = useState(0);
+  const [imagePendingRemove, setImagePendingRemove] = useState<string | null>(null);
 
   const { handlePaste } = useImagePaste({
     editorRef,
-    onImageReady: (img) => setImages((prev) => [...prev, img]),
+    onImageReady: (img) => {
+      setImages((prev) => [...prev, img]);
+      setEditorBump((n) => n + 1);
+    },
   });
 
   const toggleAsset = useCallback((id: string) => {
@@ -122,8 +129,8 @@ export function PostGlobalAnalysisInput({
   }, []);
 
   const handleCreate = useCallback(() => {
-    const html = editorRef.current?.innerHTML?.trim() ?? "";
-    if (!html && images.length === 0) return;
+    const html = editorRef.current?.innerHTML ?? "";
+    if (isHtmlEffectivelyEmpty(html) && images.length === 0) return;
     const scope: "global" | string[] =
       scopeMode === "global" ? "global" : Array.from(selectedAssetIds);
     if (scopeMode === "assets" && scope.length === 0) return;
@@ -135,13 +142,17 @@ export function PostGlobalAnalysisInput({
     });
     if (editorRef.current) editorRef.current.innerHTML = "";
     setImages([]);
+    setEditorBump((n) => n + 1);
   }, [scopeMode, selectedAssetIds, analysisType, onCreated, images]);
 
-  const canCreate =
-    scopeMode === "global" ||
-    (scopeMode === "assets" && selectedAssetIds.size > 0);
+  const scopeOk =
+    scopeMode === "global" || (scopeMode === "assets" && selectedAssetIds.size > 0);
+  const hasBody =
+    !isHtmlEffectivelyEmpty(editorRef.current?.innerHTML ?? "") || images.length > 0;
+  const canCreate = scopeOk && hasBody;
 
   return (
+    <>
     <div className="rounded-xl border border-sidebar-border bg-sidebar/50 p-3 mt-6">
       <div
         ref={editorRef}
@@ -151,6 +162,7 @@ export function PostGlobalAnalysisInput({
         role="textbox"
         aria-multiline="true"
         onPaste={handlePaste}
+        onInput={() => setEditorBump((n) => n + 1)}
         onClick={handleEditorClick}
         className="min-h-[82px] max-h-[123px] overflow-y-auto w-full min-w-0 rounded-lg border border-sidebar-border bg-header-input px-3 py-2.5 text-sm text-dashboard-foreground placeholder:text-dashboard-foreground/50 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary break-words [&:empty::before]:content-[attr(data-placeholder)] [&:empty::before]:text-dashboard-foreground/50 [&_*]:break-words [&_img]:max-w-[50%] [&_img]:w-[50%] [&_img]:h-auto [&_img]:object-contain [&_img]:rounded-lg [&_img]:cursor-pointer [&_img]:block [&_img]:my-2 [&_h1]:text-xl [&_h1]:font-bold [&_h2]:text-lg [&_h2]:font-semibold [&_h3]:text-base [&_h3]:font-medium [&_u]:underline"
         suppressContentEditableWarning
@@ -392,10 +404,7 @@ export function PostGlobalAnalysisInput({
               </button>
               <button
                 type="button"
-                onClick={async () => {
-                  setImages((prev) => prev.filter((p) => p.path !== img.path));
-                  await deleteStoredImage(img.path).catch(() => undefined);
-                }}
+                onClick={() => setImagePendingRemove(img.path)}
                 className="absolute -top-2 -right-2 rounded-full bg-red-500 text-white text-xs w-5 h-5 flex items-center justify-center shadow"
                 aria-label="Remove image"
               >
@@ -416,5 +425,23 @@ export function PostGlobalAnalysisInput({
         </Dialog>
       )}
     </div>
+
+    <ConfirmDeleteDialog
+      open={imagePendingRemove != null}
+      onOpenChange={(o) => !o && setImagePendingRemove(null)}
+      title="Remove this image?"
+      description="It will be removed from this draft and deleted from storage."
+      details={imagePendingRemove ? `Storage path: ${imagePendingRemove}` : undefined}
+      confirmLabel="Remove image"
+      onConfirm={async () => {
+        if (imagePendingRemove) {
+          const path = imagePendingRemove;
+          setImages((prev) => prev.filter((p) => p.path !== path));
+          setEditorBump((n) => n + 1);
+          await deleteStoredImage(path).catch(() => undefined);
+        }
+      }}
+    />
+    </>
   );
 }

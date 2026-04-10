@@ -9,7 +9,13 @@ import { StreamEntry as StreamEntryComponent } from "./analysis/StreamEntry";
 import { PostGlobalAnalysisInput } from "./PostGlobalAnalysisInput";
 import { EditAnalysisModal } from "./analysis/EditAnalysisModal";
 import { DateRangePicker, type DateRange } from "./analysis/DateRangePicker";
-import { ChevronUp, ChevronDown } from "lucide-react";
+import { ChevronUp, ChevronDown, Star } from "lucide-react";
+import {
+  deserializeDateRangeFromStorage,
+  saveGlobalAnalysisStreamFilters,
+  loadGlobalAnalysisStreamFilters,
+  serializeDateRangeForStorage,
+} from "@/lib/analysis-stream-filters";
 
 const ANALYSIS_TYPE_TO_TAG: Record<
   string,
@@ -66,6 +72,7 @@ export function GlobalAnalysisView() {
   const [list, setList] = useState<GlobalAnalysis[]>([]);
   const [loading, setLoading] = useState(true);
   const [analysisFilter, setAnalysisFilter] = useState<string>("all");
+  const [favoritesOnly, setFavoritesOnly] = useState(false);
   const [dateRange, setDateRange] = useState<DateRange>(null);
   const [editing, setEditing] = useState<GlobalAnalysis | null>(null);
   const [editModalOpen, setEditModalOpen] = useState(false);
@@ -73,6 +80,31 @@ export function GlobalAnalysisView() {
   const entryRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const streamScrollRef = useRef<HTMLDivElement | null>(null);
   const didInitialAutoScrollRef = useRef(false);
+  const filtersHydratedRef = useRef(false);
+  const skipNextFilterPersistRef = useRef(true);
+
+  useEffect(() => {
+    const stored = loadGlobalAnalysisStreamFilters();
+    if (stored) {
+      setAnalysisFilter(stored.analysisFilter);
+      setFavoritesOnly(stored.favoritesOnly);
+      setDateRange(deserializeDateRangeFromStorage(stored.dateRange));
+    }
+    filtersHydratedRef.current = true;
+  }, []);
+
+  useEffect(() => {
+    if (!filtersHydratedRef.current) return;
+    if (skipNextFilterPersistRef.current) {
+      skipNextFilterPersistRef.current = false;
+      return;
+    }
+    saveGlobalAnalysisStreamFilters({
+      analysisFilter,
+      favoritesOnly,
+      dateRange: serializeDateRangeForStorage(dateRange),
+    });
+  }, [analysisFilter, favoritesOnly, dateRange]);
 
   const fetchList = useCallback(async () => {
     setLoading(true);
@@ -164,6 +196,15 @@ export function GlobalAnalysisView() {
     [list]
   );
 
+  const handleToggleFavorite = useCallback(async (id: string, next: boolean) => {
+    try {
+      const updated = await globalAnalysisService.update(id, { favorite: next });
+      setList((prev) => prev.map((g) => (g.id === id ? { ...g, ...updated } : g)));
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
   const mappedEntries = useMemo((): StreamEntry[] => {
     const entries = list.map((ga) => {
       const createdAt = new Date(ga.createdAt).getTime();
@@ -186,6 +227,7 @@ export function GlobalAnalysisView() {
         images: imageList,
         imageNames,
         scopeLabel: ga.scopeDisplay,
+        favorite: ga.favorite ?? false,
       };
     });
     /** Oldest first, newest at bottom (same as asset analysis stream) */
@@ -217,8 +259,11 @@ export function GlobalAnalysisView() {
         return t >= startMs && t <= endMs;
       });
     }
+    if (favoritesOnly) {
+      entries = entries.filter((e) => e.favorite);
+    }
     return entries;
-  }, [mappedEntries, analysisFilter, dateRange]);
+  }, [mappedEntries, analysisFilter, dateRange, favoritesOnly]);
 
   const entriesWithGroups = useMemo(() => {
     let lastWeekKey: string | undefined;
@@ -293,6 +338,20 @@ export function GlobalAnalysisView() {
               </option>
             ))}
           </select>
+          <button
+            type="button"
+            onClick={() => setFavoritesOnly((v) => !v)}
+            className={`shrink-0 rounded-lg border p-2 transition-colors ${
+              favoritesOnly
+                ? "border-sky-500 bg-sky-500/15 text-sky-500"
+                : "border-sidebar-border bg-sidebar text-dashboard-foreground/70 hover:bg-sidebar-hover hover:text-dashboard-foreground"
+            }`}
+            aria-pressed={favoritesOnly}
+            title={favoritesOnly ? "Show all analyses" : "Show favorites only"}
+            aria-label={favoritesOnly ? "Show all analyses" : "Show favorites only"}
+          >
+            <Star className={`h-4 w-4 ${favoritesOnly ? "fill-current" : ""}`} />
+          </button>
           <DateRangePicker value={dateRange} onChange={setDateRange} />
         </div>
         <div className="flex-1 flex flex-col min-h-0 w-full">
@@ -324,6 +383,9 @@ export function GlobalAnalysisView() {
                           const ga = list.find((g) => g.id === entry.id);
                           if (ga) handleEdit(ga);
                         }}
+                        onToggleFavorite={() =>
+                          handleToggleFavorite(entry.id, !entry.favorite)
+                        }
                       />
                     </div>
                   ))

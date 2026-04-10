@@ -420,6 +420,7 @@ export interface Analysis {
   scopeLabel?: string | null;
   /** Set when this analysis was created from a global analysis; edit/delete only from Global Analysis page */
   globalAnalysisId?: string | null;
+  favorite?: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -437,6 +438,7 @@ export interface UpdateAnalysisDto {
   notes?: string;
   images?: string[] | null;
   imageNames?: string[] | null;
+  favorite?: boolean;
 }
 
 /** Global analysis (template applied to one or more assets) */
@@ -448,6 +450,7 @@ export interface GlobalAnalysis {
   scope: "global" | string[];
   scopeDisplay: string;
   analysisType?: string;
+  favorite?: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -469,6 +472,7 @@ export interface UpdateGlobalAnalysisDto {
   analysisType?: string;
   /** When set and different from current scope, child analyses are recreated for the new assets */
   scope?: "global" | string[];
+  favorite?: boolean;
 }
 
 export type NoteTier = "tier_1" | "tier_2" | "tier_3";

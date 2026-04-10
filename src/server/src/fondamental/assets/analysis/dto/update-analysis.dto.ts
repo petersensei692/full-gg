@@ -1,5 +1,5 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsOptional, IsString, IsArray, IsUUID } from 'class-validator';
+import { IsOptional, IsString, IsArray, IsUUID, IsBoolean } from 'class-validator';
 
 export class UpdateAnalysisDto {
   @ApiPropertyOptional({ description: 'Asset UUID (change which asset this analysis belongs to)' })
@@ -23,4 +23,9 @@ export class UpdateAnalysisDto {
   @IsArray()
   @IsString({ each: true })
   imageNames?: string[] | null;
+
+  @ApiPropertyOptional({ description: 'Starred on the asset analysis stream (allowed even for global-originated copies)' })
+  @IsOptional()
+  @IsBoolean()
+  favorite?: boolean;
 }

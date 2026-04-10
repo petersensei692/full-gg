@@ -1,5 +1,5 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsOptional, IsString, IsArray } from 'class-validator';
+import { IsOptional, IsString, IsArray, IsBoolean } from 'class-validator';
 
 /** Scope: "global" or list of asset UUIDs (same shape as create). */
 export class UpdateGlobalAnalysisDto {
@@ -31,4 +31,9 @@ export class UpdateGlobalAnalysisDto {
   })
   @IsOptional()
   scope?: 'global' | string[];
+
+  @ApiPropertyOptional({ description: 'Starred in the global analysis stream' })
+  @IsOptional()
+  @IsBoolean()
+  favorite?: boolean;
 }

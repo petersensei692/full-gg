@@ -45,6 +45,9 @@ export class Analysis {
   @Column({ type: 'varchar', length: 36, name: 'global_analysis_id', nullable: true })
   globalAnalysisId: string | null;
 
+  @Column({ type: 'boolean', default: false })
+  favorite: boolean;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 

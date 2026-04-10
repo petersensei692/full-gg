@@ -18,6 +18,7 @@ import {
   Globe,
   Coins,
   Menu,
+  House,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useState, useCallback, useMemo, useEffect } from "react";
@@ -208,8 +209,26 @@ export function Sidebar({
         )}
       </div>
 
-      {/* Nav: Assets (expandable), Global Analysis, Watch List, Calendar, Notes, Settings */}
+      {/* Nav: Main menu (home), then section links */}
       <nav className="flex-1 overflow-y-auto py-3">
+        <div className={`mb-2 ${isExpanded ? "px-2" : "px-2 flex justify-center"}`}>
+          <Link
+            href="/"
+            onClick={() => onOverlayClose?.()}
+            className={`flex items-center rounded-lg text-sm font-medium transition-colors ${
+              isExpanded ? "gap-2.5 px-3 py-2.5 w-full" : "h-10 w-10 justify-center"
+            } ${
+              pathname === "/"
+                ? "bg-primary/15 text-primary"
+                : "text-sidebar-foreground hover:bg-sidebar-hover"
+            }`}
+            title="Main Menu"
+            aria-label="Main Menu — choose Fundamental or Analytics"
+          >
+            <House className={`shrink-0 ${isExpanded ? "h-4 w-4" : "h-5 w-5"}`} />
+            {isExpanded && "Main Menu"}
+          </Link>
+        </div>
         <ul className={`space-y-0.5 ${isExpanded ? "px-2" : "px-2 flex flex-col items-center"}`}>
           {topLevelNav.map((item) => {
             const isActive = (() => {

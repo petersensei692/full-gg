@@ -8,6 +8,7 @@ import { WatchlistEntryCard } from "@/components/analysis/WatchlistEntryCard";
 import { CreatePairModal } from "@/components/analysis/CreatePairModal";
 import { useAssets } from "@/context/AssetsContext";
 import { WeeklyCalendarModal } from "@/components/analysis/WeeklyCalendarModal";
+import { ConfirmDeleteDialog } from "@/components/ui/ConfirmDeleteDialog";
 
 const DISPLAY_OPTIONS = [
   { value: "1", label: "Latest" },
@@ -52,6 +53,7 @@ export function WatchListView() {
   const [editItemOpen, setEditItemOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<WatchItem | null>(null);
   const [createWatchlistModalOpen, setCreateWatchlistModalOpen] = useState(false);
+  const [pendingWatchlistDelete, setPendingWatchlistDelete] = useState<WeeklyWatchlist | null>(null);
 
   const sortedCalendars = useMemo(
     () =>
@@ -197,7 +199,7 @@ export function WatchListView() {
                       </button>
                       <button
                         type="button"
-                        onClick={() => deleteWeeklyWatchlist(cal.id)}
+                        onClick={() => setPendingWatchlistDelete(cal)}
                         className="text-dashboard-foreground/50 hover:text-red-400 transition-colors p-1"
                         aria-label="Delete watchlist"
                         title="Delete watchlist"
@@ -233,6 +235,23 @@ export function WatchListView() {
         </div>
       </div>
     </div>
+    <ConfirmDeleteDialog
+      open={pendingWatchlistDelete != null}
+      onOpenChange={(o) => !o && setPendingWatchlistDelete(null)}
+      title="Delete this weekly watchlist?"
+      description="All pairs in this watchlist will be removed. This cannot be undone."
+      details={
+        pendingWatchlistDelete
+          ? [
+              `Week: ${formatDateRange(pendingWatchlistDelete.startDate, pendingWatchlistDelete.endDate)}`,
+              `ID: ${pendingWatchlistDelete.id}`,
+            ].join("\n")
+          : undefined
+      }
+      onConfirm={async () => {
+        if (pendingWatchlistDelete) await deleteWeeklyWatchlist(pendingWatchlistDelete.id);
+      }}
+    />
     <WeeklyCalendarModal
       open={createWatchlistModalOpen}
       onOpenChange={setCreateWatchlistModalOpen}

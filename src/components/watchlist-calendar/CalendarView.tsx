@@ -7,6 +7,7 @@ import { CreateEventModal } from "@/components/analysis/CreateEventModal";
 import type { WeeklyCalendar, Event } from "@/types/api";
 import type { EventImpact } from "@/types/calendar";
 import { WeeklyCalendarModal } from "@/components/analysis/WeeklyCalendarModal";
+import { ConfirmDeleteDialog } from "@/components/ui/ConfirmDeleteDialog";
 
 const DISPLAY_OPTIONS = [
   { value: "1", label: "Latest" },
@@ -88,6 +89,11 @@ export function CalendarView() {
   const [editEventOpen, setEditEventOpen] = useState(false);
   const [editingEvent, setEditingEvent] = useState<Event | null>(null);
   const [createCalendarModalOpen, setCreateCalendarModalOpen] = useState(false);
+  const [pendingCalendarDelete, setPendingCalendarDelete] = useState<WeeklyCalendar | null>(null);
+  const [pendingEventDelete, setPendingEventDelete] = useState<{
+    ev: Event;
+    calendarWeek: string;
+  } | null>(null);
 
   const sortedCalendars = useMemo(
     () =>
@@ -237,7 +243,7 @@ export function CalendarView() {
                       </button>
                       <button
                         type="button"
-                        onClick={() => deleteWeeklyCalendar(cal.id)}
+                        onClick={() => setPendingCalendarDelete(cal)}
                         className="text-dashboard-foreground/50 hover:text-red-400 transition-colors p-1"
                         aria-label="Delete calendar"
                         title="Delete calendar"
@@ -351,7 +357,12 @@ export function CalendarView() {
                                             </button>
                                             <button
                                               type="button"
-                                              onClick={() => deleteEvent(ev.id)}
+                                              onClick={() =>
+                                                setPendingEventDelete({
+                                                  ev,
+                                                  calendarWeek: formatDateRange(cal.startDate, cal.endDate),
+                                                })
+                                              }
                                               className="text-dashboard-foreground/50 hover:text-red-400 transition-colors"
                                               aria-label="Delete event"
                                               title="Delete event"
@@ -398,6 +409,43 @@ export function CalendarView() {
         await updateWeeklyCalendar(editingCalendar.id, dto);
         setEditModalOpen(false);
         setEditingCalendar(null);
+      }}
+    />
+    <ConfirmDeleteDialog
+      open={pendingCalendarDelete != null}
+      onOpenChange={(o) => !o && setPendingCalendarDelete(null)}
+      title="Delete this weekly calendar?"
+      description="All events linked to this calendar will be removed. This cannot be undone."
+      details={
+        pendingCalendarDelete
+          ? [
+              `Week: ${formatDateRange(pendingCalendarDelete.startDate, pendingCalendarDelete.endDate)}`,
+              `ID: ${pendingCalendarDelete.id}`,
+            ].join("\n")
+          : undefined
+      }
+      onConfirm={async () => {
+        if (pendingCalendarDelete) await deleteWeeklyCalendar(pendingCalendarDelete.id);
+      }}
+    />
+    <ConfirmDeleteDialog
+      open={pendingEventDelete != null}
+      onOpenChange={(o) => !o && setPendingEventDelete(null)}
+      title="Delete this economic event?"
+      details={
+        pendingEventDelete
+          ? [
+              `Name: ${pendingEventDelete.ev.name}`,
+              `Day: ${pendingEventDelete.ev.day} • Time: ${pendingEventDelete.ev.time || "—"}`,
+              `Currency: ${pendingEventDelete.ev.asset?.name ?? "—"}`,
+              `Impact: ${pendingEventDelete.ev.impact}`,
+              `Calendar week: ${pendingEventDelete.calendarWeek}`,
+              `ID: ${pendingEventDelete.ev.id}`,
+            ].join("\n")
+          : undefined
+      }
+      onConfirm={async () => {
+        if (pendingEventDelete) await deleteEvent(pendingEventDelete.ev.id);
       }}
     />
     <CreateEventModal

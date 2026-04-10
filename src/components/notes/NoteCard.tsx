@@ -5,6 +5,19 @@ import type { Note, NoteTier } from "@/types/api";
 import { getImageUrl } from "@/lib/imageUrls";
 import { Trash2 } from "lucide-react";
 import { NoteFocusDialog } from "./NoteFocusDialog";
+import { ConfirmDeleteDialog } from "@/components/ui/ConfirmDeleteDialog";
+
+function formatNoteDeleteDetails(note: Note): string {
+  const lines = [
+    `Title: ${note.title}`,
+    `Type: ${note.type ?? "—"}`,
+    `Tier: ${note.tier ?? "—"}`,
+    `Images: ${note.images?.length ?? 0}`,
+    `Updated: ${new Date(note.updatedAt).toLocaleString()}`,
+    `ID: ${note.id}`,
+  ];
+  return lines.join("\n");
+}
 
 const TIER_BORDER: Record<NoteTier, string> = {
   tier_1: "border-l-4 border-l-red-500 border border-sidebar-border",
@@ -15,11 +28,12 @@ const TIER_BORDER: Record<NoteTier, string> = {
 interface NoteCardProps {
   note: Note;
   onEdit?: (note: Note) => void;
-  onDelete?: (note: Note) => void;
+  onDelete?: (note: Note) => void | Promise<void>;
 }
 
 export function NoteCard({ note, onEdit, onDelete }: NoteCardProps) {
   const [focusOpen, setFocusOpen] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState<Note | null>(null);
   const tier = (note.tier ?? "tier_2") as NoteTier;
   const borderClass = TIER_BORDER[tier] ?? TIER_BORDER.tier_2;
   const firstImage = note.images?.[0];
@@ -48,7 +62,7 @@ export function NoteCard({ note, onEdit, onDelete }: NoteCardProps) {
                 type="button"
                 onClick={(e) => {
                   e.stopPropagation();
-                  onDelete(note);
+                  setPendingDelete(note);
                 }}
                 className="text-dashboard-foreground/50 hover:text-red-400 transition-colors p-1"
                 aria-label="Delete note"
@@ -94,9 +108,18 @@ export function NoteCard({ note, onEdit, onDelete }: NoteCardProps) {
           setFocusOpen(false);
           onEdit?.(n);
         }}
-        onDelete={(n) => {
-          setFocusOpen(false);
-          onDelete?.(n);
+        onDelete={onDelete}
+      />
+
+      <ConfirmDeleteDialog
+        open={pendingDelete != null}
+        onOpenChange={(o) => !o && setPendingDelete(null)}
+        title="Delete this note?"
+        details={pendingDelete ? formatNoteDeleteDetails(pendingDelete) : undefined}
+        onConfirm={async () => {
+          const n = pendingDelete;
+          if (n && onDelete) await Promise.resolve(onDelete(n));
+          setPendingDelete(null);
         }}
       />
     </>

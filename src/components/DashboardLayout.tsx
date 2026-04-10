@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { Sidebar } from "./Sidebar";
 import { SidebarTrigger } from "./SidebarTrigger";
@@ -21,6 +21,16 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
   const isAssetAnalysisPage =
     pathname === "/fundamental-analysis/asset" ||
     !!pathname?.match(/^\/fundamental-analysis\/[^/]+$/);
+
+  /** Radix dialogs portal to `body`; expose width so `containToMain` can center in the main column. */
+  useEffect(() => {
+    const px =
+      !isDesktop ? 0 : collapsed ? 64 : 260;
+    document.documentElement.style.setProperty("--sidebar-width", `${px}px`);
+    return () => {
+      document.documentElement.style.removeProperty("--sidebar-width");
+    };
+  }, [isDesktop, collapsed]);
 
   return (
     <SidebarContextProvider openOverlay={() => setOverlayOpen(true)}>

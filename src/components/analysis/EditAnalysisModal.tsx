@@ -6,6 +6,7 @@ import { Bold, Italic, Underline, Check, ChevronDown } from "lucide-react";
 import { useImagePaste } from "@/hooks/useImagePaste";
 import { getImageUrl } from "@/lib/imageUrls";
 import { deleteStoredImage } from "@/lib/imageUpload";
+import { ConfirmDeleteDialog } from "@/components/ui/ConfirmDeleteDialog";
 import type { AssetConfig } from "@/types/asset";
 
 const ANALYSIS_TYPES = [
@@ -75,6 +76,7 @@ export function EditAnalysisModal({
   const [selectedAssetIds, setSelectedAssetIds] = useState<Set<string>>(new Set());
   const [assetsDropdownOpen, setAssetsDropdownOpen] = useState(false);
   const [scopeError, setScopeError] = useState("");
+  const [imagePendingRemove, setImagePendingRemove] = useState<string | null>(null);
 
   const assetsWithIds = useMemo(
     () => (globalScopeEditor?.assets ?? []).filter((a) => !!a.id),
@@ -196,6 +198,7 @@ export function EditAnalysisModal({
   const showScope = !!globalScopeEditor;
 
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         showClose={true}
@@ -379,10 +382,7 @@ export function EditAnalysisModal({
                     />
                     <button
                       type="button"
-                      onClick={async () => {
-                        setImages((prev) => prev.filter((p) => p !== path));
-                        await deleteStoredImage(path).catch(() => undefined);
-                      }}
+                      onClick={() => setImagePendingRemove(path)}
                       className="absolute -top-2 -right-2 rounded-full bg-red-500 text-white text-xs w-5 h-5 flex items-center justify-center shadow"
                       aria-label="Remove image"
                       title="Remove image"
@@ -413,5 +413,22 @@ export function EditAnalysisModal({
         </div>
       </DialogContent>
     </Dialog>
+
+    <ConfirmDeleteDialog
+      open={imagePendingRemove != null}
+      onOpenChange={(o) => !o && setImagePendingRemove(null)}
+      title="Remove this image?"
+      description="It will be removed from this draft and deleted from storage. Save the analysis to persist changes."
+      details={imagePendingRemove ? `Storage path: ${imagePendingRemove}` : undefined}
+      confirmLabel="Remove image"
+      onConfirm={async () => {
+        if (imagePendingRemove) {
+          const path = imagePendingRemove;
+          setImages((prev) => prev.filter((p) => p !== path));
+          await deleteStoredImage(path).catch(() => undefined);
+        }
+      }}
+    />
+    </>
   );
 }

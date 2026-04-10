@@ -38,6 +38,8 @@ export interface StreamEntry {
   analysisType?: string;
   /** Scope label: "GLOBAL", "USD•EUR•...", or single asset name for asset analysis */
   scopeLabel?: string | null;
+  /** Starred in the analysis stream */
+  favorite?: boolean;
 }
 
 export interface AssetSnapshot {

@@ -5,6 +5,8 @@ import { Bold, Italic, Underline, PenSquare } from "lucide-react";
 import { useImagePaste } from "@/hooks/useImagePaste";
 import { Dialog, DialogContent } from "@/components/ui/Dialog";
 import { deleteStoredImage } from "@/lib/imageUpload";
+import { ConfirmDeleteDialog } from "@/components/ui/ConfirmDeleteDialog";
+import { isHtmlEffectivelyEmpty } from "@/lib/html-empty";
 
 interface PostAnalysisInputProps {
   placeholder: string;
@@ -25,10 +27,15 @@ export function PostAnalysisInput({ placeholder, onCreated }: PostAnalysisInputP
   const [zoomedImageSrc, setZoomedImageSrc] = useState<string | null>(null);
   const [analysisType, setAnalysisType] = useState<string>("daily");
   const [images, setImages] = useState<Array<{ path: string; url: string }>>([]);
+  const [, setEditorBump] = useState(0);
+  const [imagePendingRemove, setImagePendingRemove] = useState<string | null>(null);
 
   const { handlePaste } = useImagePaste({
     editorRef,
-    onImageReady: (img) => setImages((prev) => [...prev, img]),
+    onImageReady: (img) => {
+      setImages((prev) => [...prev, img]);
+      setEditorBump((n) => n + 1);
+    },
   });
 
   const applyFormat = useCallback((command: "bold" | "italic" | "underline") => {
@@ -55,8 +62,8 @@ export function PostAnalysisInput({ placeholder, onCreated }: PostAnalysisInputP
   }, []);
 
   const handleCreate = useCallback(() => {
-    const html = editorRef.current?.innerHTML?.trim() ?? "";
-    if (!html && images.length === 0) return;
+    const html = editorRef.current?.innerHTML ?? "";
+    if (isHtmlEffectivelyEmpty(html) && images.length === 0) return;
     onCreated?.({
       notes: html,
       images: images.map((img) => img.path),
@@ -69,6 +76,7 @@ export function PostAnalysisInput({ placeholder, onCreated }: PostAnalysisInputP
   }, [analysisType, onCreated, images]);
 
   return (
+    <>
     <div className="rounded-xl border border-sidebar-border bg-sidebar/50 p-3 mt-6">
       <div
         ref={editorRef}
@@ -79,6 +87,7 @@ export function PostAnalysisInput({ placeholder, onCreated }: PostAnalysisInputP
         aria-multiline="true"
         aria-placeholder={placeholder}
         onPaste={handlePaste}
+        onInput={() => setEditorBump((n) => n + 1)}
         onClick={handleEditorClick}
         className="min-h-[82px] max-h-[123px] overflow-y-auto w-full min-w-0 rounded-lg border border-sidebar-border bg-header-input px-3 py-2.5 text-sm text-dashboard-foreground placeholder:text-dashboard-foreground/50 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary break-words [&:empty::before]:content-[attr(data-placeholder)] [&:empty::before]:text-dashboard-foreground/50 [&_*]:break-words [&_img]:max-w-[50%] [&_img]:w-[50%] [&_img]:h-auto [&_img]:object-contain [&_img]:rounded-lg [&_img]:cursor-pointer [&_img]:block [&_img]:my-2 [&_h1]:text-xl [&_h1]:font-bold [&_h2]:text-lg [&_h2]:font-semibold [&_h3]:text-base [&_h3]:font-medium [&_u]:underline"
         suppressContentEditableWarning
@@ -173,7 +182,10 @@ export function PostAnalysisInput({ placeholder, onCreated }: PostAnalysisInputP
           <button
             type="button"
             onClick={handleCreate}
-            className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
+            disabled={
+              isHtmlEffectivelyEmpty(editorRef.current?.innerHTML ?? "") && images.length === 0
+            }
+            className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:pointer-events-none"
           >
             <PenSquare className="h-4 w-4" />
             Create
@@ -198,10 +210,7 @@ export function PostAnalysisInput({ placeholder, onCreated }: PostAnalysisInputP
               </button>
               <button
                 type="button"
-                onClick={async () => {
-                  setImages((prev) => prev.filter((p) => p.path !== img.path));
-                  await deleteStoredImage(img.path).catch(() => undefined);
-                }}
+                onClick={() => setImagePendingRemove(img.path)}
                 className="absolute -top-2 -right-2 rounded-full bg-red-500 text-white text-xs w-5 h-5 flex items-center justify-center shadow"
                 aria-label="Remove image"
                 title="Remove image"
@@ -227,5 +236,23 @@ export function PostAnalysisInput({ placeholder, onCreated }: PostAnalysisInputP
         </Dialog>
       )}
     </div>
+
+    <ConfirmDeleteDialog
+      open={imagePendingRemove != null}
+      onOpenChange={(o) => !o && setImagePendingRemove(null)}
+      title="Remove this image?"
+      description="It will be removed from this draft and deleted from storage."
+      details={imagePendingRemove ? `Storage path: ${imagePendingRemove}` : undefined}
+      confirmLabel="Remove image"
+      onConfirm={async () => {
+        if (imagePendingRemove) {
+          const path = imagePendingRemove;
+          setImages((prev) => prev.filter((p) => p.path !== path));
+          setEditorBump((n) => n + 1);
+          await deleteStoredImage(path).catch(() => undefined);
+        }
+      }}
+    />
+    </>
   );
 }

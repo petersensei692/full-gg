@@ -129,6 +129,20 @@ export class GlobalAnalysisService {
     const ga = await this.globalAnalysisRepository.findOne({ where: { id } });
     if (!ga) throw new NotFoundException(`Global analysis with id ${id} not found`);
 
+    const onlyFavorite =
+      dto.favorite !== undefined &&
+      dto.notes === undefined &&
+      dto.images === undefined &&
+      dto.imageNames === undefined &&
+      dto.analysisType === undefined &&
+      dto.scope === undefined;
+
+    if (onlyFavorite) {
+      ga.favorite = dto.favorite as boolean;
+      const saved = await this.globalAnalysisRepository.save(ga);
+      return { ...saved, scopeDisplay: await this.getScopeDisplay(saved.scope) };
+    }
+
     const scopeChanged =
       dto.scope !== undefined && !this.scopesEqual(ga.scope, dto.scope);
 
@@ -148,6 +162,7 @@ export class GlobalAnalysisService {
       if (dto.images !== undefined) ga.images = dto.images;
       if (dto.imageNames !== undefined) ga.imageNames = dto.imageNames;
       if (dto.analysisType !== undefined) ga.analysisType = dto.analysisType;
+      if (dto.favorite !== undefined) ga.favorite = dto.favorite;
       ga.scope = nextScope;
       const saved = await this.globalAnalysisRepository.save(ga);
 
@@ -176,6 +191,7 @@ export class GlobalAnalysisService {
     if (dto.images !== undefined) ga.images = dto.images;
     if (dto.imageNames !== undefined) ga.imageNames = dto.imageNames;
     if (dto.analysisType !== undefined) ga.analysisType = dto.analysisType;
+    if (dto.favorite !== undefined) ga.favorite = dto.favorite;
     const saved = await this.globalAnalysisRepository.save(ga);
 
     const notesForChildren = this.addAnalysisTypeMarker(

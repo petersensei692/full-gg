@@ -10,6 +10,7 @@ import { usePersistedTradeFilters } from "@/lib/usePersistedTradeFilters";
 import { filtersActive } from "@/lib/trade-filters";
 import type { TradesQueryParams } from "@/lib/services/trades.service";
 import { TradeFiltersDrawer } from "@/components/analytics/TradeFiltersDrawer";
+import { ConfirmDeleteDialog } from "@/components/ui/ConfirmDeleteDialog";
 import { uploadImageBlob } from "@/lib/imageUpload";
 import { getImageUrl } from "@/lib/imageUrls";
 import { useAssets } from "@/context/AssetsContext";
@@ -88,8 +89,46 @@ const FALLBACK_TRADES: Trade[] = [
   },
 ];
 
-function Cell({ children, className = "" }: { children: React.ReactNode; className?: string }) {
-  return <td className={`whitespace-nowrap px-5 py-4 text-sm text-dashboard-foreground ${className}`}>{children}</td>;
+/** Sticky column widths (px) — keep in sync with `<th>` min-widths (actions: two 32px buttons + gap + padding) */
+const TRADE_STICKY = { date: 168, actions: 92, pair: 150, type: 110 } as const;
+const TRADE_LEFT = {
+  actions: TRADE_STICKY.date,
+  pair: TRADE_STICKY.date + TRADE_STICKY.actions,
+  type: TRADE_STICKY.date + TRADE_STICKY.actions + TRADE_STICKY.pair,
+} as const;
+
+function Cell({
+  children,
+  className = "",
+  style,
+}: {
+  children: React.ReactNode;
+  className?: string;
+  style?: React.CSSProperties;
+}) {
+  return (
+    <td
+      className={`whitespace-nowrap px-5 py-4 text-sm text-dashboard-foreground ${className}`}
+      style={style}
+    >
+      {children}
+    </td>
+  );
+}
+
+function formatTradeDeleteDetails(trade: Trade): string {
+  const close = getLatestClosePrice(trade);
+  const lines = [
+    `Pair: ${trade.pair}`,
+    `Side: ${trade.type.toUpperCase()}`,
+    `Status: ${trade.status}`,
+    `Execution: ${formatDateTime(trade.executionTime)} @ ${trade.executionPrice}`,
+    `TP: ${trade.tpPrice}  |  SL: ${getActualSl(trade)}`,
+    close != null ? `Last close: ${close}` : null,
+    `R targeted: ${formatTargetedR(trade.profitFactorTargeted)}  |  R earned: ${trade.profitFactorEarned.totalEarned.toFixed(2)}`,
+    `Created: ${formatCreatedAt(trade.createdAt)}`,
+  ].filter(Boolean) as string[];
+  return lines.join("\n");
 }
 
 function getLatestClosePrice(trade: Trade): number | null {
@@ -185,6 +224,7 @@ export default function AnalyticsTradesPage() {
   const [noteEditNames, setNoteEditNames] = useState<string[]>([]);
   const [pairOptionsFromApi, setPairOptionsFromApi] = useState<string[]>([]);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [tradePendingDelete, setTradePendingDelete] = useState<Trade | null>(null);
 
   useEffect(() => {
     if (!selectedTrade) return;
@@ -508,26 +548,87 @@ export default function AnalyticsTradesPage() {
             onApply={persistTradeFilters}
           />
 
-          <div className="rounded-xl border border-sidebar-border bg-sidebar">
-            <div className="overflow-x-auto scrollbar-hide">
-              <table className="min-w-[1480px] w-full border-collapse">
+          <ConfirmDeleteDialog
+            open={tradePendingDelete != null}
+            onOpenChange={(open) => !open && setTradePendingDelete(null)}
+            title="Delete this trade?"
+            description="The trade and its journal data will be removed permanently."
+            details={tradePendingDelete ? formatTradeDeleteDetails(tradePendingDelete) : undefined}
+            onConfirm={async () => {
+              const trade = tradePendingDelete;
+              if (!trade) return;
+              setDeletingId(trade.id);
+              try {
+                await tradesApi.delete(trade.id);
+                const remainingOnPage = trades.filter((t) => t.id !== trade.id).length;
+                setTrades((prev) => (Array.isArray(prev) ? prev : []).filter((t) => t.id !== trade.id));
+                setTotal((t) => Math.max(0, t - 1));
+                if (remainingOnPage === 0 && page > 1) {
+                  setPage((p) => Math.max(1, p - 1));
+                }
+                if (selectedTrade?.id === trade.id) {
+                  setPanelOpen(false);
+                  setSelectedTrade(null);
+                }
+                setTradePendingDelete(null);
+              } catch (e) {
+                window.alert(e instanceof Error ? e.message : "Could not delete trade. Try again.");
+              } finally {
+                setDeletingId(null);
+              }
+            }}
+          />
+
+          <div className="rounded-xl border border-sidebar-border bg-sidebar flex flex-col min-h-0">
+            <div className="isolate overflow-auto max-h-[min(70vh,calc(100dvh-13rem))] scrollbar-hide">
+              <table className="min-w-[1500px] w-full border-collapse">
                 <thead>
-                  <tr className="border-b border-sidebar-border bg-header/50">
-                    <th className="min-w-[168px] px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-header-muted">
+                  <tr className="border-b border-sidebar-border">
+                    <th
+                      style={{ left: 0, width: TRADE_STICKY.date, minWidth: TRADE_STICKY.date }}
+                      className="sticky top-0 z-[45] min-w-[168px] max-w-[168px] bg-sidebar px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-header-muted shadow-[4px_0_8px_-4px_rgba(0,0,0,0.18)]"
+                    >
                       Date &amp; Time
                     </th>
-                    <th className="min-w-[4.5rem] px-2 py-3 text-left text-xs font-semibold uppercase tracking-wide text-header-muted">
+                    <th
+                      style={{ left: TRADE_LEFT.actions, width: TRADE_STICKY.actions, minWidth: TRADE_STICKY.actions }}
+                      className="sticky top-0 z-[45] bg-sidebar px-2 py-3 text-center text-xs font-semibold uppercase tracking-wide text-header-muted shadow-[4px_0_8px_-4px_rgba(0,0,0,0.18)]"
+                    >
                       <span className="sr-only">Open / delete</span>
                     </th>
-                    <th className="min-w-[150px] px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-header-muted">Pair</th>
-                    <th className="min-w-[110px] px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-header-muted">Type</th>
-                    <th className="min-w-[130px] px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-header-muted">Entry Price</th>
-                    <th className="min-w-[120px] px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-header-muted">TP Price</th>
-                    <th className="min-w-[120px] px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-header-muted">SL Price</th>
-                    <th className="min-w-[130px] px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-header-muted">Close Price</th>
-                    <th className="min-w-[120px] px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-header-muted">R Targeted</th>
-                    <th className="min-w-[120px] px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-header-muted">R Earned</th>
-                    <th className="min-w-[130px] px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-header-muted">Status</th>
+                    <th
+                      style={{ left: TRADE_LEFT.pair, width: TRADE_STICKY.pair, minWidth: TRADE_STICKY.pair }}
+                      className="sticky top-0 z-[45] min-w-[150px] bg-sidebar px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-header-muted shadow-[4px_0_8px_-4px_rgba(0,0,0,0.18)]"
+                    >
+                      Pair
+                    </th>
+                    <th
+                      style={{ left: TRADE_LEFT.type, width: TRADE_STICKY.type, minWidth: TRADE_STICKY.type }}
+                      className="sticky top-0 z-[45] min-w-[110px] bg-sidebar px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-header-muted shadow-[4px_0_8px_-4px_rgba(0,0,0,0.18)]"
+                    >
+                      Type
+                    </th>
+                    <th className="sticky top-0 z-[30] min-w-[130px] bg-sidebar px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-header-muted">
+                      Entry Price
+                    </th>
+                    <th className="sticky top-0 z-[30] min-w-[120px] bg-sidebar px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-header-muted">
+                      TP Price
+                    </th>
+                    <th className="sticky top-0 z-[30] min-w-[120px] bg-sidebar px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-header-muted">
+                      SL Price
+                    </th>
+                    <th className="sticky top-0 z-[30] min-w-[130px] bg-sidebar px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-header-muted">
+                      Close Price
+                    </th>
+                    <th className="sticky top-0 z-[30] min-w-[120px] bg-sidebar px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-header-muted">
+                      R Targeted
+                    </th>
+                    <th className="sticky top-0 z-[30] min-w-[120px] bg-sidebar px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-header-muted">
+                      R Earned
+                    </th>
+                    <th className="sticky top-0 z-[30] min-w-[130px] bg-sidebar px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-header-muted">
+                      Status
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
@@ -541,10 +642,18 @@ export default function AnalyticsTradesPage() {
                     rows.map((trade) => {
                       const closePrice = getLatestClosePrice(trade);
                       return (
-                        <tr key={trade.id} className="border-b border-sidebar-border/70 hover:bg-header/40">
-                          <Cell className="whitespace-nowrap text-xs text-header-muted">{formatCreatedAt(trade.createdAt)}</Cell>
-                          <Cell className="min-w-[4.5rem] px-2">
-                            <div className="flex items-center gap-1">
+                        <tr key={trade.id} className="group border-b border-sidebar-border/70 hover:bg-sidebar-hover">
+                          <Cell
+                            style={{ left: 0, width: TRADE_STICKY.date, minWidth: TRADE_STICKY.date }}
+                            className="sticky z-[25] max-w-[168px] bg-sidebar shadow-[4px_0_8px_-4px_rgba(0,0,0,0.18)] whitespace-nowrap text-xs text-header-muted group-hover:bg-sidebar-hover"
+                          >
+                            {formatCreatedAt(trade.createdAt)}
+                          </Cell>
+                          <Cell
+                            style={{ left: TRADE_LEFT.actions, width: TRADE_STICKY.actions, minWidth: TRADE_STICKY.actions }}
+                            className="sticky z-[25] bg-sidebar px-2 shadow-[4px_0_8px_-4px_rgba(0,0,0,0.18)] group-hover:bg-sidebar-hover"
+                          >
+                            <div className="flex items-center justify-center gap-1.5">
                               <button
                                 type="button"
                                 onClick={() => {
@@ -552,7 +661,7 @@ export default function AnalyticsTradesPage() {
                                   setPanelOpen(true);
                                   setPanelTab("metrics");
                                 }}
-                                className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-primary/40 bg-primary/10 text-[11px] text-primary transition-colors hover:bg-primary/20"
+                                className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-primary/50 bg-primary/15 text-xs font-semibold text-primary transition-colors hover:bg-primary/25"
                                 aria-label={`Open trade journal for ${trade.pair}`}
                               >
                                 ↗
@@ -561,55 +670,43 @@ export default function AnalyticsTradesPage() {
                                 <button
                                   type="button"
                                   disabled={deletingId === trade.id}
-                                  onClick={async () => {
-                                    if (
-                                      !window.confirm(
-                                        `Delete trade ${trade.pair} (${trade.type})? This cannot be undone.`,
-                                      )
-                                    ) {
-                                      return;
-                                    }
-                                    setDeletingId(trade.id);
-                                    try {
-                                      await tradesApi.delete(trade.id);
-                                      const remainingOnPage = trades.filter((t) => t.id !== trade.id).length;
-                                      setTrades((prev) => (Array.isArray(prev) ? prev : []).filter((t) => t.id !== trade.id));
-                                      setTotal((t) => Math.max(0, t - 1));
-                                      if (remainingOnPage === 0 && page > 1) {
-                                        setPage((p) => Math.max(1, p - 1));
-                                      }
-                                      if (selectedTrade?.id === trade.id) {
-                                        setPanelOpen(false);
-                                        setSelectedTrade(null);
-                                      }
-                                    } catch (e) {
-                                      window.alert(
-                                        e instanceof Error ? e.message : "Could not delete trade. Try again.",
-                                      );
-                                    } finally {
-                                      setDeletingId(null);
-                                    }
-                                  }}
-                                  className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-rose-500/40 bg-rose-500/10 text-rose-400 transition-colors hover:bg-rose-500/20 disabled:opacity-50"
+                                  onClick={() => setTradePendingDelete(trade)}
+                                  className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-rose-500/55 bg-rose-500/15 text-rose-400 transition-colors hover:bg-rose-500/25 disabled:opacity-50"
                                   aria-label={`Delete trade ${trade.pair}`}
                                   title="Delete trade"
                                 >
-                                  <Trash2 className="h-3.5 w-3.5" />
+                                  <Trash2 className="h-4 w-4" />
                                 </button>
                               )}
                             </div>
                           </Cell>
-                          <Cell className="font-medium">{trade.pair}</Cell>
-                          <Cell className="uppercase">{trade.type}</Cell>
-                          <Cell>{trade.executionPrice}</Cell>
-                          <Cell>{trade.tpPrice}</Cell>
-                          <Cell>{getActualSl(trade)}</Cell>
-                          <Cell>{closePrice ?? "-"}</Cell>
-                          <Cell>{formatTargetedR(trade.profitFactorTargeted)}</Cell>
-                          <Cell className={trade.profitFactorEarned.totalEarned >= 0 ? "text-primary" : "text-rose-400"}>
+                          <Cell
+                            style={{ left: TRADE_LEFT.pair, width: TRADE_STICKY.pair, minWidth: TRADE_STICKY.pair }}
+                            className="sticky z-[25] bg-sidebar font-medium shadow-[4px_0_8px_-4px_rgba(0,0,0,0.18)] group-hover:bg-sidebar-hover"
+                          >
+                            {trade.pair}
+                          </Cell>
+                          <Cell
+                            style={{ left: TRADE_LEFT.type, width: TRADE_STICKY.type, minWidth: TRADE_STICKY.type }}
+                            className="sticky z-[25] bg-sidebar uppercase shadow-[4px_0_8px_-4px_rgba(0,0,0,0.18)] group-hover:bg-sidebar-hover"
+                          >
+                            {trade.type}
+                          </Cell>
+                          <Cell className="relative z-0 bg-sidebar group-hover:bg-sidebar-hover">{trade.executionPrice}</Cell>
+                          <Cell className="relative z-0 bg-sidebar group-hover:bg-sidebar-hover">{trade.tpPrice}</Cell>
+                          <Cell className="relative z-0 bg-sidebar group-hover:bg-sidebar-hover">{getActualSl(trade)}</Cell>
+                          <Cell className="relative z-0 bg-sidebar group-hover:bg-sidebar-hover">{closePrice ?? "-"}</Cell>
+                          <Cell className="relative z-0 bg-sidebar group-hover:bg-sidebar-hover">
+                            {formatTargetedR(trade.profitFactorTargeted)}
+                          </Cell>
+                          <Cell
+                            className={`relative z-0 bg-sidebar group-hover:bg-sidebar-hover ${
+                              trade.profitFactorEarned.totalEarned >= 0 ? "text-primary" : "text-rose-400"
+                            }`}
+                          >
                             {trade.profitFactorEarned.totalEarned.toFixed(2)}
                           </Cell>
-                          <Cell>
+                          <Cell className="relative z-0 bg-sidebar group-hover:bg-sidebar-hover">
                             <div className="flex flex-wrap items-center gap-2">
                               <span className="rounded-md border border-sidebar-border bg-header px-2 py-1 text-xs capitalize">
                                 {trade.status}

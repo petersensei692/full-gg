@@ -48,7 +48,8 @@ function formatRange(range: DateRange): string {
 function getDaysInMonth(year: number, month: number): Date[] {
   const first = new Date(year, month, 1);
   const last = new Date(year, month + 1, 0);
-  const startPad = (first.getDay() + 6) % 7;
+  /** Align with Sun–Sat headers (was Monday-first padding, which shifted every date one weekday left). */
+  const startPad = first.getDay();
   const days: Date[] = [];
   for (let i = 0; i < startPad; i++) {
     days.push(new Date(0));
@@ -193,7 +194,7 @@ export function DateRangePicker({ value, onChange, className = "" }: DateRangePi
             const isStart = draft && !isEmpty && isSameDay(d, draft.start);
             const isEnd = draft && !isEmpty && isSameDay(d, draft.end);
             const inRange = draft && !isEmpty && isInRange(d, draft.start, draft.end);
-            const isToday = isSameDay(d, new Date());
+            const isToday = isSameDay(d, today);
             return (
               <button
                 key={i}

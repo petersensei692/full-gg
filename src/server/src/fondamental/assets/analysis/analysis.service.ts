@@ -102,11 +102,27 @@ export class AnalysisService {
 
   async update(id: string, updateDto: UpdateAnalysisDto): Promise<Analysis> {
     const analysis = await this.findOne(id);
+
+    const touchesContent =
+      updateDto.assetId !== undefined ||
+      updateDto.notes !== undefined ||
+      updateDto.images !== undefined ||
+      updateDto.imageNames !== undefined;
+
+    const favoriteOnly =
+      updateDto.favorite !== undefined && !touchesContent;
+
+    if (favoriteOnly) {
+      analysis.favorite = updateDto.favorite as boolean;
+      return this.analysisRepository.save(analysis);
+    }
+
     if (analysis.globalAnalysisId) {
       throw new ForbiddenException(
         'This analysis was created from a global analysis. Edit it from the Global Analysis page.',
       );
     }
+
     if (isTradeNoteAnalysisNotes(analysis.notes)) {
       throw new ForbiddenException(
         'This entry was created from a trade note. Edit it from the trade journal (Analytics → Trades).',
@@ -124,6 +140,9 @@ export class AnalysisService {
     }
     if (updateDto.imageNames !== undefined) {
       analysis.imageNames = updateDto.imageNames;
+    }
+    if (updateDto.favorite !== undefined) {
+      analysis.favorite = updateDto.favorite;
     }
 
     return this.analysisRepository.save(analysis);

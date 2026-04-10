@@ -10,8 +10,6 @@ const DialogPortal = DialogPrimitive.Portal;
 const DialogClose = DialogPrimitive.Close;
 const DialogTitle = DialogPrimitive.Title;
 
-const SIDEBAR_WIDTH = "260px";
-
 const DialogOverlay = React.forwardRef<
   React.ComponentRef<typeof DialogPrimitive.Overlay>,
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Overlay> & {
@@ -22,7 +20,9 @@ const DialogOverlay = React.forwardRef<
   <DialogPrimitive.Overlay
     ref={ref}
     className={`fixed z-50 bg-black/90 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 ${
-      containToMain ? `left-[var(--sidebar-width,${SIDEBAR_WIDTH})] top-0 right-0 bottom-0` : "inset-0"
+      containToMain
+        ? "left-[var(--sidebar-width,0px)] top-0 right-0 bottom-0"
+        : "inset-0"
     } ${className}`}
     {...props}
   />
@@ -43,7 +43,7 @@ const DialogContent = React.forwardRef<
       ref={ref}
       className={`fixed z-50 flex max-h-[100dvh] translate-x-[-50%] translate-y-[-50%] flex-col items-center justify-center p-4 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 ${
         containToMain
-          ? "left-[calc(130px+50dvw)] top-[50%] w-full max-w-[min(56rem,calc(100vw-280px))]"
+          ? "left-[calc(50vw+var(--sidebar-width,0px)/2)] top-[50%] w-full max-w-[min(56rem,calc(100dvw-var(--sidebar-width,0px)-2rem))]"
           : "left-[50%] top-[50%] w-[100dvw] max-w-[100dvw]"
       } ${className}`}
       {...props}

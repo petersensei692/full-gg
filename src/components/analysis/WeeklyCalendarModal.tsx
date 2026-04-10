@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Dialog, DialogContent } from "@/components/ui/Dialog";
+import { FundamentalDateField, isoToUtcYmd } from "@/components/analysis/FundamentalDateField";
 import type { CreateWeeklyCalendarDto, CreateWeeklyWatchlistDto } from "@/types/api";
 
 interface WeeklyCalendarModalProps {
@@ -42,20 +43,17 @@ export function WeeklyCalendarModal({
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
 
-  const normalizeDate = (value?: string) =>
-    value ? new Date(value).toISOString().slice(0, 10) : "";
-
   useEffect(() => {
     if (open) {
-      setStartDate(normalizeDate(initialStartDate));
-      setEndDate(normalizeDate(initialEndDate));
+      setStartDate(isoToUtcYmd(initialStartDate));
+      setEndDate(isoToUtcYmd(initialEndDate));
     }
   }, [open, initialStartDate, initialEndDate]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!startDate || !endDate) return;
-    if (new Date(endDate) < new Date(startDate)) return;
+    if (endDate < startDate) return;
 
     const startIso = new Date(`${startDate}T00:00:00.000Z`).toISOString();
     const endIso = new Date(`${endDate}T23:59:59.999Z`).toISOString();
@@ -75,39 +73,22 @@ export function WeeklyCalendarModal({
           {title}
         </h3>
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label
-              htmlFor="start-date"
-              className="block text-sm font-medium text-dashboard-foreground/80 mb-1"
-            >
-              Start date
-            </label>
-            <input
-              id="start-date"
-              type="date"
-              value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
-              required
-              className="w-full rounded-lg border border-sidebar-border bg-header-input px-3 py-2 text-sm text-dashboard-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-            />
-          </div>
-          <div>
-            <label
-              htmlFor="end-date"
-              className="block text-sm font-medium text-dashboard-foreground/80 mb-1"
-            >
-              End date
-            </label>
-            <input
-              id="end-date"
-              type="date"
-              value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
-              required
-              min={startDate || undefined}
-              className="w-full rounded-lg border border-sidebar-border bg-header-input px-3 py-2 text-sm text-dashboard-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-            />
-          </div>
+          <FundamentalDateField
+            id="start-date"
+            label="Start date"
+            value={startDate}
+            onChange={(ymd) => {
+              setStartDate(ymd);
+              if (endDate && ymd && endDate < ymd) setEndDate(ymd);
+            }}
+          />
+          <FundamentalDateField
+            id="end-date"
+            label="End date"
+            value={endDate}
+            minYmd={startDate || undefined}
+            onChange={setEndDate}
+          />
           <div className="flex justify-end gap-2 pt-2">
             <button
               type="button"

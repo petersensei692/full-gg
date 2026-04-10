@@ -16,6 +16,39 @@ export type TradeFilters = {
   volumeMax: string;
 };
 
+/**
+ * Restricts typing/paste to a decimal number with at most `maxDecimals` fractional digits.
+ * Empty string allowed. Commas normalized to dots (consistent with Number() parsing elsewhere).
+ */
+export function sanitizeDecimalFilterInput(
+  raw: string,
+  options?: { allowNegative?: boolean; maxDecimals?: number },
+): string {
+  const allowNegative = options?.allowNegative ?? false;
+  const maxDecimals = options?.maxDecimals ?? 2;
+  const s = raw.replace(/,/g, ".");
+  let out = "";
+  let i = 0;
+  if (allowNegative && s[0] === "-") {
+    out = "-";
+    i = 1;
+  }
+  let hasDot = false;
+  let fracCount = 0;
+  for (; i < s.length; i++) {
+    const c = s[i];
+    if (c >= "0" && c <= "9") {
+      if (hasDot && fracCount >= maxDecimals) continue;
+      out += c;
+      if (hasDot) fracCount += 1;
+    } else if (c === "." && !hasDot) {
+      hasDot = true;
+      out += ".";
+    }
+  }
+  return out;
+}
+
 export function defaultTradeFilters(): TradeFilters {
   return {
     symbols: [],
@@ -57,16 +90,18 @@ export function saveTradeFilters(page: TradeFiltersPageKey, f: TradeFilters): vo
   localStorage.setItem(PREFIX + page, JSON.stringify(f));
 }
 
-/** Parse hold-time field: bare number = hours; or 1h30m, 90s, etc. */
+/** Parse hold-time field: bare number = hours; or 2d1h30m, 90s, etc. */
 export function parseDurationInput(s: string): number | null {
   const t = s.trim();
   if (!t) return null;
   const bare = Number(t.replace(",", "."));
-  if (Number.isFinite(bare) && bare >= 0) return bare * 3600000;
+  if (Number.isFinite(bare) && bare >= 0 && !/[dhms]/i.test(t)) return bare * 3600000;
   let ms = 0;
+  const d = t.match(/(\d+(?:\.\d+)?)\s*d/i);
   const h = t.match(/(\d+(?:\.\d+)?)\s*h/i);
   const m = t.match(/(\d+(?:\.\d+)?)\s*m/i);
   const sec = t.match(/(\d+(?:\.\d+)?)\s*s/i);
+  if (d) ms += parseFloat(d[1]) * 86400000;
   if (h) ms += parseFloat(h[1]) * 3600000;
   if (m) ms += parseFloat(m[1]) * 60000;
   if (sec) ms += parseFloat(sec[1]) * 1000;
@@ -76,6 +111,40 @@ export function parseDurationInput(s: string): number | null {
     return (parts[0] * 3600 + parts[1] * 60 + parts[2]) * 1000;
   }
   return null;
+}
+
+export function durationMsToParts(ms: number): { d: number; h: number; m: number; s: number } {
+  let sec = Math.round(ms / 1000);
+  const s = sec % 60;
+  sec = Math.floor(sec / 60);
+  const m = sec % 60;
+  sec = Math.floor(sec / 60);
+  const h = sec % 24;
+  const d = Math.floor(sec / 24);
+  return { d, h, m, s };
+}
+
+export function partsToDurationMs(d: number, h: number, m: number, s: number): number {
+  return (
+    (((Math.max(0, d) * 24 + Math.max(0, h)) * 60 + Math.max(0, m)) * 60 + Math.max(0, s)) * 1000
+  );
+}
+
+export function formatDurationMsForFilter(ms: number): string {
+  if (!Number.isFinite(ms) || ms <= 0) return "";
+  const { d, h, m, s } = durationMsToParts(ms);
+  const parts: string[] = [];
+  if (d) parts.push(`${d}d`);
+  if (h) parts.push(`${h}h`);
+  if (m) parts.push(`${m}m`);
+  if (s || parts.length === 0) parts.push(`${s}s`);
+  return parts.join("");
+}
+
+export function parseDurationInputToParts(s: string): { d: number; h: number; m: number; s: number } {
+  const ms = parseDurationInput(s);
+  if (ms == null || ms <= 0) return { d: 0, h: 0, m: 0, s: 0 };
+  return durationMsToParts(ms);
 }
 
 export function tradeHoldMs(t: { executionTime: string | null; tradeCloseTime: string | null }): number {

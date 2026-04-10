@@ -1,16 +1,29 @@
 "use client";
 
+import { useState } from "react";
 import { Dialog, DialogContent } from "@/components/ui/Dialog";
+import { ConfirmDeleteDialog } from "@/components/ui/ConfirmDeleteDialog";
 import type { Note } from "@/types/api";
 import { getImageUrl } from "@/lib/imageUrls";
 import { Trash2 } from "lucide-react";
+
+function formatNoteDeleteDetails(note: Note): string {
+  return [
+    `Title: ${note.title}`,
+    `Type: ${note.type ?? "—"}`,
+    `Tier: ${note.tier ?? "—"}`,
+    `Images: ${note.images?.length ?? 0}`,
+    `Updated: ${new Date(note.updatedAt).toLocaleString()}`,
+    `ID: ${note.id}`,
+  ].join("\n");
+}
 
 interface NoteFocusDialogProps {
   note: Note | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onEdit?: (note: Note) => void;
-  onDelete?: (note: Note) => void;
+  onDelete?: (note: Note) => void | Promise<void>;
 }
 
 export function NoteFocusDialog({
@@ -20,12 +33,15 @@ export function NoteFocusDialog({
   onEdit,
   onDelete,
 }: NoteFocusDialogProps) {
+  const [pendingDelete, setPendingDelete] = useState<Note | null>(null);
+
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         showClose
         containToMain
-        className="bg-sidebar border border-sidebar-border rounded-xl !w-[min(56rem,calc(100vw-280px))] !max-w-[min(56rem,calc(100vw-280px))] max-h-[85dvh] flex flex-col overflow-hidden p-0 min-w-0"
+        className="bg-sidebar border border-sidebar-border rounded-xl !w-[min(56rem,calc(100dvw-var(--sidebar-width,0px)-2rem))] !max-w-[min(56rem,calc(100dvw-var(--sidebar-width,0px)-2rem))] max-h-[85dvh] flex flex-col overflow-hidden p-0 min-w-0"
       >
         {note && (
         <>
@@ -81,5 +97,20 @@ export function NoteFocusDialog({
         )}
       </DialogContent>
     </Dialog>
+
+    <ConfirmDeleteDialog
+      open={pendingDelete != null}
+      onOpenChange={(o) => !o && setPendingDelete(null)}
+      title="Delete this note?"
+      details={pendingDelete ? formatNoteDeleteDetails(pendingDelete) : undefined}
+      onConfirm={async () => {
+        const n = pendingDelete;
+        if (n && onDelete) {
+          await Promise.resolve(onDelete(n));
+          onOpenChange(false);
+        }
+      }}
+    />
+    </>
   );
 }

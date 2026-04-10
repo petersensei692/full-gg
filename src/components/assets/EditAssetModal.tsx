@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Dialog, DialogContent } from "@/components/ui/Dialog";
+import { ConfirmDeleteDialog } from "@/components/ui/ConfirmDeleteDialog";
 import type { AssetWithStats } from "@/types/api";
 
 const ASSET_TYPES = [
@@ -32,6 +33,7 @@ export function EditAssetModal({
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState("");
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
 
   useEffect(() => {
     if (asset && open) {
@@ -56,13 +58,14 @@ export function EditAssetModal({
     }
   };
 
-  const handleDelete = async () => {
-    if (!asset || !confirm(`Delete asset "${asset.name}"? This cannot be undone.`)) return;
+  const runDelete = async () => {
+    if (!asset) return;
     setError("");
     setDeleting(true);
     try {
       await onDelete(asset.id);
       onOpenChange(false);
+      setConfirmDeleteOpen(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to delete");
     } finally {
@@ -73,6 +76,7 @@ export function EditAssetModal({
   if (!asset) return null;
 
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent showClose containToMain className="!max-w-md bg-sidebar border border-sidebar-border rounded-xl p-0 overflow-hidden">
         <div className="p-6">
@@ -107,11 +111,11 @@ export function EditAssetModal({
             <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
               <button
                 type="button"
-                onClick={handleDelete}
+                onClick={() => setConfirmDeleteOpen(true)}
                 disabled={deleting}
                 className="text-sm text-red-400 hover:text-red-300 disabled:opacity-50"
               >
-                {deleting ? "Deleting…" : "Delete asset"}
+                Delete asset
               </button>
               <div className="flex gap-2">
                 <button
@@ -134,5 +138,19 @@ export function EditAssetModal({
         </div>
       </DialogContent>
     </Dialog>
+
+    <ConfirmDeleteDialog
+      open={confirmDeleteOpen}
+      onOpenChange={setConfirmDeleteOpen}
+      title="Delete this asset?"
+      description="All related data for this asset may be affected. This cannot be undone."
+      details={
+        asset
+          ? [`Name: ${asset.name}`, `Type: ${asset.type ?? "—"}`, `ID: ${asset.id}`].join("\n")
+          : undefined
+      }
+      onConfirm={runDelete}
+    />
+    </>
   );
 }

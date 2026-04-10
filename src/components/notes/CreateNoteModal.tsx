@@ -5,6 +5,7 @@ import { Bold, Italic, Underline } from "lucide-react";
 import { Dialog, DialogContent } from "@/components/ui/Dialog";
 import { useImagePaste } from "@/hooks/useImagePaste";
 import { deleteStoredImage } from "@/lib/imageUpload";
+import { ConfirmDeleteDialog } from "@/components/ui/ConfirmDeleteDialog";
 import { getImageUrl } from "@/lib/imageUrls";
 import type { Note, NoteTier, NoteType } from "@/types/api";
 
@@ -51,6 +52,7 @@ export function CreateNoteModal({
   const [zoomedImageSrc, setZoomedImageSrc] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [imagePendingRemove, setImagePendingRemove] = useState<string | null>(null);
 
   const { handlePaste: handleImagePaste } = useImagePaste({
     onImageReady: (img) => setNoteImages((prev) => [...prev, img]),
@@ -199,11 +201,12 @@ export function CreateNoteModal({
   );
 
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         showClose
         containToMain
-        className="!w-[min(56rem,calc(100vw-280px))] !max-w-[min(56rem,calc(100vw-280px))] !min-w-0 min-h-[min(80dvh,36rem)] max-h-[90dvh] flex flex-col items-stretch overflow-hidden bg-sidebar border border-sidebar-border rounded-xl p-0 box-border"
+        className="!w-[min(56rem,calc(100dvw-var(--sidebar-width,0px)-2rem))] !max-w-[min(56rem,calc(100dvw-var(--sidebar-width,0px)-2rem))] !min-w-0 min-h-[min(80dvh,36rem)] max-h-[90dvh] flex flex-col items-stretch overflow-hidden bg-sidebar border border-sidebar-border rounded-xl p-0 box-border"
       >
         <div className="w-full flex flex-col flex-1 min-h-0 min-w-0 overflow-hidden">
           <div className="scrollbar-modal flex flex-col min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden w-full max-w-full p-6 space-y-5">
@@ -359,10 +362,7 @@ export function CreateNoteModal({
                     </button>
                     <button
                       type="button"
-                      onClick={async () => {
-                        setNoteImages((prev) => prev.filter((p) => p.path !== img.path));
-                        await deleteStoredImage(img.path).catch(() => undefined);
-                      }}
+                      onClick={() => setImagePendingRemove(img.path)}
                       className="absolute -top-2 -right-2 rounded-full bg-red-500 text-white text-xs w-5 h-5 flex items-center justify-center shadow"
                       aria-label="Remove image"
                       title="Remove image"
@@ -415,5 +415,22 @@ export function CreateNoteModal({
         )}
       </DialogContent>
     </Dialog>
+
+    <ConfirmDeleteDialog
+      open={imagePendingRemove != null}
+      onOpenChange={(o) => !o && setImagePendingRemove(null)}
+      title="Remove this image?"
+      description="It will be removed from this note and deleted from storage. Save the note to persist other changes."
+      details={imagePendingRemove ? `Storage path: ${imagePendingRemove}` : undefined}
+      confirmLabel="Remove image"
+      onConfirm={async () => {
+        if (imagePendingRemove) {
+          const path = imagePendingRemove;
+          setNoteImages((prev) => prev.filter((p) => p.path !== path));
+          await deleteStoredImage(path).catch(() => undefined);
+        }
+      }}
+    />
+    </>
   );
 }

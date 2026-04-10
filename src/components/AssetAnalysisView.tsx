@@ -3,7 +3,7 @@
 import { useState, useCallback, useMemo, useRef, useEffect, useLayoutEffect } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
-import { Calendar, Plus, ChevronDown, ChevronUp, Settings } from "lucide-react";
+import { Calendar, Plus, ChevronDown, ChevronUp, Settings, Star } from "lucide-react";
 import type { AssetConfig, StreamEntry } from "@/types/asset";
 import type { Analysis, AssetCalendar, AssetWatchlist, Event, WatchItem, CreateWatchItemDto } from "@/types/api";
 import { analysisService, assetCalendarService, assetWatchlistService } from "@/lib/api";
@@ -18,6 +18,12 @@ import { PostAnalysisInput } from "./analysis/PostAnalysisInput";
 import { EconomicEventsView } from "./analysis/EconomicEventsView";
 import { PairWatchlistView } from "./analysis/PairWatchlistView";
 import { DateRangePicker, type DateRange } from "./analysis/DateRangePicker";
+import {
+  deserializeDateRangeFromStorage,
+  loadAssetAnalysisStreamFilters,
+  saveAssetAnalysisStreamFilters,
+  serializeDateRangeForStorage,
+} from "@/lib/analysis-stream-filters";
 import { CreateEventModal } from "./analysis/CreateEventModal";
 import { CreatePairModal } from "./analysis/CreatePairModal";
 import { SidebarTrigger } from "./SidebarTrigger";
@@ -101,6 +107,7 @@ export function AssetAnalysisView({ asset }: AssetAnalysisViewProps) {
   const [activeTab, setActiveTab] = useState<"stream" | "events" | "watchlist">("stream");
   const [analyses, setAnalyses] = useState<Analysis[]>([]);
   const [analysisFilter, setAnalysisFilter] = useState<string>("all");
+  const [favoritesOnly, setFavoritesOnly] = useState(false);
   const [dateRange, setDateRange] = useState<DateRange>(null);
   const [editingAnalysis, setEditingAnalysis] = useState<Analysis | null>(null);
   const [editingAnalysisType, setEditingAnalysisType] = useState<string>("daily");
@@ -204,7 +211,53 @@ export function AssetAnalysisView({ asset }: AssetAnalysisViewProps) {
     setEditModalOpen(true);
   }, []);
 
+  const handleToggleFavorite = useCallback(async (analysisId: string, next: boolean) => {
+    try {
+      const updated = await analysisService.update(analysisId, { favorite: next });
+      setAnalyses((prev) => prev.map((a) => (a.id === analysisId ? updated : a)));
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
   const streamScrollRef = useRef<HTMLDivElement>(null);
+  const streamFiltersHydratedRef = useRef(false);
+  const skipNextAssetFilterPersistRef = useRef(true);
+
+  useEffect(() => {
+    streamFiltersHydratedRef.current = false;
+    skipNextAssetFilterPersistRef.current = true;
+    if (!resolvedAsset.id) {
+      setAnalysisFilter("all");
+      setFavoritesOnly(false);
+      setDateRange(null);
+      return;
+    }
+    const stored = loadAssetAnalysisStreamFilters(resolvedAsset.id);
+    if (stored) {
+      setAnalysisFilter(stored.analysisFilter);
+      setFavoritesOnly(stored.favoritesOnly);
+      setDateRange(deserializeDateRangeFromStorage(stored.dateRange));
+    } else {
+      setAnalysisFilter("all");
+      setFavoritesOnly(false);
+      setDateRange(null);
+    }
+    streamFiltersHydratedRef.current = true;
+  }, [resolvedAsset.id]);
+
+  useEffect(() => {
+    if (!resolvedAsset.id || !streamFiltersHydratedRef.current) return;
+    if (skipNextAssetFilterPersistRef.current) {
+      skipNextAssetFilterPersistRef.current = false;
+      return;
+    }
+    saveAssetAnalysisStreamFilters(resolvedAsset.id, {
+      analysisFilter,
+      favoritesOnly,
+      dateRange: serializeDateRangeForStorage(dateRange),
+    });
+  }, [resolvedAsset.id, analysisFilter, favoritesOnly, dateRange]);
 
   useEffect(() => {
     if (!resolvedAsset.id) {
@@ -351,6 +404,7 @@ export function AssetAnalysisView({ asset }: AssetAnalysisViewProps) {
           images: imageList,
           imageNames,
           scopeLabel: analysis.scopeLabel ?? resolvedAsset.label,
+          favorite: analysis.favorite ?? false,
         };
         return entry;
       })
@@ -370,8 +424,11 @@ export function AssetAnalysisView({ asset }: AssetAnalysisViewProps) {
         return t >= startMs && t <= endMs;
       });
     }
+    if (favoritesOnly) {
+      list = list.filter((e) => e.favorite);
+    }
     return list;
-  }, [mappedEntries, analysisFilter, dateRange]);
+  }, [mappedEntries, analysisFilter, dateRange, favoritesOnly]);
 
   const entriesWithGroups = useMemo(() => {
     let lastWeekKey: string | undefined;
@@ -449,6 +506,20 @@ export function AssetAnalysisView({ asset }: AssetAnalysisViewProps) {
                 </option>
               ))}
             </select>
+            <button
+              type="button"
+              onClick={() => setFavoritesOnly((v) => !v)}
+              className={`shrink-0 rounded-lg border p-2 transition-colors ${
+                favoritesOnly
+                  ? "border-sky-500 bg-sky-500/15 text-sky-500"
+                  : "border-sidebar-border bg-sidebar text-dashboard-foreground/70 hover:bg-sidebar-hover hover:text-dashboard-foreground"
+              }`}
+              aria-pressed={favoritesOnly}
+              title={favoritesOnly ? "Show all analyses" : "Show favorites only"}
+              aria-label={favoritesOnly ? "Show all analyses" : "Show favorites only"}
+            >
+              <Star className={`h-4 w-4 ${favoritesOnly ? "fill-current" : ""}`} />
+            </button>
             <DateRangePicker value={dateRange} onChange={setDateRange} />
           </div>
         )}
@@ -536,6 +607,11 @@ export function AssetAnalysisView({ asset }: AssetAnalysisViewProps) {
                         onDeleteImage={streamReadOnly ? undefined : (path) => handleDeleteImage(entry.id, path)}
                         onUpdateImageName={streamReadOnly ? undefined : (path, name) => handleUpdateImageName(entry.id, path, name)}
                         onEdit={streamReadOnly ? undefined : () => analysis && handleEditAnalysis(analysis)}
+                        onToggleFavorite={
+                          fromGlobalAnalysis
+                            ? undefined
+                            : () => handleToggleFavorite(entry.id, !entry.favorite)
+                        }
                       />
                     );
                   })}

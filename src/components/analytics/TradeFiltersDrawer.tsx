@@ -3,7 +3,14 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Coins, LineChart, X } from "lucide-react";
-import { defaultTradeFilters, type TradeFilters } from "@/lib/trade-filters";
+import {
+  defaultTradeFilters,
+  type TradeFilters,
+  formatDurationMsForFilter,
+  parseDurationInputToParts,
+  partsToDurationMs,
+  sanitizeDecimalFilterInput,
+} from "@/lib/trade-filters";
 import { uniqueCurrenciesFromPairs } from "@/lib/pair-currency-utils";
 
 type Props = {
@@ -16,6 +23,79 @@ type Props = {
 
 const PANEL_MS = 320;
 
+const DURATION_FIELDS = ["d", "h", "m", "s"] as const;
+type DurationField = (typeof DURATION_FIELDS)[number];
+
+function DurationPartsGrid({
+  parts,
+  onChange,
+}: {
+  parts: { d: number; h: number; m: number; s: number };
+  onChange: (next: { d: number; h: number; m: number; s: number }) => void;
+}) {
+  const label = (f: DurationField) =>
+    f === "d" ? "Days" : f === "h" ? "Hrs" : f === "m" ? "Min" : "Sec";
+  const maxFor = (f: DurationField) => (f === "d" ? 9999 : f === "h" ? 23 : 59);
+
+  return (
+    <div className="grid grid-cols-4 gap-2">
+      {DURATION_FIELDS.map((field) => (
+        <label key={field} className="flex min-w-0 flex-col gap-0.5">
+          <span className="truncate text-[10px] uppercase text-header-muted">{label(field)}</span>
+          <input
+            type="number"
+            min={0}
+            max={maxFor(field)}
+            value={parts[field]}
+            onChange={(e) => {
+              const v = Math.max(0, parseInt(e.target.value, 10) || 0);
+              const cap = Math.min(v, maxFor(field));
+              onChange({ ...parts, [field]: cap });
+            }}
+            className="w-full rounded-lg border border-sidebar-border bg-header px-2 py-1.5 text-sm text-header-foreground [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+          />
+        </label>
+      ))}
+    </div>
+  );
+}
+
+function HoldDurationFilters({
+  minValue,
+  maxValue,
+  onMin,
+  onMax,
+}: {
+  minValue: string;
+  maxValue: string;
+  onMin: (v: string) => void;
+  onMax: (v: string) => void;
+}) {
+  const minParts = parseDurationInputToParts(minValue);
+  const maxParts = parseDurationInputToParts(maxValue);
+  return (
+    <div className="space-y-3">
+      <p className="text-sm font-medium text-header-foreground">Hold time</p>
+      <p className="text-xs text-header-muted">Minimum</p>
+      <DurationPartsGrid
+        parts={minParts}
+        onChange={(next) => {
+          const ms = partsToDurationMs(next.d, next.h, next.m, next.s);
+          onMin(ms > 0 ? formatDurationMsForFilter(ms) : "");
+        }}
+      />
+      <p className="text-xs text-header-muted">Maximum</p>
+      <DurationPartsGrid
+        parts={maxParts}
+        onChange={(next) => {
+          const ms = partsToDurationMs(next.d, next.h, next.m, next.s);
+          onMax(ms > 0 ? formatDurationMsForFilter(ms) : "");
+        }}
+      />
+    </div>
+  );
+}
+
 function FieldPair({
   label,
   minPlaceholder,
@@ -24,6 +104,8 @@ function FieldPair({
   maxValue,
   onMin,
   onMax,
+  decimal,
+  allowNegativeDecimal,
 }: {
   label: string;
   minPlaceholder?: string;
@@ -32,22 +114,35 @@ function FieldPair({
   maxValue: string;
   onMin: (v: string) => void;
   onMax: (v: string) => void;
+  /** When true, only digits, optional decimal point, and up to 2 fractional digits. */
+  decimal?: boolean;
+  /** Only when `decimal`: allow a leading minus (e.g. negative R). */
+  allowNegativeDecimal?: boolean;
 }) {
+  const decOpts = decimal ? { allowNegative: !!allowNegativeDecimal, maxDecimals: 2 } : undefined;
   return (
     <div className="space-y-2">
       <p className="text-sm font-medium text-header-foreground">{label}</p>
       <div className="grid grid-cols-2 gap-2">
         <input
           type="text"
+          inputMode={decimal ? "decimal" : undefined}
+          autoComplete="off"
           value={minValue}
-          onChange={(e) => onMin(e.target.value)}
+          onChange={(e) =>
+            onMin(decimal ? sanitizeDecimalFilterInput(e.target.value, decOpts) : e.target.value)
+          }
           placeholder={minPlaceholder ?? "Minimum"}
           className="rounded-lg border border-sidebar-border bg-header px-3 py-2 text-sm text-header-foreground placeholder:text-header-muted/50"
         />
         <input
           type="text"
+          inputMode={decimal ? "decimal" : undefined}
+          autoComplete="off"
           value={maxValue}
-          onChange={(e) => onMax(e.target.value)}
+          onChange={(e) =>
+            onMax(decimal ? sanitizeDecimalFilterInput(e.target.value, decOpts) : e.target.value)
+          }
           placeholder={maxPlaceholder ?? "Maximum"}
           className="rounded-lg border border-sidebar-border bg-header px-3 py-2 text-sm text-header-foreground placeholder:text-header-muted/50"
         />
@@ -283,16 +378,15 @@ export function TradeFiltersDrawer({ open, onClose, symbolOptions, applied, onAp
 
             <FieldPair
               label="Profit range (R)"
+              decimal
+              allowNegativeDecimal
               minValue={draft.profitMin}
               maxValue={draft.profitMax}
               onMin={(v) => setDraft((d) => ({ ...d, profitMin: v }))}
               onMax={(v) => setDraft((d) => ({ ...d, profitMax: v }))}
             />
 
-            <FieldPair
-              label="Hold time"
-              minPlaceholder="e.g. 1h30m, 90s"
-              maxPlaceholder="Maximum"
+            <HoldDurationFilters
               minValue={draft.holdMin}
               maxValue={draft.holdMax}
               onMin={(v) => setDraft((d) => ({ ...d, holdMin: v }))}
@@ -301,6 +395,7 @@ export function TradeFiltersDrawer({ open, onClose, symbolOptions, applied, onAp
 
             <FieldPair
               label="Volume range"
+              decimal
               minValue={draft.volumeMin}
               maxValue={draft.volumeMax}
               onMin={(v) => setDraft((d) => ({ ...d, volumeMin: v }))}

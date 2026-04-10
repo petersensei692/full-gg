@@ -1,7 +1,8 @@
 import { useState } from "react";
 import type { StreamEntry as StreamEntryType } from "@/types/asset";
-import { Trash2, X } from "lucide-react";
+import { Trash2, X, Star } from "lucide-react";
 import { AnalysisImage } from "@/components/ui/AnalysisImage";
+import { ConfirmDeleteDialog } from "@/components/ui/ConfirmDeleteDialog";
 import { getImageUrl } from "@/lib/imageUrls";
 
 const TAG_COLOR_BORDER: Record<NonNullable<StreamEntryType["tagColor"]>, string> = {
@@ -33,6 +34,7 @@ interface StreamEntryProps {
   onDeleteImage?: (path: string) => void;
   onUpdateImageName?: (path: string, name: string) => void;
   onEdit?: () => void;
+  onToggleFavorite?: () => void;
 }
 
 export function StreamEntry({
@@ -44,8 +46,20 @@ export function StreamEntry({
   onDeleteImage,
   onUpdateImageName,
   onEdit,
+  onToggleFavorite,
 }: StreamEntryProps) {
   const [draftNames, setDraftNames] = useState<Record<string, string>>({});
+  const [confirmDeleteEntryOpen, setConfirmDeleteEntryOpen] = useState(false);
+  const [confirmDeleteImagePath, setConfirmDeleteImagePath] = useState<string | null>(null);
+
+  const analysisDeleteDetails = [
+    `${entry.tag} • ${entry.time}`,
+    entry.scopeLabel ? `Scope: ${entry.scopeLabel}` : null,
+    `Type: ${entry.analysisType ?? "daily"}`,
+    entry.images?.length ? `Attached images: ${entry.images.length}` : null,
+  ]
+    .filter(Boolean)
+    .join("\n");
 
   const tagColor = entry.tagColor ?? "blue";
   const borderClass = TAG_COLOR_BORDER[tagColor] ?? TAG_COLOR_BORDER.blue;
@@ -79,11 +93,23 @@ export function StreamEntry({
         <div className="flex-1 h-px bg-sidebar-border" />
       </div>
     ) : (
-      <div className="pt-3 mt-3 border-t border-sidebar-border/50" />
+      <div className="mt-2 pt-1" aria-hidden />
     );
 
+  const hasTextContent =
+    (() => {
+      try {
+        const doc = new DOMParser().parseFromString(`<div>${entry.content ?? ""}</div>`, "text/html");
+        const root = doc.body.firstElementChild;
+        return root ? (root.textContent ?? "").trim() !== "" || !!root.querySelector("img") : false;
+      } catch {
+        return (entry.content ?? "").replace(/<[^>]*>/g, "").trim() !== "";
+      }
+    })();
+
   return (
-    <article className="pb-6 last:pb-0">
+    <>
+    <article className="pb-3 last:pb-0">
       {separatorTop}
       <div
         className={`min-w-0 w-full max-w-full sm:max-w-[90%] md:max-w-[80%] lg:max-w-[70%] xl:max-w-[60%] 2xl:max-w-[50%] rounded-xl border border-sidebar-border border-l-4 ${borderClass} bg-sidebar/50 p-4 shadow-sm overflow-hidden`}
@@ -97,7 +123,21 @@ export function StreamEntry({
               </span>
             )}
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5">
+            {onToggleFavorite && (
+              <button
+                type="button"
+                onClick={onToggleFavorite}
+                className="rounded p-0.5 text-dashboard-foreground/50 hover:text-sky-400 transition-colors"
+                aria-label={entry.favorite ? "Remove from favorites" : "Add to favorites"}
+                title={entry.favorite ? "Remove from favorites" : "Add to favorites"}
+                aria-pressed={!!entry.favorite}
+              >
+                <Star
+                  className={`h-4 w-4 ${entry.favorite ? "fill-sky-500 text-sky-500" : ""}`}
+                />
+              </button>
+            )}
             {onEdit && (
               <button
                 type="button"
@@ -112,7 +152,7 @@ export function StreamEntry({
             {onDelete && (
               <button
                 type="button"
-                onClick={onDelete}
+                onClick={() => setConfirmDeleteEntryOpen(true)}
                 className="text-dashboard-foreground/50 hover:text-red-400 transition-colors"
                 aria-label="Delete analysis"
                 title="Delete analysis"
@@ -122,11 +162,13 @@ export function StreamEntry({
             )}
           </div>
         </div>
-        <div
-          className="stream-entry-content min-w-0 max-w-full break-words text-sm text-dashboard-foreground/90 leading-relaxed mb-2 [&_*]:break-words [&_*]:min-w-0 [&_*]:max-w-full [&_img]:max-w-[50%] [&_img]:w-[50%] [&_img]:max-h-[300px] [&_img]:h-auto [&_img]:object-contain [&_img]:rounded-lg [&_img]:my-2 [&_img]:cursor-pointer [&_h1]:text-xl [&_h1]:font-bold [&_h2]:text-lg [&_h2]:font-semibold [&_h3]:text-base [&_h3]:font-medium"
-          style={{ overflowWrap: "break-word" } as React.CSSProperties}
-          dangerouslySetInnerHTML={{ __html: entry.content }}
-        />
+        {hasTextContent ? (
+          <div
+            className="stream-entry-content min-w-0 max-w-full break-words text-sm text-dashboard-foreground/90 leading-relaxed mb-2 [&_*]:break-words [&_*]:min-w-0 [&_*]:max-w-full [&_img]:max-w-[50%] [&_img]:w-[50%] [&_img]:max-h-[300px] [&_img]:h-auto [&_img]:object-contain [&_img]:rounded-lg [&_img]:my-2 [&_img]:cursor-pointer [&_h1]:text-xl [&_h1]:font-bold [&_h2]:text-lg [&_h2]:font-semibold [&_h3]:text-base [&_h3]:font-medium"
+            style={{ overflowWrap: "break-word" } as React.CSSProperties}
+            dangerouslySetInnerHTML={{ __html: entry.content }}
+          />
+        ) : null}
         {entry.images && entry.images.length > 0 && (
           <div className="grid grid-cols-1 gap-4 mb-3">
             {entry.images.map((path, index) => {
@@ -167,7 +209,7 @@ export function StreamEntry({
                     {onDeleteImage && (
                       <button
                         type="button"
-                        onClick={() => onDeleteImage(path)}
+                        onClick={() => setConfirmDeleteImagePath(path)}
                         className="absolute top-2 right-2 rounded-full bg-red-500 text-white w-7 h-7 flex items-center justify-center shadow hover:bg-red-600 transition-colors"
                         aria-label="Delete image"
                         title="Delete image"
@@ -235,5 +277,40 @@ export function StreamEntry({
           )}
       </div>
     </article>
+
+    <ConfirmDeleteDialog
+      open={confirmDeleteEntryOpen}
+      onOpenChange={setConfirmDeleteEntryOpen}
+      title="Delete this analysis?"
+      details={analysisDeleteDetails}
+      onConfirm={() => {
+        onDelete?.();
+        setConfirmDeleteEntryOpen(false);
+      }}
+    />
+    <ConfirmDeleteDialog
+      open={confirmDeleteImagePath != null}
+      onOpenChange={(open) => !open && setConfirmDeleteImagePath(null)}
+      title="Remove this image?"
+      description="The image file will be removed from this analysis and deleted from storage."
+      details={
+        confirmDeleteImagePath && entry.images
+          ? (() => {
+              const ix = entry.images.indexOf(confirmDeleteImagePath);
+              const cap =
+                ix >= 0
+                  ? draftNames[confirmDeleteImagePath] ?? entry.imageNames?.[ix] ?? `Chart ${ix + 1}`
+                  : "Image";
+              return [`Caption: ${cap}`, `Storage path: ${confirmDeleteImagePath}`].join("\n");
+            })()
+          : undefined
+      }
+      confirmLabel="Remove image"
+      onConfirm={() => {
+        if (confirmDeleteImagePath) onDeleteImage?.(confirmDeleteImagePath);
+        setConfirmDeleteImagePath(null);
+      }}
+    />
+    </>
   );
 }
