@@ -124,7 +124,7 @@ export function StreamEntry({
             )}
           </div>
           <div className="flex items-center gap-1.5">
-            {onToggleFavorite && (
+            {onToggleFavorite ? (
               <button
                 type="button"
                 onClick={onToggleFavorite}
@@ -137,7 +137,15 @@ export function StreamEntry({
                   className={`h-4 w-4 ${entry.favorite ? "fill-sky-500 text-sky-500" : ""}`}
                 />
               </button>
-            )}
+            ) : entry.favorite ? (
+              <span
+                className="rounded p-0.5 text-sky-500"
+                title="Favorite — change from Global Analysis"
+                aria-label="Favorite (global analysis)"
+              >
+                <Star className="h-4 w-4 fill-sky-500 text-sky-500" />
+              </span>
+            ) : null}
             {onEdit && (
               <button
                 type="button"

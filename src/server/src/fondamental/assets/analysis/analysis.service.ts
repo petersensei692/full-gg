@@ -36,6 +36,7 @@ export class AnalysisService {
     imageNames: string[] | null,
     scopeLabel: string,
     globalAnalysisId: string,
+    favorite = false,
   ): Promise<Analysis> {
     const analysis = this.analysisRepository.create({
       assetId,
@@ -44,6 +45,7 @@ export class AnalysisService {
       imageNames,
       scopeLabel,
       globalAnalysisId,
+      favorite,
     });
     return this.analysisRepository.save(analysis);
   }
@@ -54,7 +56,12 @@ export class AnalysisService {
 
   async updateByGlobalAnalysisId(
     globalAnalysisId: string,
-    data: { notes?: string; images?: string[] | null; imageNames?: string[] | null },
+    data: {
+      notes?: string;
+      images?: string[] | null;
+      imageNames?: string[] | null;
+      favorite?: boolean;
+    },
   ): Promise<void> {
     await this.analysisRepository.update({ globalAnalysisId }, data);
   }

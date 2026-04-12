@@ -75,6 +75,7 @@ export class GlobalAnalysisService {
         imageNames,
         scopeLabel,
         saved.id,
+        saved.favorite ?? false,
       );
     }
 
@@ -140,6 +141,9 @@ export class GlobalAnalysisService {
     if (onlyFavorite) {
       ga.favorite = dto.favorite as boolean;
       const saved = await this.globalAnalysisRepository.save(ga);
+      await this.analysisService.updateByGlobalAnalysisId(id, {
+        favorite: saved.favorite,
+      });
       return { ...saved, scopeDisplay: await this.getScopeDisplay(saved.scope) };
     }
 
@@ -182,6 +186,7 @@ export class GlobalAnalysisService {
           imageNames,
           scopeLabel,
           saved.id,
+          saved.favorite ?? false,
         );
       }
       return { ...saved, scopeDisplay: scopeLabel };
@@ -202,6 +207,7 @@ export class GlobalAnalysisService {
       notes: notesForChildren,
       images: saved.images,
       imageNames: saved.imageNames,
+      favorite: saved.favorite,
     });
     return { ...saved, scopeDisplay: await this.getScopeDisplay(saved.scope) };
   }
