@@ -1,5 +1,5 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
+import { IsArray, IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
 
 export class UpdateEventDto {
   @ApiPropertyOptional({ description: 'UUID of the weekly calendar' })
@@ -13,26 +13,17 @@ export class UpdateEventDto {
   @MaxLength(50)
   day?: string;
 
-  @ApiPropertyOptional({ description: 'Time of the event', maxLength: 50 })
-  @IsOptional()
-  @IsString()
-  @MaxLength(50)
-  time?: string;
-
   @ApiPropertyOptional({ description: 'UUID of the asset' })
   @IsOptional()
   @IsUUID()
   assetId?: string;
 
-  @ApiPropertyOptional({ description: 'Event name', maxLength: 255 })
+  @ApiPropertyOptional({
+    description: 'Replace image list (e.g. data URLs)',
+    type: [String],
+  })
   @IsOptional()
-  @IsString()
-  @MaxLength(255)
-  name?: string;
-
-  @ApiPropertyOptional({ description: 'Impact level', maxLength: 100 })
-  @IsOptional()
-  @IsString()
-  @MaxLength(100)
-  impact?: string;
+  @IsArray()
+  @IsString({ each: true })
+  eventsImages?: string[];
 }

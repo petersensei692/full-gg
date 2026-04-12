@@ -21,6 +21,14 @@ export class EventsService {
     private readonly assetCalendarRepository: Repository<AssetCalendar>,
   ) {}
 
+  /** save() does not always run @AfterLoad — keep API responses consistent. */
+  private ensureEventsImages(e: Event): Event {
+    if (e.eventsImages == null || !Array.isArray(e.eventsImages)) {
+      e.eventsImages = [];
+    }
+    return e;
+  }
+
   async create(createDto: CreateEventDto): Promise<Event> {
     let calendar: WeeklyCalendar | null = null;
     let asset: Asset;
@@ -69,12 +77,10 @@ export class EventsService {
       asset,
       assetCalendar,
       day: createDto.day,
-      time: createDto.time,
-      name: createDto.name,
-      impact: createDto.impact,
+      eventsImages: createDto.eventsImages ?? [],
     });
 
-    return this.eventRepository.save(event);
+    return this.ensureEventsImages(await this.eventRepository.save(event));
   }
 
   async findAll(): Promise<Event[]> {
@@ -135,17 +141,11 @@ export class EventsService {
     if (updateDto.day !== undefined) {
       event.day = updateDto.day;
     }
-    if (updateDto.time !== undefined) {
-      event.time = updateDto.time;
-    }
-    if (updateDto.name !== undefined) {
-      event.name = updateDto.name;
-    }
-    if (updateDto.impact !== undefined) {
-      event.impact = updateDto.impact;
+    if (updateDto.eventsImages !== undefined) {
+      event.eventsImages = updateDto.eventsImages;
     }
 
-    return this.eventRepository.save(event);
+    return this.ensureEventsImages(await this.eventRepository.save(event));
   }
 
   async remove(id: string): Promise<void> {

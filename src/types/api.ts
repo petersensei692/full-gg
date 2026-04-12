@@ -101,10 +101,9 @@ export interface Event {
   calendar: WeeklyCalendar | null;
   assetCalendar: AssetCalendar | null;
   day: string;
-  time: string;
   asset: Asset;
-  name: string;
-  impact: string;
+  /** Pasted images (typically data URLs) */
+  eventsImages: string[];
   createdAt: string;
   updatedAt: string;
 }
@@ -114,20 +113,16 @@ export interface CreateEventDto {
   assetCalendarId?: string;
   calendarId?: string;
   day: string;
-  time: string;
   assetId?: string;
-  name: string;
-  impact: string;
+  eventsImages: string[];
 }
 
 /** Body for updating an event */
 export interface UpdateEventDto {
   calendarId?: string;
   day?: string;
-  time?: string;
   assetId?: string;
-  name?: string;
-  impact?: string;
+  eventsImages?: string[];
 }
 
 export interface Thesis {

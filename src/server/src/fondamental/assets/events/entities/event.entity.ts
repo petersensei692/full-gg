@@ -6,6 +6,7 @@ import {
   UpdateDateColumn,
   ManyToOne,
   JoinColumn,
+  AfterLoad,
 } from 'typeorm';
 import { WeeklyCalendar } from '../../../weekly/weekly-calendar/entities/weekly-calendar.entity';
 import { Asset } from '../../entities/asset.entity';
@@ -27,18 +28,23 @@ export class Event {
   @Column({ type: 'varchar', length: 50 })
   day: string;
 
-  @Column({ type: 'varchar', length: 50 })
-  time: string;
-
   @ManyToOne(() => Asset)
   @JoinColumn({ name: 'asset_id' })
   asset: Asset;
 
-  @Column({ type: 'varchar', length: 255 })
-  name: string;
+  /**
+   * Pasted image payloads (typically data URLs).
+   * Nullable in DB so SQLite synchronize can migrate old rows; always an array after load.
+   */
+  @Column({ type: 'simple-json', name: 'events_images', nullable: true })
+  eventsImages: string[];
 
-  @Column({ type: 'varchar', length: 100 })
-  impact: string;
+  @AfterLoad()
+  ensureEventsImages(): void {
+    if (this.eventsImages == null || !Array.isArray(this.eventsImages)) {
+      this.eventsImages = [];
+    }
+  }
 
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;

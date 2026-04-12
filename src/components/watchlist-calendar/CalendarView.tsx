@@ -4,8 +4,9 @@ import { useState, useMemo } from "react";
 import { Calendar, ChevronDown, Trash2 } from "lucide-react";
 import { useWatchlistCalendar } from "@/context/WatchlistCalendarContext";
 import { CreateEventModal } from "@/components/analysis/CreateEventModal";
+import { EventImageThumb } from "@/components/analysis/EventImageThumb";
 import type { WeeklyCalendar, Event } from "@/types/api";
-import type { EventImpact } from "@/types/calendar";
+import { sortEventsByCurrencyOrder } from "@/lib/eventCurrencySort";
 import { WeeklyCalendarModal } from "@/components/analysis/WeeklyCalendarModal";
 import { ConfirmDeleteDialog } from "@/components/ui/ConfirmDeleteDialog";
 
@@ -17,12 +18,6 @@ const DISPLAY_OPTIONS = [
   { value: "12", label: "Last 12" },
   { value: "all", label: "All" },
 ] as const;
-
-const IMPACT_DOTS: Record<EventImpact, string> = {
-  low: "bg-emerald-400",
-  medium: "bg-amber-400",
-  high: "bg-red-400",
-};
 
 function formatDateRange(start: string, end: string): string {
   const s = new Date(start).toLocaleDateString("en-US", {
@@ -119,9 +114,6 @@ export function CalendarView() {
       if (!map[calId]) map[calId] = [];
       map[calId].push(ev);
     });
-    Object.keys(map).forEach((id) => {
-      map[id].sort((a, b) => (a.time || "00:00").localeCompare(b.time || "00:00"));
-    });
     return map;
   }, [events]);
 
@@ -135,9 +127,6 @@ export function CalendarView() {
         <h1 className="text-xl font-semibold text-dashboard-foreground mb-4">
           Economic Calendar
         </h1>
-        <p className="text-sm text-dashboard-foreground/70 mb-4">
-          Create calendars and events from any asset&apos;s Economic Events tab. Each card shows all events for that week, sorted by date & time.
-        </p>
 
         <div className="flex flex-wrap items-center gap-3 mb-6">
           <button
@@ -212,17 +201,14 @@ export function CalendarView() {
                 if (!eventsByDate[date]) eventsByDate[date] = [];
                 eventsByDate[date].push(ev);
               });
-              Object.keys(eventsByDate).forEach((d) =>
-                eventsByDate[d].sort((a, b) => (a.time || "00:00").localeCompare(b.time || "00:00"))
-              );
               const daysInRange = getDaysInRange(cal.startDate, cal.endDate);
               return (
                 <div
                   key={cal.id}
                   className="rounded-xl border border-sidebar-border bg-sidebar/50 overflow-hidden shadow-sm"
                 >
-                  <div className="px-5 py-4 border-b border-sidebar-border bg-sidebar/80 grid grid-cols-[15%_12.5%_12.5%_12.5%_35%_12.5%] items-center gap-0 w-full">
-                    <div className="col-span-5 flex items-center gap-2 min-w-0">
+                  <div className="px-5 py-4 border-b border-sidebar-border bg-sidebar/80 grid grid-cols-[1fr_auto] items-center gap-2 w-full">
+                    <div className="flex items-center gap-2 min-w-0">
                       <Calendar className="h-5 w-5 shrink-0 text-primary/80" />
                       <h2 className="text-lg font-semibold text-dashboard-foreground truncate">
                         {formatDateRange(cal.startDate, cal.endDate)}
@@ -259,8 +245,10 @@ export function CalendarView() {
                       </p>
                     ) : (
                       daysInRange.map(({ date, label }) => {
-                        const dayEvents = (eventsByDate[date] ?? []).sort((a, b) =>
-                          (a.time || "00:00").localeCompare(b.time || "00:00")
+                        const dayEvents = sortEventsByCurrencyOrder(
+                          (eventsByDate[date] ?? []).filter(
+                            (ev) => (ev.eventsImages?.length ?? 0) > 0,
+                          ),
                         );
                         const today = new Date().toISOString().slice(0, 10);
                         const isToday = date === today;
@@ -284,20 +272,14 @@ export function CalendarView() {
                               <div className="overflow-x-auto">
                                 <table className="w-full text-sm table-fixed">
                                   <colgroup>
-                                    <col className="w-[15%]" />
-                                    <col className="w-[12.5%]" />
-                                    <col className="w-[12.5%]" />
-                                    <col className="w-[12.5%]" />
-                                    <col className="w-[35%]" />
-                                    <col className="w-[12.5%]" />
+                                    <col className="w-[20%]" />
+                                    <col className="w-[68%]" />
+                                    <col className="w-[12%]" />
                                   </colgroup>
                                   <thead>
                                     <tr className="border-b border-sidebar-border bg-sidebar/80 text-dashboard-foreground/70 font-medium">
-                                      <th className="py-2.5 px-2 text-left">DATE</th>
-                                      <th className="py-2.5 px-2 text-center">TIME</th>
-                                      <th className="py-2.5 px-2 text-center">CUR</th>
-                                      <th className="py-2.5 px-2 text-center">IMPACT</th>
-                                      <th className="py-2.5 px-2 text-left"></th>
+                                      <th className="py-2.5 px-2 text-left">CURRENCY</th>
+                                      <th className="py-2.5 px-2 text-left">EVENTS</th>
                                       <th className="py-2.5 px-2 text-center">DEL</th>
                                     </tr>
                                   </thead>
@@ -309,39 +291,21 @@ export function CalendarView() {
                                           i % 2 === 0 ? "bg-header-input/30" : "bg-sidebar/30"
                                         }`}
                                       >
-                                        <td className="py-2.5 px-2 text-dashboard-foreground/80 text-left">
-                                          {new Date(date + "T12:00:00").toLocaleDateString("en-US", {
-                                            weekday: "short",
-                                            month: "short",
-                                            day: "numeric",
-                                          })}
-                                        </td>
-                                        <td className="py-2.5 px-2 text-dashboard-foreground/90 tabular-nums text-center">
-                                          {ev.time || "—"}
-                                        </td>
-                                        <td className="py-2.5 px-2 text-dashboard-foreground font-medium text-center">
+                                        <td className="py-2.5 px-2 text-dashboard-foreground font-medium align-top">
                                           {ev.asset?.name ?? "—"}
                                         </td>
-                                        <td className="py-2.5 px-2 text-center">
-                                          <span
-                                            className="inline-flex gap-0.5 items-center justify-center"
-                                            title={ev.impact}
-                                          >
-                                            <span
-                                              className={`w-1.5 h-1.5 shrink-0 rounded-full ${IMPACT_DOTS[ev.impact.toLowerCase() as EventImpact]}`}
-                                            />
-                                            <span
-                                              className={`w-1.5 h-1.5 shrink-0 rounded-full ${IMPACT_DOTS[ev.impact.toLowerCase() as EventImpact]}`}
-                                            />
-                                            <span
-                                              className={`w-1.5 h-1.5 shrink-0 rounded-full ${IMPACT_DOTS[ev.impact.toLowerCase() as EventImpact]}`}
-                                            />
-                                          </span>
+                                        <td className="py-2.5 px-2 align-top min-w-0">
+                                          <div className="flex flex-wrap gap-2">
+                                            {(ev.eventsImages ?? []).map((src, imgIdx) => (
+                                              <EventImageThumb
+                                                key={`${ev.id}-img-${imgIdx}`}
+                                                src={src}
+                                                alt={`${ev.asset?.name ?? "Event"} image ${imgIdx + 1}`}
+                                              />
+                                            ))}
+                                          </div>
                                         </td>
-                                        <td className="py-2.5 px-2 text-dashboard-foreground text-left break-words" title={ev.name}>
-                                          {ev.name}
-                                        </td>
-                                        <td className="py-2.5 px-2 text-center">
+                                        <td className="py-2.5 px-2 text-center align-top">
                                           <span className="inline-flex items-center justify-center gap-1">
                                             <button
                                               type="button"
@@ -435,10 +399,9 @@ export function CalendarView() {
       details={
         pendingEventDelete
           ? [
-              `Name: ${pendingEventDelete.ev.name}`,
-              `Day: ${pendingEventDelete.ev.day} • Time: ${pendingEventDelete.ev.time || "—"}`,
+              `Day: ${pendingEventDelete.ev.day}`,
               `Currency: ${pendingEventDelete.ev.asset?.name ?? "—"}`,
-              `Impact: ${pendingEventDelete.ev.impact}`,
+              `Images: ${pendingEventDelete.ev.eventsImages?.length ?? 0}`,
               `Calendar week: ${pendingEventDelete.calendarWeek}`,
               `ID: ${pendingEventDelete.ev.id}`,
             ].join("\n")
@@ -462,7 +425,7 @@ export function CalendarView() {
       initialEvent={editingEvent ?? undefined}
       onSubmit={async (dto) => {
         if (!editingEvent) return;
-        await updateEvent(editingEvent.id, dto);
+        await updateEvent(editingEvent.id, { day: dto.day, eventsImages: dto.eventsImages });
         setEditEventOpen(false);
         setEditingEvent(null);
       }}

@@ -16,9 +16,9 @@ import { seedPairsPipsValues, seedTradesForPairs } from './database/seeds/analyt
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
-  // Increase body size limit for large notes (default ~100kb)
-  app.use(json({ limit: '10mb' }));
-  app.use(urlencoded({ extended: true, limit: '10mb' }));
+  // Large notes + economic event payloads (pasted images as data URLs)
+  app.use(json({ limit: '32mb' }));
+  app.use(urlencoded({ extended: true, limit: '32mb' }));
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,

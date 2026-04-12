@@ -1,5 +1,13 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsNotEmpty, IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
+import {
+  ArrayMinSize,
+  IsArray,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  IsUUID,
+  MaxLength,
+} from 'class-validator';
 
 export class CreateEventDto {
   @ApiPropertyOptional({
@@ -25,12 +33,6 @@ export class CreateEventDto {
   @MaxLength(50)
   day: string;
 
-  @ApiProperty({ description: 'Time of the event', example: '14:30', maxLength: 50 })
-  @IsString()
-  @IsNotEmpty()
-  @MaxLength(50)
-  time: string;
-
   @ApiPropertyOptional({
     description: 'UUID of the asset (required if assetCalendarId not provided)',
     example: '123e4567-e89b-12d3-a456-426614174000',
@@ -39,15 +41,13 @@ export class CreateEventDto {
   @IsUUID()
   assetId?: string;
 
-  @ApiProperty({ description: 'Event name', example: 'FOMC Meeting', maxLength: 255 })
-  @IsString()
-  @IsNotEmpty()
-  @MaxLength(255)
-  name: string;
-
-  @ApiProperty({ description: 'Impact level', example: 'High', maxLength: 100 })
-  @IsString()
-  @IsNotEmpty()
-  @MaxLength(100)
-  impact: string;
+  @ApiProperty({
+    description: 'Image payloads (e.g. data URLs from paste)',
+    type: [String],
+    example: ['data:image/png;base64,...'],
+  })
+  @IsArray()
+  @ArrayMinSize(1)
+  @IsString({ each: true })
+  eventsImages: string[];
 }

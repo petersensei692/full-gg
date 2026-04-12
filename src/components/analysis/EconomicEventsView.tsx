@@ -3,11 +3,12 @@
 import { useState, useMemo, useEffect } from "react";
 import { Calendar, Plus, ChevronDown, Trash2 } from "lucide-react";
 import type { AssetConfig } from "@/types/asset";
-import type { AssetCalendar, Event } from "@/types/api";
-import type { EventImpact } from "@/types/calendar";
+import type { AssetCalendar, CreateEventDto, Event } from "@/types/api";
 import { useWatchlistCalendar } from "@/context/WatchlistCalendarContext";
+import { sortEventsByCurrencyOrder } from "@/lib/eventCurrencySort";
 import { assetCalendarService } from "@/lib/api";
 import { CreateEventModal } from "./CreateEventModal";
+import { EventImageThumb } from "./EventImageThumb";
 import { ConfirmDeleteDialog } from "@/components/ui/ConfirmDeleteDialog";
 
 interface EconomicEventsViewProps {
@@ -41,30 +42,11 @@ function getDaysInRange(start: string, end: string): { date: string; label: stri
   return days;
 }
 
-const IMPACT_DOTS: Record<EventImpact, string> = {
-  low: "bg-emerald-400",
-  medium: "bg-amber-400",
-  high: "bg-red-400",
-};
-
-function getWeekdayName(date: string): string {
-  return new Date(date + "T12:00:00").toLocaleDateString("en-US", {
-    weekday: "long",
-  });
-}
-
 const todayIso = () => new Date().toISOString().slice(0, 10);
 
 /** True if the given date is strictly before today */
 function isDayPassed(date: string): boolean {
   return date < todayIso();
-}
-
-/** True if the event's datetime (date + time) is in the past */
-function isEventPassed(date: string, time: string): boolean {
-  const dateTime = `${date}T${time || "23:59"}`;
-  const eventMs = new Date(dateTime).getTime();
-  return eventMs < Date.now();
 }
 
 /** Resolve weekday (e.g. "Tuesday") to the first matching date in range (same logic as principal calendar). */
@@ -148,9 +130,6 @@ export function EconomicEventsView({
         if (!map[date]) map[date] = [];
         map[date].push(e);
       });
-    Object.keys(map).forEach((d) =>
-      map[d].sort((a, b) => (a.time || "").localeCompare(b.time || ""))
-    );
     return map;
   }, [events, selectedAssetCalendar]);
 
@@ -159,17 +138,9 @@ export function EconomicEventsView({
   const [eventModalOpen, setEventModalOpen] = useState(false);
   const [pendingEventDelete, setPendingEventDelete] = useState<Event | null>(null);
   const { createEvent, updateEvent, refetchAll } = useWatchlistCalendar();
-  const handleEventSubmit = async (dto: {
-    assetCalendarId?: string;
-    calendarId?: string;
-    day: string;
-    time: string;
-    assetId?: string;
-    name: string;
-    impact: string;
-  }) => {
+  const handleEventSubmit = async (dto: CreateEventDto) => {
     if (editingEvent) {
-      await updateEvent(editingEvent.id, { day: dto.day, time: dto.time, name: dto.name, impact: dto.impact });
+      await updateEvent(editingEvent.id, { day: dto.day, eventsImages: dto.eventsImages });
     } else {
       await createEvent(dto);
     }
@@ -254,8 +225,10 @@ export function EconomicEventsView({
                 const today = todayIso();
                 const isToday = date === today;
                 const dayPassed = isDayPassed(date);
-                const dayEvents = (eventsByDate[date] || []).sort((a, b) =>
-                  (a.time || "00:00").localeCompare(b.time || "00:00")
+                const dayEvents = sortEventsByCurrencyOrder(
+                  (eventsByDate[date] || []).filter(
+                    (ev) => (ev.eventsImages?.length ?? 0) > 0,
+                  ),
                 );
                 return (
                   <div
@@ -275,20 +248,14 @@ export function EconomicEventsView({
                     <div className="rounded-lg border border-sidebar-border overflow-hidden">
                       <table className="w-full text-sm table-fixed">
                         <colgroup>
-                          <col className="w-[15%]" />
-                          <col className="w-[12.5%]" />
-                          <col className="w-[12.5%]" />
-                          <col className="w-[12.5%]" />
-                          <col className="w-[35%]" />
-                          <col className="w-[12.5%]" />
+                          <col className="w-[20%]" />
+                          <col className="w-[68%]" />
+                          <col className="w-[12%]" />
                         </colgroup>
                         <thead>
                           <tr className="border-b border-sidebar-border bg-sidebar/80 text-dashboard-foreground/70 font-medium">
-                            <th className="py-2.5 px-2 text-left">DATE</th>
-                            <th className="py-2.5 px-2 text-center">TIME</th>
-                            <th className="py-2.5 px-2 text-center">CUR</th>
-                            <th className="py-2.5 px-2 text-center">IMPACT</th>
-                            <th className="py-2.5 px-2 text-left"></th>
+                            <th className="py-2.5 px-2 text-left">CURRENCY</th>
+                            <th className="py-2.5 px-2 text-left">EVENTS</th>
                             <th className="py-2.5 px-2 text-center">DEL</th>
                           </tr>
                         </thead>
@@ -296,80 +263,68 @@ export function EconomicEventsView({
                           {dayEvents.length === 0 ? (
                             <tr>
                               <td
-                                colSpan={6}
+                                colSpan={3}
                                 className="py-4 px-2 text-dashboard-foreground/50 text-center"
                               >
                                 No events
                               </td>
                             </tr>
                           ) : (
-                            dayEvents.map((ev, i) => {
-                              const eventPassed = isEventPassed(date, ev.time || "");
-                              return (
-                                <tr
-                                  key={ev.id}
-                                  className={`border-b border-sidebar-border/50 last:border-0 ${
-                                    eventPassed
-                                      ? "bg-dashboard-foreground/15"
-                                      : i % 2 === 0
-                                        ? "bg-header-input/30"
-                                        : "bg-sidebar/30"
-                                  }`}
-                                >
-                              <td className="py-2.5 px-2 text-dashboard-foreground/90 text-left break-words">
-                                {new Date(date + "T12:00:00").toLocaleDateString("en-US", {
-                                  weekday: "short",
-                                  month: "short",
-                                  day: "numeric",
-                                })}
-                              </td>
-                              <td className="py-2.5 px-2 text-dashboard-foreground/90 tabular-nums text-center">
-                                {ev.time || "—"}
-                              </td>
-                              <td className="py-2.5 px-2 text-dashboard-foreground font-medium text-center">
-                                {ev.asset?.name ?? asset.label}
-                              </td>
-                              <td className="py-2.5 px-2 text-center">
-                                <span
-                                  className="inline-flex gap-0.5 items-center justify-center"
-                                  title={ev.impact}
-                                >
-                                  <span className={`w-1.5 h-1.5 shrink-0 rounded-full ${IMPACT_DOTS[ev.impact.toLowerCase() as EventImpact]}`} />
-                                  <span className={`w-1.5 h-1.5 shrink-0 rounded-full ${IMPACT_DOTS[ev.impact.toLowerCase() as EventImpact]}`} />
-                                  <span className={`w-1.5 h-1.5 shrink-0 rounded-full ${IMPACT_DOTS[ev.impact.toLowerCase() as EventImpact]}`} />
-                                </span>
-                              </td>
-                              <td className="py-2.5 px-2 text-dashboard-foreground text-left break-words" title={ev.name}>
-                                {ev.name}
-                              </td>
-                              <td className="py-2.5 px-2 text-center">
-                                <span className="inline-flex items-center justify-center gap-1">
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      if (onEditEvent) onEditEvent(ev);
-                                      else { setEditingEvent(ev); setEventModalOpen(true); }
-                                    }}
-                                    className="text-dashboard-foreground/50 hover:text-primary transition-colors"
-                                    aria-label="Edit event"
-                                    title="Edit event"
-                                  >
-                                    ✎
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => setPendingEventDelete(ev)}
-                                    className="text-dashboard-foreground/50 hover:text-red-400 transition-colors"
-                                    aria-label="Delete event"
-                                    title="Delete event"
-                                  >
-                                    <Trash2 className="h-4 w-4" />
-                                  </button>
-                                </span>
-                              </td>
-                            </tr>
-                              );
-                            })
+                            dayEvents.map((ev, i) => (
+                              <tr
+                                key={ev.id}
+                                className={`border-b border-sidebar-border/50 last:border-0 ${
+                                  dayPassed
+                                    ? "bg-dashboard-foreground/15"
+                                    : i % 2 === 0
+                                      ? "bg-header-input/30"
+                                      : "bg-sidebar/30"
+                                }`}
+                              >
+                                <td className="py-2.5 px-2 text-dashboard-foreground font-medium align-top">
+                                  {ev.asset?.name ?? asset.label}
+                                </td>
+                                <td className="py-2.5 px-2 align-top min-w-0">
+                                  <div className="flex flex-wrap gap-2">
+                                    {(ev.eventsImages ?? []).map((src, imgIdx) => (
+                                      <EventImageThumb
+                                        key={`${ev.id}-img-${imgIdx}`}
+                                        src={src}
+                                        alt={`${ev.asset?.name ?? "Event"} image ${imgIdx + 1}`}
+                                      />
+                                    ))}
+                                  </div>
+                                </td>
+                                <td className="py-2.5 px-2 text-center align-top">
+                                  <span className="inline-flex items-center justify-center gap-1">
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        if (onEditEvent) onEditEvent(ev);
+                                        else {
+                                          setEditingEvent(ev);
+                                          setEventModalOpen(true);
+                                        }
+                                      }}
+                                      className="text-dashboard-foreground/50 hover:text-primary transition-colors"
+                                      aria-label="Edit event"
+                                      title="Edit event"
+                                    >
+                                      ✎
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => setPendingEventDelete(ev)}
+                                      className="text-dashboard-foreground/50 hover:text-red-400 transition-colors"
+                                      aria-label="Delete event"
+                                      title="Delete event"
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </button>
+                                  </span>
+                                </td>
+                              </tr>
+                            ))
                           )}
                         </tbody>
                       </table>
@@ -402,10 +357,9 @@ export function EconomicEventsView({
         details={
           pendingEventDelete
             ? [
-                `Name: ${pendingEventDelete.name}`,
-                `Day: ${pendingEventDelete.day} • Time: ${pendingEventDelete.time || "—"}`,
+                `Day: ${pendingEventDelete.day}`,
                 `Currency: ${pendingEventDelete.asset?.name ?? asset.label}`,
-                `Impact: ${pendingEventDelete.impact}`,
+                `Images: ${pendingEventDelete.eventsImages?.length ?? 0}`,
                 selectedAssetCalendar
                   ? `Calendar week: ${selectedAssetCalendar.startDate} → ${selectedAssetCalendar.endDate}`
                   : null,

@@ -5,7 +5,15 @@ import { createPortal } from "react-dom";
 import Link from "next/link";
 import { Calendar, Plus, ChevronDown, ChevronUp, Settings, Star } from "lucide-react";
 import type { AssetConfig, StreamEntry } from "@/types/asset";
-import type { Analysis, AssetCalendar, AssetWatchlist, Event, WatchItem, CreateWatchItemDto } from "@/types/api";
+import type {
+  Analysis,
+  AssetCalendar,
+  AssetWatchlist,
+  CreateEventDto,
+  Event,
+  WatchItem,
+  CreateWatchItemDto,
+} from "@/types/api";
 import { analysisService, assetCalendarService, assetWatchlistService } from "@/lib/api";
 import { useAssets } from "@/context/AssetsContext";
 import { useWatchlistCalendar } from "@/context/WatchlistCalendarContext";
@@ -389,9 +397,9 @@ export function AssetAnalysisView({ asset, favoritesWindow = false }: AssetAnaly
   }, [watchlistDropdownOpen]);
 
   const handleEventSubmit = useCallback(
-    async (dto: { assetCalendarId?: string; calendarId?: string; day: string; time: string; assetId?: string; name: string; impact: string }) => {
+    async (dto: CreateEventDto) => {
       if (editingEvent) {
-        await updateEvent(editingEvent.id, { day: dto.day, time: dto.time, name: dto.name, impact: dto.impact });
+        await updateEvent(editingEvent.id, { day: dto.day, eventsImages: dto.eventsImages });
       } else {
         await createEvent(dto);
       }
