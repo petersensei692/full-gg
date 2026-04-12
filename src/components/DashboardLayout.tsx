@@ -29,6 +29,10 @@ export function DashboardLayout({ children, favoritesNav = false }: DashboardLay
   const isFavoritesGlobalPage =
     favoritesNav && pathname === "/fundamental-analysis/favorites/global";
 
+  /** Mobile-only title in top bar (desktop title lives in GlobalAnalysisView filter row). */
+  const showMobileGlobalAnalysisTitle =
+    isFavoritesGlobalPage || pathname === "/global-analysis";
+
   /** Radix dialogs portal to `body`; expose width so `containToMain` can center in the main column. */
   useEffect(() => {
     const px =
@@ -72,7 +76,7 @@ export function DashboardLayout({ children, favoritesNav = false }: DashboardLay
           {!isDesktop && !isAssetAnalysisPage && (
             <div className="shrink-0 h-11 flex items-center gap-3 px-4 border-b border-sidebar-border bg-dashboard-bg lg:hidden">
               <SidebarTrigger />
-              {isFavoritesGlobalPage && (
+              {showMobileGlobalAnalysisTitle && (
                 <h2 className="text-sm font-semibold text-dashboard-foreground truncate min-w-0">
                   Global Analysis
                 </h2>

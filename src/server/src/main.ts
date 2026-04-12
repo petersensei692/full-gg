@@ -55,6 +55,15 @@ async function bootstrap() {
     await app.listen(port);
   }
 
+  const httpServer = app.getHttpAdapter().getHttpServer() as import('http').Server & {
+    requestTimeout?: number;
+  };
+  httpServer.keepAliveTimeout = 65_000;
+  httpServer.headersTimeout = 66_000;
+  if (typeof httpServer.requestTimeout === 'number') {
+    httpServer.requestTimeout = 120_000;
+  }
+
   try {
     const dataSource = app.get(DataSource);
     await seedAssets(dataSource);

@@ -1,3 +1,5 @@
+"use client";
+
 import { GlobalAnalysisView } from "@/components/GlobalAnalysisView";
 
 export default function FavoritesGlobalAnalysisPage() {

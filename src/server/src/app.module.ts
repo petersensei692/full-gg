@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import type Database from 'better-sqlite3';
 import * as path from 'path';
 import { readAppConfig, resolveDatabasePath } from './database/app-config';
 import { AppController } from './app.controller';
@@ -26,6 +27,10 @@ const rootEnv = path.resolve(cwd, cwd.replace(/[/\\]+$/, '').endsWith('server') 
           database: databasePath,
           entities: [__dirname + '/**/*.entity{.ts,.js}'],
           synchronize: true,
+          prepareDatabase: (db: Database) => {
+            db.pragma('journal_mode = WAL');
+            db.pragma('busy_timeout = 5000');
+          },
         };
       },
     }),

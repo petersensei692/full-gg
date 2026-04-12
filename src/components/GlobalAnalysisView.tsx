@@ -349,17 +349,10 @@ export function GlobalAnalysisView({ favoritesWindow = false }: { favoritesWindo
   return (
     <>
       <div className="flex h-full min-h-0 flex-col overflow-auto">
-        {!favoritesWindow && (
-          <div className="h-14 shrink-0 flex items-center gap-3 px-6 border-b border-sidebar-border overflow-hidden">
-            <h2 className="text-sm font-semibold text-dashboard-foreground truncate">Global Analysis</h2>
-          </div>
-        )}
         <div className="shrink-0 flex flex-wrap items-center gap-3 px-6 py-3 border-b border-sidebar-border bg-sidebar/30">
-          {favoritesWindow && (
-            <h2 className="hidden lg:block text-sm font-semibold text-dashboard-foreground truncate shrink-0 max-w-full">
-              Global Analysis
-            </h2>
-          )}
+          <h2 className="hidden lg:block text-sm font-semibold text-dashboard-foreground truncate shrink-0 max-w-full">
+            Global Analysis
+          </h2>
           <span className="text-sm text-dashboard-foreground/70 shrink-0">Filter:</span>
           <select
             value={analysisFilter}

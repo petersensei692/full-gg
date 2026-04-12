@@ -1,8 +1,8 @@
-const { app, BrowserWindow, ipcMain, dialog, protocol, net } = require("electron");
+const { app, BrowserWindow, ipcMain, dialog, protocol } = require("electron");
 const path = require("path");
-const { pathToFileURL } = require("url");
 const { fork } = require("child_process");
 const fs = require("fs");
+const fsp = fs.promises;
 const { ensureBundledWindowsRootCert } = require("./windows-root-cert");
 
 protocol.registerSchemesAsPrivileged([
@@ -13,6 +13,9 @@ protocol.registerSchemesAsPrivileged([
 const isDev = !app.isPackaged;
 
 let serverProcess = null;
+let appIsQuitting = false;
+/** True while we are intentionally killing the forked API server (avoid false "crash" handling). */
+let stoppingServerProcess = false;
 
 function getOutDir() {
   return app.isPackaged
@@ -33,7 +36,12 @@ function joinUnderOutRoot(outRootResolved, posixRel) {
   return path.join(outRootResolved, ...parts);
 }
 
-function resolveExportedHtmlPath(outDir, pathnameRaw) {
+/**
+ * Resolves a URL path to an on-disk file under `out/`.
+ * - Extension paths (_next/*.js, .css, …): exact match only → null if missing (do not serve index.html as JS).
+ * - Extensionless routes: Next `route.html`, then SPA fallback to index.html.
+ */
+function resolveAppProtocolFile(outDir, pathnameRaw) {
   const outRoot = path.resolve(outDir);
   let pathname = String(pathnameRaw || "").replace(/^\/+/, "");
   try {
@@ -54,18 +62,45 @@ function resolveExportedHtmlPath(outDir, pathnameRaw) {
     return tryFile("index.html") || path.join(outRoot, "index.html");
   }
 
-  const candidates = [
-    pathname,
-    `${pathname}.html`,
-    `${pathname}/index.html`,
-  ];
+  const lastSeg = pathname.split("/").pop() || "";
+  const looksLikeFile = /\.[a-zA-Z0-9]{1,12}$/.test(lastSeg);
+
+  const candidates = looksLikeFile
+    ? [pathname, `${pathname}/index.html`]
+    : [`${pathname}.html`, pathname, `${pathname}/index.html`];
 
   for (const c of candidates) {
     const hit = tryFile(c);
     if (hit) return hit;
   }
 
+  if (looksLikeFile) return null;
   return path.join(outRoot, "index.html");
+}
+
+const APP_MIME = {
+  ".html": "text/html; charset=utf-8",
+  ".js": "application/javascript; charset=utf-8",
+  ".mjs": "application/javascript; charset=utf-8",
+  ".css": "text/css; charset=utf-8",
+  ".json": "application/json; charset=utf-8",
+  ".ico": "image/x-icon",
+  ".svg": "image/svg+xml",
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".webp": "image/webp",
+  ".woff2": "font/woff2",
+  ".woff": "font/woff",
+  ".ttf": "font/ttf",
+  ".txt": "text/plain; charset=utf-8",
+  ".map": "application/json",
+  ".webmanifest": "application/manifest+json",
+};
+
+function mimeForFile(absPath) {
+  const ext = path.extname(absPath).toLowerCase();
+  return APP_MIME[ext] || "application/octet-stream";
 }
 
 ipcMain.handle("settings:choose-directory", async () => {
@@ -189,10 +224,29 @@ function startServer() {
       console.error("Server spawn error:", err);
       reject(err);
     });
-    serverProcess.on("exit", (code) => {
+    serverProcess.on("exit", (code, signal) => {
       serverProcess = null;
+      const intentional = stoppingServerProcess || appIsQuitting;
+      stoppingServerProcess = false;
       if (code !== 0 && code !== null) {
-        console.error("Server exited with code", code);
+        console.error("[Server] exited with code", code, signal || "");
+      }
+      if (
+        app.isPackaged &&
+        !intentional &&
+        code !== 0 &&
+        code !== null
+      ) {
+        try {
+          dialog.showMessageBoxSync({
+            type: "error",
+            title: "JournalApp",
+            message:
+              "The journal data server stopped unexpectedly. API requests will not work until you fully quit and reopen the application.",
+          });
+        } catch {
+          /* ignore */
+        }
       }
     });
 
@@ -311,15 +365,64 @@ app.whenReady().then(async () => {
 
   if (!isDev) {
     const outDir = getOutDir();
-    protocol.handle("app", (request) => {
-      const url = new URL(request.url);
-      const pathname = url.pathname || "/";
-      const outDirResolved = path.resolve(outDir);
-      const resolved = resolveExportedHtmlPath(outDir, pathname);
-      if (!resolved.startsWith(outDirResolved + path.sep) && resolved !== outDirResolved) {
-        return net.fetch(pathToFileURL(path.join(outDir, "index.html")).href);
+    const outDirResolved = path.resolve(outDir);
+    protocol.handle("app", async (request) => {
+      try {
+        const url = new URL(request.url);
+        const pathname = url.pathname || "/";
+        const resolvedFile = resolveAppProtocolFile(outDir, pathname);
+        if (!resolvedFile) {
+          return new Response("Not Found", {
+            status: 404,
+            headers: { "Content-Type": "text/plain; charset=utf-8" },
+          });
+        }
+        const resolvedAbs = path.resolve(resolvedFile);
+        if (resolvedAbs !== outDirResolved && !resolvedAbs.startsWith(outDirResolved + path.sep)) {
+          return new Response("Forbidden", {
+            status: 403,
+            headers: { "Content-Type": "text/plain; charset=utf-8" },
+          });
+        }
+        const stat = await fsp.stat(resolvedAbs);
+        if (!stat.isFile()) {
+          return new Response("Not Found", {
+            status: 404,
+            headers: { "Content-Type": "text/plain; charset=utf-8" },
+          });
+        }
+        const ct = mimeForFile(resolvedAbs);
+        const p = pathname.replace(/^\/+/, "");
+        const cache =
+          p.startsWith("_next/static/") || pathname.startsWith("/_next/static/")
+            ? "public, max-age=31536000, immutable"
+            : "no-cache";
+        if (request.method === "HEAD") {
+          return new Response(null, {
+            status: 200,
+            headers: {
+              "Content-Type": ct,
+              "Content-Length": String(stat.size),
+              "Cache-Control": cache,
+            },
+          });
+        }
+        const body = await fsp.readFile(resolvedAbs);
+        return new Response(body, {
+          status: 200,
+          headers: {
+            "Content-Type": ct,
+            "Content-Length": String(body.length),
+            "Cache-Control": cache,
+          },
+        });
+      } catch (err) {
+        console.error("[app protocol]", request.url, err);
+        return new Response("Internal Server Error", {
+          status: 500,
+          headers: { "Content-Type": "text/plain; charset=utf-8" },
+        });
       }
-      return net.fetch(pathToFileURL(resolved).href);
     });
   }
   startServer()
@@ -327,8 +430,8 @@ app.whenReady().then(async () => {
     .catch((err) => {
       console.error("Failed to start server:", err);
       if (serverProcess) {
+        stoppingServerProcess = true;
         serverProcess.kill();
-        serverProcess = null;
       }
       createWindow(err);
     });
@@ -336,8 +439,8 @@ app.whenReady().then(async () => {
 
 app.on("window-all-closed", () => {
   if (serverProcess) {
+    stoppingServerProcess = true;
     serverProcess.kill();
-    serverProcess = null;
   }
   if (process.platform !== "darwin") {
     app.quit();
@@ -345,14 +448,25 @@ app.on("window-all-closed", () => {
 });
 
 app.on("before-quit", () => {
+  appIsQuitting = true;
   if (serverProcess) {
+    stoppingServerProcess = true;
     serverProcess.kill();
-    serverProcess = null;
   }
 });
 
-app.on("activate", () => {
+app.on("activate", async () => {
   if (BrowserWindow.getAllWindows().length === 0) {
-    createWindow(null);
+    if (app.isPackaged && !serverProcess) {
+      try {
+        await startServer();
+        createWindow(null);
+      } catch (err) {
+        console.error("Failed to restart server on activate:", err);
+        createWindow(err);
+      }
+    } else {
+      createWindow(null);
+    }
   }
 });

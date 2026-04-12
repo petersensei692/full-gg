@@ -50,6 +50,40 @@ function getAssetType(asset: AssetConfig): string {
   return "currency";
 }
 
+/** Full document loads for favorites popup (`app://`); avoids broken Next client transitions between asset ↔ global. */
+function FavoritesNavLink({
+  href,
+  className,
+  children,
+  title,
+  ariaLabel,
+  useFullPage,
+  onOverlayClose,
+}: {
+  href: string;
+  className?: string;
+  children: React.ReactNode;
+  title?: string;
+  ariaLabel?: string;
+  useFullPage: boolean;
+  onOverlayClose?: () => void;
+}) {
+  const navClose = () => onOverlayClose?.();
+  const a11y = ariaLabel ? { "aria-label": ariaLabel } : {};
+  if (useFullPage) {
+    return (
+      <a href={href} className={className} title={title} {...a11y} onClick={navClose}>
+        {children}
+      </a>
+    );
+  }
+  return (
+    <Link href={href} className={className} title={title} {...a11y} onClick={navClose}>
+      {children}
+    </Link>
+  );
+}
+
 type NavSubItem = { href: string; label: string; icon: LucideIcon };
 type NavItemWithAssets = {
   href: string;
@@ -233,9 +267,10 @@ export function Sidebar({
       {/* Nav: Main menu (home), then section links */}
       <nav className="flex-1 overflow-y-auto py-3">
         <div className={`mb-2 ${isExpanded ? "px-2" : "px-2 flex justify-center"}`}>
-          <Link
+          <FavoritesNavLink
             href="/"
-            onClick={() => onOverlayClose?.()}
+            useFullPage={favoritesNav}
+            onOverlayClose={onOverlayClose}
             className={`flex items-center rounded-lg text-sm font-medium transition-colors ${
               isExpanded ? "gap-2.5 px-3 py-2.5 w-full" : "h-10 w-10 justify-center"
             } ${
@@ -244,11 +279,11 @@ export function Sidebar({
                 : "text-sidebar-foreground hover:bg-sidebar-hover"
             }`}
             title="Main Menu"
-            aria-label="Main Menu — choose Fundamental or Analytics"
+            ariaLabel="Main Menu — choose Fundamental or Analytics"
           >
             <House className={`shrink-0 ${isExpanded ? "h-4 w-4" : "h-5 w-5"}`} />
             {isExpanded && "Main Menu"}
-          </Link>
+          </FavoritesNavLink>
         </div>
         <ul className={`space-y-0.5 ${isExpanded ? "px-2" : "px-2 flex flex-col items-center"}`}>
           {topLevelNav.map((item) => {
@@ -273,27 +308,28 @@ export function Sidebar({
                       ? "/fundamental-analysis/favorites/global"
                       : "/assets";
                 const collapsedAssetsActive = favoritesNav
-                  ? pathname.startsWith("/fundamental-analysis/favorites")
+                  ? pathname.startsWith("/fundamental-analysis/favorites/asset")
                   : pathname === "/assets" || pathname.startsWith("/fundamental-analysis");
                 return (
                   <li key="assets" className="w-full flex justify-center">
-                    <Link
+                    <FavoritesNavLink
                       href={collapsedAssetsHref}
+                      useFullPage={favoritesNav}
                       className={`flex h-10 w-10 items-center justify-center rounded-lg transition-colors ${
                         collapsedAssetsActive ? "bg-primary/15 text-primary" : "text-sidebar-foreground hover:bg-sidebar-hover"
                       }`}
                       title="Assets"
-                      aria-label="Assets"
+                      ariaLabel="Assets"
                     >
                       <Icon className="h-5 w-5" />
-                    </Link>
+                    </FavoritesNavLink>
                   </li>
                 );
               }
               const itemWithAssets = item as NavItemWithAssets;
               const assetsExpanded = assetsOpen;
               const subActive = favoritesNav
-                ? pathname.startsWith("/fundamental-analysis/favorites")
+                ? pathname.startsWith("/fundamental-analysis/favorites/asset")
                 : pathname.startsWith("/fundamental-analysis") ||
                   pathname === "/assets" ||
                   itemWithAssets.subNav.some((s: NavSubItem) => pathname === s.href);
@@ -376,8 +412,10 @@ export function Sidebar({
                                             const isAssetActive = activeAssetSlug != null && asset.slug === activeAssetSlug;
                                             return (
                                               <li key={asset.id ?? asset.slug} className="flex items-center gap-0.5 group/list-item">
-                                                <Link
+                                                <FavoritesNavLink
                                                   href={assetHref(asset.slug)}
+                                                  useFullPage={favoritesNav}
+                                                  onOverlayClose={onOverlayClose}
                                                   className={`flex-1 min-w-0 rounded-lg px-3 py-2 text-xs truncate ${
                                                     isAssetActive
                                                       ? "bg-primary/15 text-primary font-medium"
@@ -385,7 +423,7 @@ export function Sidebar({
                                                   }`}
                                                 >
                                                   {asset.label}
-                                                </Link>
+                                                </FavoritesNavLink>
                                                 {asset.id && (
                                                   <div className="flex flex-row items-center gap-0 shrink-0 relative z-10" role="group" aria-label="Reorder">
                                                     <button
@@ -439,8 +477,10 @@ export function Sidebar({
 
             return (
               <li key={item.href} className={!isExpanded ? "w-full flex justify-center" : ""}>
-                <Link
+                <FavoritesNavLink
                   href={item.href}
+                  useFullPage={favoritesNav}
+                  onOverlayClose={onOverlayClose}
                   className={`flex items-center rounded-lg text-sm font-medium transition-colors ${
                     isExpanded ? "gap-2.5 px-3 py-2.5" : "h-10 w-10 justify-center"
                   } ${
@@ -449,11 +489,11 @@ export function Sidebar({
                       : "text-sidebar-foreground hover:bg-sidebar-hover"
                   }`}
                   title={item.label}
-                  aria-label={item.label}
+                  ariaLabel={item.label}
                 >
                   <Icon className={`shrink-0 ${isExpanded ? "h-4 w-4" : "h-5 w-5"}`} />
                   {isExpanded && item.label}
-                </Link>
+                </FavoritesNavLink>
               </li>
             );
           })}
