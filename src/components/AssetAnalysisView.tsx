@@ -21,9 +21,15 @@ import { DateRangePicker, type DateRange } from "./analysis/DateRangePicker";
 import {
   deserializeDateRangeFromStorage,
   loadAssetAnalysisStreamFilters,
+  loadFavoritesWindowAssetFilters,
   saveAssetAnalysisStreamFilters,
+  saveFavoritesWindowAssetFilters,
   serializeDateRangeForStorage,
 } from "@/lib/analysis-stream-filters";
+import { broadcastAnalysisOrFavoriteChanged, subscribeAnalysisOrFavoriteChanged } from "@/lib/analysisBroadcast";
+import { openFavoritesWindow } from "@/lib/favoritesWindow";
+import { useFavoritesPopupOpen } from "@/hooks/useFavoritesPopupOpen";
+import { favoritesAssetAnalysisHref } from "@/lib/assetRoutes";
 import { CreateEventModal } from "./analysis/CreateEventModal";
 import { CreatePairModal } from "./analysis/CreatePairModal";
 import { SidebarTrigger } from "./SidebarTrigger";
@@ -93,9 +99,11 @@ function getWeekKey(ts: number): string {
 
 interface AssetAnalysisViewProps {
   asset: AssetConfig;
+  /** Favorites popup: stream is starred-only; separate filter storage; no composer */
+  favoritesWindow?: boolean;
 }
 
-export function AssetAnalysisView({ asset }: AssetAnalysisViewProps) {
+export function AssetAnalysisView({ asset, favoritesWindow = false }: AssetAnalysisViewProps) {
   const { assets } = useAssets();
   const { createEvent, updateEvent, refetchAll, createWatchItem, updateWatchItem } = useWatchlistCalendar();
   /** Resolve asset.id at runtime from API (static export has no API at build time) */
@@ -105,10 +113,14 @@ export function AssetAnalysisView({ asset }: AssetAnalysisViewProps) {
   );
 
   const [activeTab, setActiveTab] = useState<"stream" | "events" | "watchlist">("stream");
+
+  useEffect(() => {
+    if (favoritesWindow) setActiveTab("stream");
+  }, [favoritesWindow]);
   const [analyses, setAnalyses] = useState<Analysis[]>([]);
   const [analysisFilter, setAnalysisFilter] = useState<string>("all");
-  const [favoritesOnly, setFavoritesOnly] = useState(false);
   const [dateRange, setDateRange] = useState<DateRange>(null);
+  const favoritesPopupOpen = useFavoritesPopupOpen();
   const [editingAnalysis, setEditingAnalysis] = useState<Analysis | null>(null);
   const [editingAnalysisType, setEditingAnalysisType] = useState<string>("daily");
   const [editModalOpen, setEditModalOpen] = useState(false);
@@ -156,6 +168,7 @@ export function AssetAnalysisView({ asset }: AssetAnalysisViewProps) {
       images: payload.images,
     });
     setAnalyses((prev) => [...prev, created]);
+    broadcastAnalysisOrFavoriteChanged();
   }, [resolvedAsset]);
 
   const handleDeleteAnalysis = useCallback(
@@ -163,6 +176,7 @@ export function AssetAnalysisView({ asset }: AssetAnalysisViewProps) {
       await analysisService.delete(analysisId);
       await Promise.all(images.map((path) => deleteStoredImage(path).catch(() => undefined)));
       setAnalyses((prev) => prev.filter((a) => a.id !== analysisId));
+      broadcastAnalysisOrFavoriteChanged();
     },
     []
   );
@@ -215,6 +229,7 @@ export function AssetAnalysisView({ asset }: AssetAnalysisViewProps) {
     try {
       const updated = await analysisService.update(analysisId, { favorite: next });
       setAnalyses((prev) => prev.map((a) => (a.id === analysisId ? updated : a)));
+      broadcastAnalysisOrFavoriteChanged();
     } catch {
       /* ignore */
     }
@@ -229,22 +244,30 @@ export function AssetAnalysisView({ asset }: AssetAnalysisViewProps) {
     skipNextAssetFilterPersistRef.current = true;
     if (!resolvedAsset.id) {
       setAnalysisFilter("all");
-      setFavoritesOnly(false);
       setDateRange(null);
       return;
     }
-    const stored = loadAssetAnalysisStreamFilters(resolvedAsset.id);
-    if (stored) {
-      setAnalysisFilter(stored.analysisFilter);
-      setFavoritesOnly(stored.favoritesOnly);
-      setDateRange(deserializeDateRangeFromStorage(stored.dateRange));
+    if (favoritesWindow) {
+      const stored = loadFavoritesWindowAssetFilters(resolvedAsset.id);
+      if (stored) {
+        setAnalysisFilter(stored.analysisFilter);
+        setDateRange(deserializeDateRangeFromStorage(stored.dateRange));
+      } else {
+        setAnalysisFilter("all");
+        setDateRange(null);
+      }
     } else {
-      setAnalysisFilter("all");
-      setFavoritesOnly(false);
-      setDateRange(null);
+      const stored = loadAssetAnalysisStreamFilters(resolvedAsset.id);
+      if (stored) {
+        setAnalysisFilter(stored.analysisFilter);
+        setDateRange(deserializeDateRangeFromStorage(stored.dateRange));
+      } else {
+        setAnalysisFilter("all");
+        setDateRange(null);
+      }
     }
     streamFiltersHydratedRef.current = true;
-  }, [resolvedAsset.id]);
+  }, [resolvedAsset.id, favoritesWindow]);
 
   useEffect(() => {
     if (!resolvedAsset.id || !streamFiltersHydratedRef.current) return;
@@ -252,23 +275,40 @@ export function AssetAnalysisView({ asset }: AssetAnalysisViewProps) {
       skipNextAssetFilterPersistRef.current = false;
       return;
     }
-    saveAssetAnalysisStreamFilters(resolvedAsset.id, {
-      analysisFilter,
-      favoritesOnly,
-      dateRange: serializeDateRangeForStorage(dateRange),
-    });
-  }, [resolvedAsset.id, analysisFilter, favoritesOnly, dateRange]);
+    if (favoritesWindow) {
+      saveFavoritesWindowAssetFilters(resolvedAsset.id, {
+        analysisFilter,
+        dateRange: serializeDateRangeForStorage(dateRange),
+      });
+    } else {
+      saveAssetAnalysisStreamFilters(resolvedAsset.id, {
+        analysisFilter,
+        favoritesOnly: false,
+        dateRange: serializeDateRangeForStorage(dateRange),
+      });
+    }
+  }, [resolvedAsset.id, favoritesWindow, analysisFilter, dateRange]);
+
+  const refetchAnalyses = useCallback(() => {
+    if (!resolvedAsset.id) return;
+    analysisService
+      .getAll(resolvedAsset.id)
+      .then((list) => setAnalyses(list))
+      .catch(() => setAnalyses([]));
+  }, [resolvedAsset.id]);
 
   useEffect(() => {
     if (!resolvedAsset.id) {
       setAnalyses([]);
       return;
     }
-    analysisService
-      .getAll(resolvedAsset.id)
-      .then((list) => setAnalyses(list))
-      .catch(() => setAnalyses([]));
-  }, [resolvedAsset.id]);
+    refetchAnalyses();
+  }, [resolvedAsset.id, refetchAnalyses]);
+
+  useEffect(() => {
+    if (!resolvedAsset.id) return;
+    return subscribeAnalysisOrFavoriteChanged(refetchAnalyses);
+  }, [resolvedAsset.id, refetchAnalyses]);
 
   useEffect(() => {
     if (!resolvedAsset.id) {
@@ -424,11 +464,11 @@ export function AssetAnalysisView({ asset }: AssetAnalysisViewProps) {
         return t >= startMs && t <= endMs;
       });
     }
-    if (favoritesOnly) {
+    if (favoritesWindow) {
       list = list.filter((e) => e.favorite);
     }
     return list;
-  }, [mappedEntries, analysisFilter, dateRange, favoritesOnly]);
+  }, [mappedEntries, analysisFilter, dateRange, favoritesWindow]);
 
   const entriesWithGroups = useMemo(() => {
     let lastWeekKey: string | undefined;
@@ -472,27 +512,36 @@ export function AssetAnalysisView({ asset }: AssetAnalysisViewProps) {
   return (
     <>
       <div className="flex h-full min-h-0 flex-col overflow-auto">
-        {/* Header bar: hamburger (mobile) + title + tabs; reduced height */}
+        {/* Header bar: hamburger (mobile) + title + tabs; reduced height — favorites window is stream-only */}
         <div className="h-11 shrink-0 flex items-center gap-3 px-4 sm:px-6 border-b border-sidebar-border overflow-hidden">
           <SidebarTrigger />
-          <Link
-            href="/settings"
-            className="shrink-0 rounded-lg border border-sidebar-border p-2 text-header-muted hover:bg-sidebar-hover hover:text-primary"
-            title="Settings"
-            aria-label="Open settings"
-          >
-            <Settings className="h-4 w-4" />
-          </Link>
-          <div className="flex-grow-0 min-w-0 overflow-hidden flex items-center shrink">
-            <AssetHeader title={fullTitle} />
-          </div>
-          <div className="flex-1 min-w-0 overflow-hidden flex justify-center">
-            <StreamTabs active={activeTab} onSelect={setActiveTab} noBorder />
-          </div>
+          {!favoritesWindow && (
+            <>
+              <Link
+                href="/settings"
+                className="shrink-0 rounded-lg border border-sidebar-border p-2 text-header-muted hover:bg-sidebar-hover hover:text-primary"
+                title="Settings"
+                aria-label="Open settings"
+              >
+                <Settings className="h-4 w-4" />
+              </Link>
+              <div className="flex-grow-0 min-w-0 overflow-hidden flex items-center shrink">
+                <AssetHeader title={fullTitle} />
+              </div>
+              <div className="flex-1 min-w-0 overflow-hidden flex justify-center">
+                <StreamTabs active={activeTab} onSelect={setActiveTab} noBorder />
+              </div>
+            </>
+          )}
+          {favoritesWindow && (
+            <div className="flex-1 min-w-0 overflow-hidden flex items-center">
+              <AssetHeader title={fullTitle} />
+            </div>
+          )}
         </div>
 
         {/* Filters / actions bar below header (per tab) */}
-        {activeTab === "stream" && (
+        {(favoritesWindow || activeTab === "stream") && (
           <div className="shrink-0 flex items-center gap-3 px-6 py-3 border-b border-sidebar-border bg-sidebar/30">
             <span className="text-sm text-dashboard-foreground/70 shrink-0">Filter:</span>
             <select
@@ -506,24 +555,26 @@ export function AssetAnalysisView({ asset }: AssetAnalysisViewProps) {
                 </option>
               ))}
             </select>
-            <button
-              type="button"
-              onClick={() => setFavoritesOnly((v) => !v)}
-              className={`shrink-0 rounded-lg border p-2 transition-colors ${
-                favoritesOnly
-                  ? "border-sky-500 bg-sky-500/15 text-sky-500"
-                  : "border-sidebar-border bg-sidebar text-dashboard-foreground/70 hover:bg-sidebar-hover hover:text-dashboard-foreground"
-              }`}
-              aria-pressed={favoritesOnly}
-              title={favoritesOnly ? "Show all analyses" : "Show favorites only"}
-              aria-label={favoritesOnly ? "Show all analyses" : "Show favorites only"}
-            >
-              <Star className={`h-4 w-4 ${favoritesOnly ? "fill-current" : ""}`} />
-            </button>
+            {!favoritesWindow && (
+              <button
+                type="button"
+                onClick={() => openFavoritesWindow(favoritesAssetAnalysisHref(resolvedAsset.slug))}
+                className={`shrink-0 rounded-lg border p-2 transition-colors ${
+                  favoritesPopupOpen
+                    ? "border-sky-500 bg-sky-500/15 text-sky-500"
+                    : "border-sidebar-border bg-sidebar text-dashboard-foreground/70 hover:bg-sidebar-hover hover:text-dashboard-foreground"
+                }`}
+                aria-pressed={favoritesPopupOpen}
+                title="Open favorite analyses in a window"
+                aria-label="Open favorite analyses in a window"
+              >
+                <Star className={`h-4 w-4 ${favoritesPopupOpen ? "fill-current" : ""}`} />
+              </button>
+            )}
             <DateRangePicker value={dateRange} onChange={setDateRange} />
           </div>
         )}
-        {activeTab === "events" && (
+        {!favoritesWindow && activeTab === "events" && (
           <div className="shrink-0 flex items-center gap-3 px-6 py-3 border-b border-sidebar-border bg-sidebar/30">
             <div className="relative min-w-0 max-w-full">
               <button
@@ -552,7 +603,7 @@ export function AssetAnalysisView({ asset }: AssetAnalysisViewProps) {
             </button>
           </div>
         )}
-        {activeTab === "watchlist" && (
+        {!favoritesWindow && activeTab === "watchlist" && (
           <div className="shrink-0 flex items-center gap-3 px-6 py-3 border-b border-sidebar-border bg-sidebar/30">
             <div className="relative min-w-0 max-w-full">
               <button
@@ -582,7 +633,7 @@ export function AssetAnalysisView({ asset }: AssetAnalysisViewProps) {
           </div>
         )}
 
-        {activeTab === "stream" && (
+        {(favoritesWindow || activeTab === "stream") && (
           <div className="flex-1 flex flex-col min-h-0 w-full">
             <div className="flex-1 min-h-0 relative w-full">
               <div
@@ -649,13 +700,15 @@ export function AssetAnalysisView({ asset }: AssetAnalysisViewProps) {
                 </div>
               </div>
             </div>
-            <div className="shrink-0 w-full px-6 pb-6 pt-3 border-t border-sidebar-border/50 bg-dashboard-bg">
-              <PostAnalysisInput placeholder={resolvedAsset.placeholder} onCreated={handleCreate} />
-            </div>
+            {!favoritesWindow && (
+              <div className="shrink-0 w-full px-6 pb-6 pt-3 border-t border-sidebar-border/50 bg-dashboard-bg">
+                <PostAnalysisInput placeholder={resolvedAsset.placeholder} onCreated={handleCreate} />
+              </div>
+            )}
           </div>
         )}
 
-        {activeTab === "events" && (
+        {!favoritesWindow && activeTab === "events" && (
           <EconomicEventsView
             asset={resolvedAsset}
             assetCalendars={assetCalendars}
@@ -668,7 +721,7 @@ export function AssetAnalysisView({ asset }: AssetAnalysisViewProps) {
           />
         )}
 
-        {activeTab === "watchlist" && (
+        {!favoritesWindow && activeTab === "watchlist" && (
           <PairWatchlistView
             asset={resolvedAsset}
             assetWatchlists={assetWatchlists}
@@ -697,6 +750,7 @@ export function AssetAnalysisView({ asset }: AssetAnalysisViewProps) {
               images,
             });
             setAnalyses((prev) => prev.map((a) => (a.id === updated.id ? updated : a)));
+            broadcastAnalysisOrFavoriteChanged();
             setEditModalOpen(false);
             setEditingAnalysis(null);
           }}

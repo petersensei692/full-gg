@@ -15,10 +15,18 @@ export type AnalysisStreamFiltersStored = {
 };
 
 const GLOBAL_KEY = "gg:fundamentalAnalysisStream:global";
+const FAV_WIN_GLOBAL_KEY = "gg:fundamentalAnalysisFavWindow:global";
 
 function assetKey(assetId: string): string {
   return `gg:fundamentalAnalysisStream:asset:${assetId}`;
 }
+
+function favWinAssetKey(assetId: string): string {
+  return `gg:fundamentalAnalysisFavWindow:asset:${assetId}`;
+}
+
+/** Favorites popup: only type + date range (stream is always favorites). */
+export type FavoritesWindowStreamFiltersStored = Omit<AnalysisStreamFiltersStored, "favoritesOnly">;
 
 export function serializeDateRangeForStorage(range: DateRange): AnalysisStreamFiltersStored["dateRange"] {
   if (!range) return null;
@@ -77,6 +85,52 @@ export function loadAssetAnalysisStreamFilters(assetId: string): AnalysisStreamF
 export function saveAssetAnalysisStreamFilters(assetId: string, f: AnalysisStreamFiltersStored): void {
   if (typeof window === "undefined" || !assetId) return;
   localStorage.setItem(assetKey(assetId), JSON.stringify(f));
+}
+
+function normalizeFavWindowPartial(p: Partial<AnalysisStreamFiltersStored>): FavoritesWindowStreamFiltersStored {
+  const analysisFilter = typeof p.analysisFilter === "string" ? p.analysisFilter : "all";
+  let dateRange: AnalysisStreamFiltersStored["dateRange"] = null;
+  if (p.dateRange && typeof p.dateRange === "object") {
+    const r = p.dateRange as Record<string, unknown>;
+    const nums = ["sy", "sm", "sd", "ey", "em", "ed"].every(
+      (k) => typeof r[k] === "number" && Number.isFinite(r[k] as number),
+    );
+    if (nums) {
+      dateRange = {
+        sy: r.sy as number,
+        sm: r.sm as number,
+        sd: r.sd as number,
+        ey: r.ey as number,
+        em: r.em as number,
+        ed: r.ed as number,
+      };
+    }
+  }
+  return { analysisFilter, dateRange };
+}
+
+export function loadFavoritesWindowGlobalFilters(): FavoritesWindowStreamFiltersStored | null {
+  if (typeof window === "undefined") return null;
+  const p = safeParse(localStorage.getItem(FAV_WIN_GLOBAL_KEY));
+  if (!p) return null;
+  return normalizeFavWindowPartial(p);
+}
+
+export function saveFavoritesWindowGlobalFilters(f: FavoritesWindowStreamFiltersStored): void {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(FAV_WIN_GLOBAL_KEY, JSON.stringify(f));
+}
+
+export function loadFavoritesWindowAssetFilters(assetId: string): FavoritesWindowStreamFiltersStored | null {
+  if (typeof window === "undefined" || !assetId) return null;
+  const p = safeParse(localStorage.getItem(favWinAssetKey(assetId)));
+  if (!p) return null;
+  return normalizeFavWindowPartial(p);
+}
+
+export function saveFavoritesWindowAssetFilters(assetId: string, f: FavoritesWindowStreamFiltersStored): void {
+  if (typeof window === "undefined" || !assetId) return;
+  localStorage.setItem(favWinAssetKey(assetId), JSON.stringify(f));
 }
 
 function normalizePartial(p: Partial<AnalysisStreamFiltersStored>): AnalysisStreamFiltersStored {

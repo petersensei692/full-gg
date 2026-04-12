@@ -9,9 +9,11 @@ import { useIsDesktop } from "@/hooks/useMediaQuery";
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
+  /** Favorites popup: sidebar links stay inside /fundamental-analysis/favorites/... */
+  favoritesNav?: boolean;
 }
 
-export function DashboardLayout({ children }: DashboardLayoutProps) {
+export function DashboardLayout({ children, favoritesNav = false }: DashboardLayoutProps) {
   const isDesktop = useIsDesktop();
   const pathname = usePathname();
   const [overlayOpen, setOverlayOpen] = useState(false);
@@ -20,7 +22,12 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
   /** Asset analysis: legacy /fundamental-analysis/:slug or static /fundamental-analysis/asset?slug= */
   const isAssetAnalysisPage =
     pathname === "/fundamental-analysis/asset" ||
-    !!pathname?.match(/^\/fundamental-analysis\/[^/]+$/);
+    pathname === "/fundamental-analysis/favorites/asset" ||
+    (!!pathname?.match(/^\/fundamental-analysis\/[^/]+$/) &&
+      !pathname.startsWith("/fundamental-analysis/favorites"));
+
+  const isFavoritesGlobalPage =
+    favoritesNav && pathname === "/fundamental-analysis/favorites/global";
 
   /** Radix dialogs portal to `body`; expose width so `containToMain` can center in the main column. */
   useEffect(() => {
@@ -47,6 +54,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
             onToggleCollapsed={() => setCollapsed((c) => !c)}
             onToggleOverlay={() => setOverlayOpen((o) => !o)}
             isOverlayMode={!isDesktop}
+            favoritesNav={favoritesNav}
           />
         </Suspense>
 
@@ -62,8 +70,13 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
         <div className="flex flex-1 flex-col min-w-0 relative">
           {/* On non–asset-analysis pages (mobile), show a slim bar with hamburger so menu is always reachable */}
           {!isDesktop && !isAssetAnalysisPage && (
-            <div className="shrink-0 h-11 flex items-center px-4 border-b border-sidebar-border bg-dashboard-bg lg:hidden">
+            <div className="shrink-0 h-11 flex items-center gap-3 px-4 border-b border-sidebar-border bg-dashboard-bg lg:hidden">
               <SidebarTrigger />
+              {isFavoritesGlobalPage && (
+                <h2 className="text-sm font-semibold text-dashboard-foreground truncate min-w-0">
+                  Global Analysis
+                </h2>
+              )}
             </div>
           )}
           <main className="flex-1 overflow-auto">

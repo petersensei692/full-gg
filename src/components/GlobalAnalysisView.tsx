@@ -15,7 +15,12 @@ import {
   saveGlobalAnalysisStreamFilters,
   loadGlobalAnalysisStreamFilters,
   serializeDateRangeForStorage,
+  loadFavoritesWindowGlobalFilters,
+  saveFavoritesWindowGlobalFilters,
 } from "@/lib/analysis-stream-filters";
+import { broadcastAnalysisOrFavoriteChanged, subscribeAnalysisOrFavoriteChanged } from "@/lib/analysisBroadcast";
+import { openFavoritesWindow } from "@/lib/favoritesWindow";
+import { useFavoritesPopupOpen } from "@/hooks/useFavoritesPopupOpen";
 
 const ANALYSIS_TYPE_TO_TAG: Record<
   string,
@@ -67,13 +72,13 @@ function getWeekKey(ts: number): string {
   return monday.toISOString().slice(0, 10);
 }
 
-export function GlobalAnalysisView() {
+export function GlobalAnalysisView({ favoritesWindow = false }: { favoritesWindow?: boolean }) {
   const { assets } = useAssets();
   const [list, setList] = useState<GlobalAnalysis[]>([]);
   const [loading, setLoading] = useState(true);
   const [analysisFilter, setAnalysisFilter] = useState<string>("all");
-  const [favoritesOnly, setFavoritesOnly] = useState(false);
   const [dateRange, setDateRange] = useState<DateRange>(null);
+  const favoritesPopupOpen = useFavoritesPopupOpen();
   const [editing, setEditing] = useState<GlobalAnalysis | null>(null);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [pendingFocusId, setPendingFocusId] = useState<string | null>(null);
@@ -84,14 +89,21 @@ export function GlobalAnalysisView() {
   const skipNextFilterPersistRef = useRef(true);
 
   useEffect(() => {
-    const stored = loadGlobalAnalysisStreamFilters();
-    if (stored) {
-      setAnalysisFilter(stored.analysisFilter);
-      setFavoritesOnly(stored.favoritesOnly);
-      setDateRange(deserializeDateRangeFromStorage(stored.dateRange));
+    if (favoritesWindow) {
+      const stored = loadFavoritesWindowGlobalFilters();
+      if (stored) {
+        setAnalysisFilter(stored.analysisFilter);
+        setDateRange(deserializeDateRangeFromStorage(stored.dateRange));
+      }
+    } else {
+      const stored = loadGlobalAnalysisStreamFilters();
+      if (stored) {
+        setAnalysisFilter(stored.analysisFilter);
+        setDateRange(deserializeDateRangeFromStorage(stored.dateRange));
+      }
     }
     filtersHydratedRef.current = true;
-  }, []);
+  }, [favoritesWindow]);
 
   useEffect(() => {
     if (!filtersHydratedRef.current) return;
@@ -99,12 +111,19 @@ export function GlobalAnalysisView() {
       skipNextFilterPersistRef.current = false;
       return;
     }
-    saveGlobalAnalysisStreamFilters({
-      analysisFilter,
-      favoritesOnly,
-      dateRange: serializeDateRangeForStorage(dateRange),
-    });
-  }, [analysisFilter, favoritesOnly, dateRange]);
+    if (favoritesWindow) {
+      saveFavoritesWindowGlobalFilters({
+        analysisFilter,
+        dateRange: serializeDateRangeForStorage(dateRange),
+      });
+    } else {
+      saveGlobalAnalysisStreamFilters({
+        analysisFilter,
+        favoritesOnly: false,
+        dateRange: serializeDateRangeForStorage(dateRange),
+      });
+    }
+  }, [analysisFilter, favoritesWindow, dateRange]);
 
   const fetchList = useCallback(async () => {
     setLoading(true);
@@ -120,6 +139,10 @@ export function GlobalAnalysisView() {
 
   useEffect(() => {
     fetchList();
+  }, [fetchList]);
+
+  useEffect(() => {
+    return subscribeAnalysisOrFavoriteChanged(fetchList);
   }, [fetchList]);
 
   const handleCreate = useCallback(
@@ -139,6 +162,7 @@ export function GlobalAnalysisView() {
       });
       setPendingFocusId(created.id);
       await fetchList();
+      broadcastAnalysisOrFavoriteChanged();
     },
     [fetchList]
   );
@@ -147,6 +171,7 @@ export function GlobalAnalysisView() {
     async (id: string) => {
       await globalAnalysisService.delete(id);
       await fetchList();
+      broadcastAnalysisOrFavoriteChanged();
     },
     [fetchList]
   );
@@ -174,6 +199,7 @@ export function GlobalAnalysisView() {
       setEditing(null);
       setEditModalOpen(false);
       await fetchList();
+      broadcastAnalysisOrFavoriteChanged();
     },
     [editing, fetchList]
   );
@@ -200,6 +226,7 @@ export function GlobalAnalysisView() {
     try {
       const updated = await globalAnalysisService.update(id, { favorite: next });
       setList((prev) => prev.map((g) => (g.id === id ? { ...g, ...updated } : g)));
+      broadcastAnalysisOrFavoriteChanged();
     } catch {
       /* ignore */
     }
@@ -259,11 +286,11 @@ export function GlobalAnalysisView() {
         return t >= startMs && t <= endMs;
       });
     }
-    if (favoritesOnly) {
+    if (favoritesWindow) {
       entries = entries.filter((e) => e.favorite);
     }
     return entries;
-  }, [mappedEntries, analysisFilter, dateRange, favoritesOnly]);
+  }, [mappedEntries, analysisFilter, dateRange, favoritesWindow]);
 
   const entriesWithGroups = useMemo(() => {
     let lastWeekKey: string | undefined;
@@ -322,10 +349,17 @@ export function GlobalAnalysisView() {
   return (
     <>
       <div className="flex h-full min-h-0 flex-col overflow-auto">
-        <div className="h-14 shrink-0 flex items-center gap-3 px-6 border-b border-sidebar-border overflow-hidden">
-          <h2 className="text-sm font-semibold text-dashboard-foreground truncate">Global Analysis</h2>
-        </div>
-        <div className="shrink-0 flex items-center gap-3 px-6 py-3 border-b border-sidebar-border bg-sidebar/30">
+        {!favoritesWindow && (
+          <div className="h-14 shrink-0 flex items-center gap-3 px-6 border-b border-sidebar-border overflow-hidden">
+            <h2 className="text-sm font-semibold text-dashboard-foreground truncate">Global Analysis</h2>
+          </div>
+        )}
+        <div className="shrink-0 flex flex-wrap items-center gap-3 px-6 py-3 border-b border-sidebar-border bg-sidebar/30">
+          {favoritesWindow && (
+            <h2 className="hidden lg:block text-sm font-semibold text-dashboard-foreground truncate shrink-0 max-w-full">
+              Global Analysis
+            </h2>
+          )}
           <span className="text-sm text-dashboard-foreground/70 shrink-0">Filter:</span>
           <select
             value={analysisFilter}
@@ -338,20 +372,22 @@ export function GlobalAnalysisView() {
               </option>
             ))}
           </select>
-          <button
-            type="button"
-            onClick={() => setFavoritesOnly((v) => !v)}
-            className={`shrink-0 rounded-lg border p-2 transition-colors ${
-              favoritesOnly
-                ? "border-sky-500 bg-sky-500/15 text-sky-500"
-                : "border-sidebar-border bg-sidebar text-dashboard-foreground/70 hover:bg-sidebar-hover hover:text-dashboard-foreground"
-            }`}
-            aria-pressed={favoritesOnly}
-            title={favoritesOnly ? "Show all analyses" : "Show favorites only"}
-            aria-label={favoritesOnly ? "Show all analyses" : "Show favorites only"}
-          >
-            <Star className={`h-4 w-4 ${favoritesOnly ? "fill-current" : ""}`} />
-          </button>
+          {!favoritesWindow && (
+            <button
+              type="button"
+              onClick={() => openFavoritesWindow("/fundamental-analysis/favorites/global")}
+              className={`shrink-0 rounded-lg border p-2 transition-colors ${
+                favoritesPopupOpen
+                  ? "border-sky-500 bg-sky-500/15 text-sky-500"
+                  : "border-sidebar-border bg-sidebar text-dashboard-foreground/70 hover:bg-sidebar-hover hover:text-dashboard-foreground"
+              }`}
+              aria-pressed={favoritesPopupOpen}
+              title="Open favorite analyses in a window"
+              aria-label="Open favorite analyses in a window"
+            >
+              <Star className={`h-4 w-4 ${favoritesPopupOpen ? "fill-current" : ""}`} />
+            </button>
+          )}
           <DateRangePicker value={dateRange} onChange={setDateRange} />
         </div>
         <div className="flex-1 flex flex-col min-h-0 w-full">
@@ -416,13 +452,15 @@ export function GlobalAnalysisView() {
               </div>
             </div>
           </div>
-          <div className="shrink-0 w-full px-6 pb-6 pt-3 border-t border-sidebar-border/50 bg-dashboard-bg">
-            <PostGlobalAnalysisInput
-              placeholder="Post a new global analysis..."
-              assets={assets}
-              onCreated={handleCreate}
-            />
-          </div>
+          {!favoritesWindow && (
+            <div className="shrink-0 w-full px-6 pb-6 pt-3 border-t border-sidebar-border/50 bg-dashboard-bg">
+              <PostGlobalAnalysisInput
+                placeholder="Post a new global analysis..."
+                assets={assets}
+                onCreated={handleCreate}
+              />
+            </div>
+          )}
         </div>
       </div>
 

@@ -24,7 +24,7 @@ import type { LucideIcon } from "lucide-react";
 import { useState, useCallback, useMemo, useEffect } from "react";
 import { useAssets } from "@/context/AssetsContext";
 import { assetsApi } from "@/lib/api";
-import { assetAnalysisHref } from "@/lib/assetRoutes";
+import { assetAnalysisHref, favoritesAssetAnalysisHref } from "@/lib/assetRoutes";
 import type { AssetConfig } from "@/types/asset";
 
 const SIDEBAR_OPEN_TYPE_KEY = "sidebar-open-asset-type";
@@ -80,6 +80,8 @@ interface SidebarProps {
   onToggleOverlay?: () => void;
   /** When true, sidebar is in overlay mode (hamburger lives in main area) */
   isOverlayMode?: boolean;
+  /** Favorites popup: only fundamental asset + global favorites routes */
+  favoritesNav?: boolean;
 }
 
 export function Sidebar({
@@ -89,6 +91,7 @@ export function Sidebar({
   onToggleCollapsed,
   onToggleOverlay,
   isOverlayMode = false,
+  favoritesNav = false,
 }: SidebarProps) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -120,18 +123,22 @@ export function Sidebar({
 
   /** Active asset slug: query route (/fundamental-analysis/asset?slug=) or legacy /fundamental-analysis/:slug */
   const activeAssetSlug = useMemo(() => {
-    if (pathname === "/fundamental-analysis/asset") {
+    const assetPath = favoritesNav ? "/fundamental-analysis/favorites/asset" : "/fundamental-analysis/asset";
+    if (pathname === assetPath) {
       const raw = searchParams.get("slug");
       if (!raw?.trim()) return null;
       return raw.trim().toLowerCase().replace(/\s/g, "-");
     }
+    if (favoritesNav) return null;
     const base = "/fundamental-analysis/";
     if (!pathname.startsWith(base)) return null;
     const suffix = pathname.slice(base.length);
     const first = suffix.split("/")[0];
     if (!first || first === "asset") return null;
     return first.length > 0 ? first : null;
-  }, [pathname, searchParams]);
+  }, [pathname, searchParams, favoritesNav]);
+
+  const assetHref = favoritesNav ? favoritesAssetAnalysisHref : assetAnalysisHref;
 
   const handleMove = useCallback(
     async (assetId: string, direction: "up" | "down") => {
@@ -160,15 +167,29 @@ export function Sidebar({
     });
   }, []);
 
-  const topLevelNav: (NavItemWithAssets | NavItemSimple)[] = isAnalytics
-    ? analyticsNavItems
-    : [
-        { href: "/fundamental-analysis", label: "Assets", icon: Coins, assets, subNav: [] },
-        { href: "/global-analysis", label: "Global Analysis", icon: Globe },
-        { href: "/watch-list", label: "Watch List", icon: Eye },
-        { href: "/calendar", label: "Calendar", icon: Calendar },
-        ...otherNavItems,
+  const topLevelNav = useMemo((): (NavItemWithAssets | NavItemSimple)[] => {
+    if (isAnalytics) return analyticsNavItems;
+    const assetsItem: NavItemWithAssets = {
+      href: "/fundamental-analysis",
+      label: "Assets",
+      icon: Coins,
+      assets,
+      subNav: [],
+    };
+    if (favoritesNav) {
+      return [
+        assetsItem,
+        { href: "/fundamental-analysis/favorites/global", label: "Global Analysis", icon: Globe },
       ];
+    }
+    return [
+      assetsItem,
+      { href: "/global-analysis", label: "Global Analysis", icon: Globe },
+      { href: "/watch-list", label: "Watch List", icon: Eye },
+      { href: "/calendar", label: "Calendar", icon: Calendar },
+      ...otherNavItems,
+    ];
+  }, [isAnalytics, favoritesNav, assets]);
 
   const showAsOverlay = isOverlayMode;
   const isExpanded = !collapsed || (isOverlayMode && overlayOpen);
@@ -245,14 +266,21 @@ export function Sidebar({
 
             if ("assets" in item) {
               if (!isExpanded) {
+                const collapsedAssetsHref =
+                  favoritesNav && assets[0]?.slug
+                    ? assetHref(assets[0].slug)
+                    : favoritesNav
+                      ? "/fundamental-analysis/favorites/global"
+                      : "/assets";
+                const collapsedAssetsActive = favoritesNav
+                  ? pathname.startsWith("/fundamental-analysis/favorites")
+                  : pathname === "/assets" || pathname.startsWith("/fundamental-analysis");
                 return (
                   <li key="assets" className="w-full flex justify-center">
                     <Link
-                      href="/assets"
+                      href={collapsedAssetsHref}
                       className={`flex h-10 w-10 items-center justify-center rounded-lg transition-colors ${
-                        pathname === "/assets" || pathname.startsWith("/fundamental-analysis")
-                          ? "bg-primary/15 text-primary"
-                          : "text-sidebar-foreground hover:bg-sidebar-hover"
+                        collapsedAssetsActive ? "bg-primary/15 text-primary" : "text-sidebar-foreground hover:bg-sidebar-hover"
                       }`}
                       title="Assets"
                       aria-label="Assets"
@@ -264,10 +292,11 @@ export function Sidebar({
               }
               const itemWithAssets = item as NavItemWithAssets;
               const assetsExpanded = assetsOpen;
-              const subActive =
-                pathname.startsWith("/fundamental-analysis") ||
-                pathname === "/assets" ||
-                itemWithAssets.subNav.some((s: NavSubItem) => pathname === s.href);
+              const subActive = favoritesNav
+                ? pathname.startsWith("/fundamental-analysis/favorites")
+                : pathname.startsWith("/fundamental-analysis") ||
+                  pathname === "/assets" ||
+                  itemWithAssets.subNav.some((s: NavSubItem) => pathname === s.href);
               return (
                 <li key="assets" className="w-full">
                   <button
@@ -291,19 +320,21 @@ export function Sidebar({
                   </button>
                   {assetsExpanded && (
                     <ul className="mt-0.5 space-y-0.5 pl-4">
-                      <li>
-                        <Link
-                          href="/assets"
-                          className={`flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
-                            pathname === "/assets"
-                              ? "bg-primary/15 text-primary"
-                              : "text-sidebar-foreground hover:bg-sidebar-hover"
-                          }`}
-                        >
-                          <BarChart3 className="h-4 w-4 shrink-0" />
-                          All assets
-                        </Link>
-                      </li>
+                      {!favoritesNav && (
+                        <li>
+                          <Link
+                            href="/assets"
+                            className={`flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
+                              pathname === "/assets"
+                                ? "bg-primary/15 text-primary"
+                                : "text-sidebar-foreground hover:bg-sidebar-hover"
+                            }`}
+                          >
+                            <BarChart3 className="h-4 w-4 shrink-0" />
+                            All assets
+                          </Link>
+                        </li>
+                      )}
                       {itemWithAssets.assets.length > 0 && (
                         <li>
                           <ul className="mt-0.5 space-y-0.5 pl-2">
@@ -346,7 +377,7 @@ export function Sidebar({
                                             return (
                                               <li key={asset.id ?? asset.slug} className="flex items-center gap-0.5 group/list-item">
                                                 <Link
-                                                  href={assetAnalysisHref(asset.slug)}
+                                                  href={assetHref(asset.slug)}
                                                   className={`flex-1 min-w-0 rounded-lg px-3 py-2 text-xs truncate ${
                                                     isAssetActive
                                                       ? "bg-primary/15 text-primary font-medium"
