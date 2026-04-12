@@ -88,7 +88,7 @@ export function WeeklyCalendarModal({
       ? "Save calendar"
       : "Create calendar";
 
-  const { initialFrom, initialTo } = useMemo(
+  const { from: initialFrom, to: initialTo } = useMemo(
     () => parseInitialRange(initialStartDate, initialEndDate),
     [initialStartDate, initialEndDate],
   );
