@@ -20,6 +20,54 @@ function getOutDir() {
     : path.join(__dirname, "..", "out");
 }
 
+/**
+ * Next.js static export uses `out/<route>.html` (e.g. fundamental-analysis/asset.html).
+ * Serving root index.html for deep URLs breaks the flight payload → white screen on reload / window.open.
+ */
+function joinUnderOutRoot(outRootResolved, posixRel) {
+  const parts = posixRel
+    .split("/")
+    .filter(Boolean)
+    .filter((p) => p !== ".");
+  if (parts.some((p) => p === "..")) return null;
+  return path.join(outRootResolved, ...parts);
+}
+
+function resolveExportedHtmlPath(outDir, pathnameRaw) {
+  const outRoot = path.resolve(outDir);
+  let pathname = String(pathnameRaw || "").replace(/^\/+/, "");
+  try {
+    pathname = decodeURIComponent(pathname);
+  } catch {
+    /* keep */
+  }
+  pathname = pathname.split("?")[0].split("#")[0].replace(/\\/g, "/").replace(/\/+$/, "");
+
+  const tryFile = (posixRel) => {
+    const full = joinUnderOutRoot(outRoot, posixRel);
+    if (!full) return null;
+    if (fs.existsSync(full) && fs.statSync(full).isFile()) return full;
+    return null;
+  };
+
+  if (!pathname) {
+    return tryFile("index.html") || path.join(outRoot, "index.html");
+  }
+
+  const candidates = [
+    pathname,
+    `${pathname}.html`,
+    `${pathname}/index.html`,
+  ];
+
+  for (const c of candidates) {
+    const hit = tryFile(c);
+    if (hit) return hit;
+  }
+
+  return path.join(outRoot, "index.html");
+}
+
 ipcMain.handle("settings:choose-directory", async () => {
   const result = await dialog.showOpenDialog({
     properties: ["openDirectory"],
@@ -158,6 +206,52 @@ function startServer() {
   });
 }
 
+const preloadPath = path.join(__dirname, "preload.js");
+
+function attachPopupAndNavigationHandlers(webContents) {
+  webContents.setWindowOpenHandler(({ url }) => {
+    try {
+      const parsed = new URL(url);
+      if (parsed.protocol === "app:") {
+        return {
+          action: "allow",
+          overrideBrowserWindowOptions: {
+            webPreferences: {
+              nodeIntegration: false,
+              contextIsolation: true,
+              webSecurity: true,
+              preload: preloadPath,
+            },
+          },
+        };
+      }
+      if (isDev && (parsed.protocol === "http:" || parsed.protocol === "https:")) {
+        const host = parsed.hostname;
+        if (host === "localhost" || host === "127.0.0.1") {
+          return {
+            action: "allow",
+            overrideBrowserWindowOptions: {
+              webPreferences: {
+                nodeIntegration: false,
+                contextIsolation: true,
+                webSecurity: true,
+                preload: preloadPath,
+              },
+            },
+          };
+        }
+      }
+    } catch {
+      /* ignore */
+    }
+    return { action: "deny" };
+  });
+
+  webContents.on("did-create-window", (childWindow) => {
+    attachPopupAndNavigationHandlers(childWindow.webContents);
+  });
+}
+
 function createWindow(serverError = null) {
   const mainWindow = new BrowserWindow({
     width: 1280,
@@ -167,10 +261,12 @@ function createWindow(serverError = null) {
       nodeIntegration: false,
       contextIsolation: true,
       webSecurity: true,
-      preload: path.join(__dirname, "preload.js"),
+      preload: preloadPath,
     },
     show: false,
   });
+
+  attachPopupAndNavigationHandlers(mainWindow.webContents);
 
   mainWindow.once("ready-to-show", () => {
     mainWindow.show();
@@ -217,31 +313,13 @@ app.whenReady().then(async () => {
     const outDir = getOutDir();
     protocol.handle("app", (request) => {
       const url = new URL(request.url);
-      let filePath = url.pathname.replace(/^\/+/, "");
-      try {
-        filePath = decodeURIComponent(filePath.replace(/%20/g, " "));
-      } catch {
-        filePath = filePath.replace(/%20/g, " ");
-      }
-      if (!filePath) filePath = "index.html";
-      const fullPath = path.resolve(outDir, filePath);
+      const pathname = url.pathname || "/";
       const outDirResolved = path.resolve(outDir);
-      if (!fullPath.startsWith(outDirResolved + path.sep) && fullPath !== outDirResolved) {
+      const resolved = resolveExportedHtmlPath(outDir, pathname);
+      if (!resolved.startsWith(outDirResolved + path.sep) && resolved !== outDirResolved) {
         return net.fetch(pathToFileURL(path.join(outDir, "index.html")).href);
       }
-      if (fs.existsSync(fullPath)) {
-        const stat = fs.statSync(fullPath);
-        if (stat.isFile()) {
-          return net.fetch(pathToFileURL(fullPath).href);
-        }
-        if (stat.isDirectory()) {
-          fullPath = path.join(fullPath, "index.html");
-          if (fs.existsSync(fullPath)) {
-            return net.fetch(pathToFileURL(fullPath).href);
-          }
-        }
-      }
-      return net.fetch(pathToFileURL(path.join(outDir, "index.html")).href);
+      return net.fetch(pathToFileURL(resolved).href);
     });
   }
   startServer()
