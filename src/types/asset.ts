@@ -38,6 +38,8 @@ export interface StreamEntry {
   analysisType?: string;
   /** Scope label: "GLOBAL", "USD•EUR•...", or single asset name for asset analysis */
   scopeLabel?: string | null;
+  /** True when this row is a full global-scope analysis (server scopeLabel === "GLOBAL") */
+  globalFullScope?: boolean;
   /** Starred in the analysis stream */
   favorite?: boolean;
 }

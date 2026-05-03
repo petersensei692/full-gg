@@ -12,6 +12,10 @@ export type AnalysisStreamFiltersStored = {
     em: number;
     ed: number;
   } | null;
+  /** Asset analysis stream: hide analyses whose scope is full GLOBAL */
+  hideGlobalScoped?: boolean;
+  /** Global analysis page: show only entries with scope === "global" */
+  globalOnly?: boolean;
 };
 
 const GLOBAL_KEY = "gg:fundamentalAnalysisStream:global";
@@ -26,7 +30,7 @@ function favWinAssetKey(assetId: string): string {
 }
 
 /** Favorites popup: only type + date range (stream is always favorites). */
-export type FavoritesWindowStreamFiltersStored = Omit<AnalysisStreamFiltersStored, "favoritesOnly">;
+export type FavoritesWindowStreamFiltersStored = Omit<AnalysisStreamFiltersStored, "favoritesOnly" | "globalOnly">;
 
 export function serializeDateRangeForStorage(range: DateRange): AnalysisStreamFiltersStored["dateRange"] {
   if (!range) return null;
@@ -89,6 +93,7 @@ export function saveAssetAnalysisStreamFilters(assetId: string, f: AnalysisStrea
 
 function normalizeFavWindowPartial(p: Partial<AnalysisStreamFiltersStored>): FavoritesWindowStreamFiltersStored {
   const analysisFilter = typeof p.analysisFilter === "string" ? p.analysisFilter : "all";
+  const hideGlobalScoped = typeof p.hideGlobalScoped === "boolean" ? p.hideGlobalScoped : false;
   let dateRange: AnalysisStreamFiltersStored["dateRange"] = null;
   if (p.dateRange && typeof p.dateRange === "object") {
     const r = p.dateRange as Record<string, unknown>;
@@ -106,7 +111,7 @@ function normalizeFavWindowPartial(p: Partial<AnalysisStreamFiltersStored>): Fav
       };
     }
   }
-  return { analysisFilter, dateRange };
+  return { analysisFilter, dateRange, hideGlobalScoped };
 }
 
 export function loadFavoritesWindowGlobalFilters(): FavoritesWindowStreamFiltersStored | null {
@@ -136,6 +141,8 @@ export function saveFavoritesWindowAssetFilters(assetId: string, f: FavoritesWin
 function normalizePartial(p: Partial<AnalysisStreamFiltersStored>): AnalysisStreamFiltersStored {
   const analysisFilter = typeof p.analysisFilter === "string" ? p.analysisFilter : "all";
   const favoritesOnly = typeof p.favoritesOnly === "boolean" ? p.favoritesOnly : false;
+  const hideGlobalScoped = typeof p.hideGlobalScoped === "boolean" ? p.hideGlobalScoped : false;
+  const globalOnly = typeof p.globalOnly === "boolean" ? p.globalOnly : false;
   let dateRange: AnalysisStreamFiltersStored["dateRange"] = null;
   if (p.dateRange && typeof p.dateRange === "object") {
     const r = p.dateRange as Record<string, unknown>;
@@ -153,5 +160,5 @@ function normalizePartial(p: Partial<AnalysisStreamFiltersStored>): AnalysisStre
       };
     }
   }
-  return { analysisFilter, favoritesOnly, dateRange };
+  return { analysisFilter, favoritesOnly, dateRange, hideGlobalScoped, globalOnly };
 }

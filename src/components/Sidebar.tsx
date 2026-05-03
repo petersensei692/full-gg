@@ -8,8 +8,6 @@ import {
   LayoutDashboard,
   ArrowLeftRight,
   PieChart,
-  Eye,
-  Calendar,
   Settings,
   ChevronDown,
   ChevronRight,
@@ -19,6 +17,7 @@ import {
   Coins,
   Menu,
   House,
+  Calendar,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useState, useCallback, useMemo, useEffect } from "react";
@@ -214,13 +213,13 @@ export function Sidebar({
       return [
         assetsItem,
         { href: "/fundamental-analysis/favorites/global", label: "Global Analysis", icon: Globe },
+        { href: "/watch-list", label: "Weekly watchlist", icon: Calendar },
       ];
     }
     return [
       assetsItem,
       { href: "/global-analysis", label: "Global Analysis", icon: Globe },
-      { href: "/watch-list", label: "Watch List", icon: Eye },
-      { href: "/calendar", label: "Calendar", icon: Calendar },
+      { href: "/watch-list", label: "Weekly watchlist", icon: Calendar },
       ...otherNavItems,
     ];
   }, [isAnalytics, favoritesNav, assets]);

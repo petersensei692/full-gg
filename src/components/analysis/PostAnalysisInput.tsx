@@ -2,8 +2,9 @@
 
 import { useRef, useState, useCallback } from "react";
 import { Bold, Italic, Underline, PenSquare } from "lucide-react";
-import { useImagePaste } from "@/hooks/useImagePaste";
+import { useAnalysisEditorPaste } from "@/hooks/useAnalysisEditorPaste";
 import { Dialog, DialogContent } from "@/components/ui/Dialog";
+import { EventImageThumb } from "@/components/analysis/EventImageThumb";
 import { deleteStoredImage } from "@/lib/imageUpload";
 import { ConfirmDeleteDialog } from "@/components/ui/ConfirmDeleteDialog";
 import { isHtmlEffectivelyEmpty } from "@/lib/html-empty";
@@ -30,7 +31,7 @@ export function PostAnalysisInput({ placeholder, onCreated }: PostAnalysisInputP
   const [, setEditorBump] = useState(0);
   const [imagePendingRemove, setImagePendingRemove] = useState<string | null>(null);
 
-  const { handlePaste } = useImagePaste({
+  const { handlePaste } = useAnalysisEditorPaste({
     editorRef,
     onImageReady: (img) => {
       setImages((prev) => [...prev, img]);
@@ -89,7 +90,7 @@ export function PostAnalysisInput({ placeholder, onCreated }: PostAnalysisInputP
         onPaste={handlePaste}
         onInput={() => setEditorBump((n) => n + 1)}
         onClick={handleEditorClick}
-        className="min-h-[82px] max-h-[123px] overflow-y-auto w-full min-w-0 rounded-lg border border-sidebar-border bg-header-input px-3 py-2.5 text-sm text-dashboard-foreground placeholder:text-dashboard-foreground/50 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary break-words [&:empty::before]:content-[attr(data-placeholder)] [&:empty::before]:text-dashboard-foreground/50 [&_*]:break-words [&_img]:max-w-[50%] [&_img]:w-[50%] [&_img]:h-auto [&_img]:object-contain [&_img]:rounded-lg [&_img]:cursor-pointer [&_img]:block [&_img]:my-2 [&_h1]:text-xl [&_h1]:font-bold [&_h2]:text-lg [&_h2]:font-semibold [&_h3]:text-base [&_h3]:font-medium [&_u]:underline"
+        className="min-h-[82px] max-h-[123px] overflow-y-auto w-full min-w-0 rounded-lg border border-sidebar-border bg-header-input px-3 py-2.5 text-sm text-dashboard-foreground placeholder:text-dashboard-foreground/50 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary break-words antialiased [&:empty::before]:content-[attr(data-placeholder)] [&:empty::before]:text-dashboard-foreground/50 [&_*]:break-words [&_img]:max-w-[min(50%,480px)] [&_img]:w-auto [&_img]:h-auto [&_img]:object-contain [&_img]:rounded-lg [&_img]:cursor-pointer [&_img]:block [&_img]:my-2 [&_h1]:text-xl [&_h1]:font-bold [&_h2]:text-lg [&_h2]:font-semibold [&_h3]:text-base [&_h3]:font-medium [&_u]:underline"
         suppressContentEditableWarning
         suppressHydrationWarning
       />
@@ -194,31 +195,28 @@ export function PostAnalysisInput({ placeholder, onCreated }: PostAnalysisInputP
       </div>
 
       {images.length > 0 && (
-        <div className="mt-3 flex flex-wrap gap-2">
-          {images.map((img) => (
-            <div key={img.path} className="relative">
-              <button
-                type="button"
-                onClick={() => setZoomedImageSrc(img.url)}
-                className="block"
-              >
-                <img
+        <div className="mt-3 space-y-2">
+          <p className="text-xs font-medium text-dashboard-foreground/70">Attached images — click to preview</p>
+          <div className="flex flex-wrap gap-3">
+            {images.map((img) => (
+              <div key={img.path} className="relative inline-block">
+                <EventImageThumb
                   src={img.url}
                   alt="Attached"
-                  className="h-20 w-28 object-cover rounded-lg border border-sidebar-border hover:border-primary/50 transition-colors"
+                  imgClassName="h-24 max-w-[200px] rounded-lg border border-sidebar-border object-contain bg-black/10"
                 />
-              </button>
-              <button
-                type="button"
-                onClick={() => setImagePendingRemove(img.path)}
-                className="absolute -top-2 -right-2 rounded-full bg-red-500 text-white text-xs w-5 h-5 flex items-center justify-center shadow"
-                aria-label="Remove image"
-                title="Remove image"
-              >
-                ×
-              </button>
-            </div>
-          ))}
+                <button
+                  type="button"
+                  onClick={() => setImagePendingRemove(img.path)}
+                  className="absolute -top-2 -right-2 z-[2] rounded-full bg-red-500 text-white text-xs w-5 h-5 flex items-center justify-center shadow"
+                  aria-label="Remove image"
+                  title="Remove image"
+                >
+                  ×
+                </button>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 

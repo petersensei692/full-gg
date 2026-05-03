@@ -10,7 +10,7 @@ import type {
   WatchItem,
 } from "@/types/api";
 import type { WatchlistBias } from "@/types/calendar";
-import { useImagePaste } from "@/hooks/useImagePaste";
+import { useAnalysisEditorPaste } from "@/hooks/useAnalysisEditorPaste";
 import { deleteStoredImage } from "@/lib/imageUpload";
 import { ConfirmDeleteDialog } from "@/components/ui/ConfirmDeleteDialog";
 import { getImageUrl } from "@/lib/imageUrls";
@@ -150,7 +150,8 @@ export function CreatePairModal({
     initialItem?.thesis?.images?.[0],
   ]);
 
-  const { handlePaste: handleThesisPaste } = useImagePaste({
+  const { handlePaste: handleThesisPaste } = useAnalysisEditorPaste({
+    editorRef: thesisRef,
     onImageReady: (img) => setThesisImages((prev) => [...prev, img]),
   });
 

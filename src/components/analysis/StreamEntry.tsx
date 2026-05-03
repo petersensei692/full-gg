@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { StreamEntry as StreamEntryType } from "@/types/asset";
-import { Trash2, X, Star } from "lucide-react";
+import { Trash2, X, Star, GripVertical } from "lucide-react";
 import { AnalysisImage } from "@/components/ui/AnalysisImage";
 import { ConfirmDeleteDialog } from "@/components/ui/ConfirmDeleteDialog";
 import { getImageUrl } from "@/lib/imageUrls";
@@ -33,8 +33,15 @@ interface StreamEntryProps {
   onDelete?: () => void;
   onDeleteImage?: (path: string) => void;
   onUpdateImageName?: (path: string, name: string) => void;
+  /** Persist new image path order (same length as entry.images). */
+  onReorderImages?: (orderedPaths: string[]) => void;
   onEdit?: () => void;
   onToggleFavorite?: () => void;
+  /**
+   * Use full width of the scroll column (favorites sidebar, or main stream when docked beside favorites).
+   * Omit to keep responsive max-width bands on large viewports.
+   */
+  fillColumnWidth?: boolean;
 }
 
 export function StreamEntry({
@@ -45,10 +52,13 @@ export function StreamEntry({
   onDelete,
   onDeleteImage,
   onUpdateImageName,
+  onReorderImages,
   onEdit,
   onToggleFavorite,
+  fillColumnWidth = false,
 }: StreamEntryProps) {
   const [draftNames, setDraftNames] = useState<Record<string, string>>({});
+  const [dragPath, setDragPath] = useState<string | null>(null);
   const [confirmDeleteEntryOpen, setConfirmDeleteEntryOpen] = useState(false);
   const [confirmDeleteImagePath, setConfirmDeleteImagePath] = useState<string | null>(null);
 
@@ -112,7 +122,11 @@ export function StreamEntry({
     <article className="pb-3 last:pb-0">
       {separatorTop}
       <div
-        className={`min-w-0 w-full max-w-full sm:max-w-[90%] md:max-w-[80%] lg:max-w-[70%] xl:max-w-[60%] 2xl:max-w-[50%] rounded-xl border border-sidebar-border border-l-4 ${borderClass} bg-sidebar/50 p-4 shadow-sm overflow-hidden`}
+        className={
+          fillColumnWidth
+            ? `min-w-0 w-full max-w-full rounded-xl border border-sidebar-border border-l-4 ${borderClass} bg-sidebar/50 p-4 shadow-sm overflow-hidden antialiased [transform:translateZ(0)]`
+            : `min-w-0 w-full max-w-full sm:max-w-[90%] md:max-w-[80%] lg:max-w-[70%] xl:max-w-[60%] 2xl:max-w-[50%] rounded-xl border border-sidebar-border border-l-4 ${borderClass} bg-sidebar/50 p-4 shadow-sm overflow-hidden antialiased [transform:translateZ(0)]`
+        }
       >
         <div className="flex items-center justify-between gap-2 mb-2">
           <div className={`text-xs font-semibold uppercase tracking-wider ${textColorClass}`}>
@@ -172,7 +186,7 @@ export function StreamEntry({
         </div>
         {hasTextContent ? (
           <div
-            className="stream-entry-content min-w-0 max-w-full break-words text-sm text-dashboard-foreground/90 leading-relaxed mb-2 [&_*]:break-words [&_*]:min-w-0 [&_*]:max-w-full [&_img]:max-w-[50%] [&_img]:w-[50%] [&_img]:max-h-[300px] [&_img]:h-auto [&_img]:object-contain [&_img]:rounded-lg [&_img]:my-2 [&_img]:cursor-pointer [&_h1]:text-xl [&_h1]:font-bold [&_h2]:text-lg [&_h2]:font-semibold [&_h3]:text-base [&_h3]:font-medium"
+            className="stream-entry-content min-w-0 max-w-full break-words text-sm text-dashboard-foreground leading-relaxed mb-2 antialiased [&_*]:break-words [&_*]:min-w-0 [&_*]:max-w-full [&_img]:max-w-[min(50%,480px)] [&_img]:max-h-[300px] [&_img]:h-auto [&_img]:w-auto [&_img]:object-contain [&_img]:rounded-lg [&_img]:my-2 [&_img]:cursor-pointer [&_h1]:text-xl [&_h1]:font-bold [&_h2]:text-lg [&_h2]:font-semibold [&_h3]:text-base [&_h3]:font-medium"
             style={{ overflowWrap: "break-word" } as React.CSSProperties}
             dangerouslySetInnerHTML={{ __html: entry.content }}
           />
@@ -187,8 +201,45 @@ export function StreamEntry({
               return (
                 <div
                   key={path}
-                  className="relative min-w-0 flex flex-col gap-0 rounded-lg border border-sidebar-border bg-sidebar/50 overflow-hidden"
+                  draggable={!!onReorderImages}
+                  onDragStart={(e) => {
+                    if (!onReorderImages) return;
+                    setDragPath(path);
+                    e.dataTransfer.effectAllowed = "move";
+                    e.dataTransfer.setData("text/plain", path);
+                  }}
+                  onDragEnd={() => setDragPath(null)}
+                  onDragOver={(e) => {
+                    if (!onReorderImages || !dragPath) return;
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = "move";
+                  }}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    if (!onReorderImages || !dragPath || dragPath === path) return;
+                    const imgs = [...(entry.images ?? [])];
+                    const fromI = imgs.indexOf(dragPath);
+                    const toI = imgs.indexOf(path);
+                    if (fromI < 0 || toI < 0) return;
+                    const next = [...imgs];
+                    next.splice(fromI, 1);
+                    next.splice(toI, 0, dragPath);
+                    onReorderImages(next);
+                    setDragPath(null);
+                  }}
+                  className={`relative min-w-0 flex flex-col gap-0 rounded-lg border border-sidebar-border bg-sidebar/50 overflow-hidden ${
+                    dragPath === path ? "opacity-60 ring-1 ring-primary/40" : ""
+                  }`}
                 >
+                  {onReorderImages ? (
+                    <div
+                      className="flex items-center gap-1.5 px-2 py-1 border-b border-sidebar-border bg-sidebar/80 text-dashboard-foreground/50 cursor-grab active:cursor-grabbing select-none"
+                      title="Drag to reorder"
+                    >
+                      <GripVertical className="h-4 w-4 shrink-0" aria-hidden />
+                      <span className="text-[10px] uppercase tracking-wide">Drag to reorder</span>
+                    </div>
+                  ) : null}
                   <textarea
                     value={displayName}
                     spellCheck={false}

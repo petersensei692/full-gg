@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { GlobalAnalysis } from './entities/global-analysis.entity';
 import { Asset } from '../assets/entities/asset.entity';
@@ -9,7 +9,7 @@ import { AnalysisModule } from '../assets/analysis/analysis.module';
 @Module({
   imports: [
     TypeOrmModule.forFeature([GlobalAnalysis, Asset]),
-    AnalysisModule,
+    forwardRef(() => AnalysisModule),
   ],
   controllers: [GlobalAnalysisController],
   providers: [GlobalAnalysisService],

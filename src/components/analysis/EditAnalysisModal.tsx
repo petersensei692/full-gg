@@ -3,8 +3,9 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { Dialog, DialogContent } from "@/components/ui/Dialog";
 import { Bold, Italic, Underline, Check, ChevronDown } from "lucide-react";
-import { useImagePaste } from "@/hooks/useImagePaste";
+import { useAnalysisEditorPaste } from "@/hooks/useAnalysisEditorPaste";
 import { getImageUrl } from "@/lib/imageUrls";
+import { EventImageThumb } from "@/components/analysis/EventImageThumb";
 import { deleteStoredImage } from "@/lib/imageUpload";
 import { ConfirmDeleteDialog } from "@/components/ui/ConfirmDeleteDialog";
 import type { AssetConfig } from "@/types/asset";
@@ -126,7 +127,7 @@ export function EditAnalysisModal({
     };
   }, [open, initialNotes, initialImages, initialAnalysisType, globalScopeEditor]);
 
-  const { handlePaste } = useImagePaste({
+  const { handlePaste } = useAnalysisEditorPaste({
     editorRef,
     onImageReady: (img) => setImages((prev) => [...prev, img.path]),
   });
@@ -203,7 +204,7 @@ export function EditAnalysisModal({
       <DialogContent
         showClose={true}
         containToMain={true}
-        className="max-h-[85dvh] flex flex-col items-stretch justify-start overflow-hidden bg-sidebar border border-sidebar-border rounded-xl p-0 shadow-xl"
+        className="max-h-[85dvh] flex flex-col items-stretch justify-start overflow-hidden bg-sidebar border border-sidebar-border rounded-xl p-0 shadow-xl data-[state=open]:zoom-in-100 data-[state=closed]:zoom-out-100"
       >
         <div className="scrollbar-modal flex flex-col min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
           <div className="space-y-4 min-w-0 overflow-x-hidden p-6">
@@ -367,30 +368,33 @@ export function EditAnalysisModal({
               spellCheck={false}
               data-placeholder="Update your analysis notes..."
               onPaste={handlePaste}
-              className="min-h-[120px] max-h-[300px] w-full min-w-0 overflow-y-auto overflow-x-hidden rounded-b-lg rounded-t-none border border-sidebar-border bg-header-input px-3 py-2.5 text-sm text-dashboard-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary break-words [&:empty::before]:content-[attr(data-placeholder)] [&:empty::before]:text-dashboard-foreground/50 [&_*]:break-words [&_img]:max-w-[50%] [&_img]:max-h-[200px] [&_img]:w-[50%] [&_img]:h-auto [&_img]:object-contain [&_img]:rounded-lg [&_img]:cursor-pointer [&_img]:block [&_img]:my-2 [&_u]:underline [&_h1]:text-xl [&_h1]:font-bold [&_h2]:text-lg [&_h2]:font-semibold [&_h3]:text-base [&_h3]:font-medium"
+              className="min-h-[120px] max-h-[300px] w-full min-w-0 overflow-y-auto overflow-x-hidden rounded-b-lg rounded-t-none border border-sidebar-border bg-header-input px-3 py-2.5 text-sm text-dashboard-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary break-words antialiased [&:empty::before]:content-[attr(data-placeholder)] [&:empty::before]:text-dashboard-foreground/50 [&_*]:break-words [&_img]:max-w-[min(50%,480px)] [&_img]:max-h-[200px] [&_img]:w-auto [&_img]:h-auto [&_img]:object-contain [&_img]:rounded-lg [&_img]:cursor-pointer [&_img]:block [&_img]:my-2 [&_u]:underline [&_h1]:text-xl [&_h1]:font-bold [&_h2]:text-lg [&_h2]:font-semibold [&_h3]:text-base [&_h3]:font-medium"
               suppressContentEditableWarning
               suppressHydrationWarning
             />
             {images.length > 0 && (
-              <div className="flex flex-wrap gap-2">
-                {images.map((path) => (
-                  <div key={path} className="relative">
-                    <img
-                      src={getImageUrl(path)}
-                      alt="Analysis attachment"
-                      className="h-20 w-28 object-cover rounded-lg border border-sidebar-border"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setImagePendingRemove(path)}
-                      className="absolute -top-2 -right-2 rounded-full bg-red-500 text-white text-xs w-5 h-5 flex items-center justify-center shadow"
-                      aria-label="Remove image"
-                      title="Remove image"
-                    >
-                      ×
-                    </button>
-                  </div>
-                ))}
+              <div className="space-y-2">
+                <p className="text-xs font-medium text-dashboard-foreground/70">Attached images — click to preview</p>
+                <div className="flex flex-wrap gap-3">
+                  {images.map((path) => (
+                    <div key={path} className="relative inline-block">
+                      <EventImageThumb
+                        src={getImageUrl(path)}
+                        alt="Analysis attachment"
+                        imgClassName="h-24 max-w-[200px] rounded-lg border border-sidebar-border object-contain bg-black/10"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setImagePendingRemove(path)}
+                        className="absolute -top-2 -right-2 z-[2] rounded-full bg-red-500 text-white text-xs w-5 h-5 flex items-center justify-center shadow"
+                        aria-label="Remove image"
+                        title="Remove image"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
             <div className="flex justify-end gap-2 pt-2 border-t border-sidebar-border">

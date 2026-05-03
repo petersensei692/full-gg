@@ -413,7 +413,7 @@ export interface Analysis {
   imageNames?: string[] | null;
   /** "GLOBAL", "USD•EUR•...", or null for single-asset analysis */
   scopeLabel?: string | null;
-  /** Set when this analysis was created from a global analysis; edit/delete only from Global Analysis page */
+  /** Set when this analysis was synced from a global analysis (asset rows mirror global). */
   globalAnalysisId?: string | null;
   favorite?: boolean;
   createdAt: string;

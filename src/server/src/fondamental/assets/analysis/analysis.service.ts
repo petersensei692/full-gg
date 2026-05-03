@@ -1,21 +1,35 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
-
-const TRADE_NOTE_MARKER = '<!--analysis-type:tradeNote-->';
-
-function isTradeNoteAnalysisNotes(notes: string | null | undefined): boolean {
-  return (notes ?? '').includes(TRADE_NOTE_MARKER);
-}
+import {
+  Injectable,
+  NotFoundException,
+  ForbiddenException,
+  Inject,
+  forwardRef,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, Not, Repository } from 'typeorm';
 import { Analysis } from './entities/analysis.entity';
 import { CreateAnalysisDto } from './dto/create-analysis.dto';
 import { UpdateAnalysisDto } from './dto/update-analysis.dto';
+import { GlobalAnalysisService } from '../../global-analysis/global-analysis.service';
+
+const TRADE_NOTE_MARKER = '<!--analysis-type:tradeNote-->';
+
+/** Full global rollout: edits/deletes go through Global Analysis only. Asset-scoped copies use a different label (e.g. USD•EUR). */
+function isLockedFullGlobalChild(analysis: Analysis): boolean {
+  return !!analysis.globalAnalysisId && analysis.scopeLabel === 'GLOBAL';
+}
+
+function isTradeNoteAnalysisNotes(notes: string | null | undefined): boolean {
+  return (notes ?? '').includes(TRADE_NOTE_MARKER);
+}
 
 @Injectable()
 export class AnalysisService {
   constructor(
     @InjectRepository(Analysis)
     private readonly analysisRepository: Repository<Analysis>,
+    @Inject(forwardRef(() => GlobalAnalysisService))
+    private readonly globalAnalysisService: GlobalAnalysisService,
   ) {}
 
   async create(createDto: CreateAnalysisDto): Promise<Analysis> {
@@ -119,12 +133,22 @@ export class AnalysisService {
     const favoriteOnly =
       updateDto.favorite !== undefined && !touchesContent;
 
+    const linkedNonGlobal =
+      !!analysis.globalAnalysisId && !isLockedFullGlobalChild(analysis);
+
+    if (linkedNonGlobal && (favoriteOnly || touchesContent)) {
+      return this.globalAnalysisService.propagateFromAssetAnalysis(
+        id,
+        updateDto,
+      );
+    }
+
     if (favoriteOnly) {
       analysis.favorite = updateDto.favorite as boolean;
       return this.analysisRepository.save(analysis);
     }
 
-    if (analysis.globalAnalysisId) {
+    if (isLockedFullGlobalChild(analysis)) {
       throw new ForbiddenException(
         'This analysis was created from a global analysis. Edit it from the Global Analysis page.',
       );
@@ -157,7 +181,7 @@ export class AnalysisService {
 
   async remove(id: string): Promise<void> {
     const analysis = await this.findOne(id);
-    if (analysis.globalAnalysisId) {
+    if (isLockedFullGlobalChild(analysis)) {
       throw new ForbiddenException(
         'This analysis was created from a global analysis. Delete it from the Global Analysis page.',
       );

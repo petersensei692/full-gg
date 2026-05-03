@@ -1,10 +1,9 @@
 "use client";
 
-import { MessageSquare, CalendarDays, Eye } from "lucide-react";
+import { MessageSquare, Eye } from "lucide-react";
 
 const TABS = [
-  { id: "stream", label: "Analysis Stream", icon: MessageSquare },
-  { id: "events", label: "Economic Events", icon: CalendarDays },
+  { id: "stream", label: "Analysis", icon: MessageSquare },
   { id: "watchlist", label: "Pair Watchlist", icon: Eye },
 ] as const;
 

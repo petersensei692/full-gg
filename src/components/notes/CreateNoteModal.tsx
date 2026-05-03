@@ -3,7 +3,7 @@
 import { useRef, useCallback, useEffect, useState } from "react";
 import { Bold, Italic, Underline } from "lucide-react";
 import { Dialog, DialogContent } from "@/components/ui/Dialog";
-import { useImagePaste } from "@/hooks/useImagePaste";
+import { useAnalysisEditorPaste } from "@/hooks/useAnalysisEditorPaste";
 import { deleteStoredImage } from "@/lib/imageUpload";
 import { ConfirmDeleteDialog } from "@/components/ui/ConfirmDeleteDialog";
 import { getImageUrl } from "@/lib/imageUrls";
@@ -54,7 +54,8 @@ export function CreateNoteModal({
   const [submitting, setSubmitting] = useState(false);
   const [imagePendingRemove, setImagePendingRemove] = useState<string | null>(null);
 
-  const { handlePaste: handleImagePaste } = useImagePaste({
+  const { handlePaste } = useAnalysisEditorPaste({
+    editorRef,
     onImageReady: (img) => setNoteImages((prev) => [...prev, img]),
   });
 
@@ -138,34 +139,6 @@ export function CreateNoteModal({
     e.preventDefault();
   }, []);
 
-  /** Paste with preserved formatting (HTML from Word, Docs, web, etc.) */
-  const handlePaste = useCallback((e: React.ClipboardEvent) => {
-    e.preventDefault();
-    const editor = editorRef.current;
-    if (!editor) return;
-    const html = e.clipboardData.getData("text/html");
-    const text = e.clipboardData.getData("text/plain");
-    const data = html || text;
-    if (!data) return;
-    const sel = window.getSelection();
-    if (sel && sel.rangeCount > 0) {
-      const range = sel.getRangeAt(0);
-      range.deleteContents();
-      if (html) {
-        const frag = document.createRange().createContextualFragment(html);
-        range.insertNode(frag);
-      } else {
-        const textNode = document.createTextNode(text);
-        range.insertNode(textNode);
-      }
-      range.collapse(false);
-      sel.removeAllRanges();
-      sel.addRange(range);
-    } else {
-      document.execCommand("insertHTML", false, html || text.replace(/\n/g, "<br>"));
-    }
-  }, []);
-
   const handleSubmit = useCallback(async () => {
     const title = titleRef.current?.value?.trim() ?? "";
     const rawNote = editorRef.current?.innerHTML?.trim() ?? "";
@@ -191,14 +164,6 @@ export function CreateNoteModal({
       setSubmitting(false);
     }
   }, [onSubmit, onOpenChange, tier, type, noteImages]);
-
-  const handlePasteWithImages = useCallback(
-    (e: React.ClipboardEvent) => {
-      handleImagePaste(e);
-      if (!e.defaultPrevented) handlePaste(e);
-    },
-    [handleImagePaste, handlePaste]
-  );
 
   return (
     <>
@@ -339,7 +304,7 @@ export function CreateNoteModal({
               data-placeholder="Write your note... (Paste images to upload)"
               role="textbox"
               aria-multiline="true"
-              onPaste={handlePasteWithImages}
+              onPaste={handlePaste}
               className="min-h-[200px] min-w-0 max-w-full flex-1 w-full overflow-x-hidden overflow-y-auto break-words rounded-lg border border-sidebar-border bg-header-input px-3 py-2.5 text-sm text-dashboard-foreground placeholder:text-dashboard-foreground/50 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary [&:empty::before]:content-[attr(data-placeholder)] [&:empty::before]:text-dashboard-foreground/50 [&_h1]:text-xl [&_h1]:font-bold [&_h2]:text-lg [&_h2]:font-semibold [&_h3]:text-base [&_h3]:font-medium [&_u]:underline [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:list-decimal [&_ol]:pl-6 [&_li]:my-0.5 [&_*]:break-words [&_*]:min-w-0 [&_*]:max-w-full [&_img]:max-w-[50%] [&_img]:rounded-lg [&_img]:my-2"
               style={{ wordBreak: "break-word" } as React.CSSProperties}
               suppressContentEditableWarning

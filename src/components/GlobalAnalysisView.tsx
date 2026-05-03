@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useCallback, useMemo, useEffect, useRef } from "react";
+import { useState, useCallback, useMemo, useEffect, useRef, useLayoutEffect } from "react";
+import { createPortal } from "react-dom";
 import type { StreamEntry } from "@/types/asset";
 import type { GlobalAnalysis } from "@/types/api";
 import { globalAnalysisService } from "@/lib/api";
@@ -9,7 +10,8 @@ import { StreamEntry as StreamEntryComponent } from "./analysis/StreamEntry";
 import { PostGlobalAnalysisInput } from "./PostGlobalAnalysisInput";
 import { EditAnalysisModal } from "./analysis/EditAnalysisModal";
 import { DateRangePicker, type DateRange } from "./analysis/DateRangePicker";
-import { ChevronUp, ChevronDown, Star } from "lucide-react";
+import { ChevronUp, ChevronDown, SlidersHorizontal, Star } from "lucide-react";
+import { SidebarTrigger } from "./SidebarTrigger";
 import {
   deserializeDateRangeFromStorage,
   saveGlobalAnalysisStreamFilters,
@@ -19,8 +21,8 @@ import {
   saveFavoritesWindowGlobalFilters,
 } from "@/lib/analysis-stream-filters";
 import { broadcastAnalysisOrFavoriteChanged, subscribeAnalysisOrFavoriteChanged } from "@/lib/analysisBroadcast";
-import { openFavoritesWindow } from "@/lib/favoritesWindow";
-import { useFavoritesPopupOpen } from "@/hooks/useFavoritesPopupOpen";
+import { buildStreamEntryGroups } from "@/lib/analysis-stream-entry-groups";
+import { FavoritesAnalysisSidebar } from "./analysis/FavoritesAnalysisSidebar";
 
 const ANALYSIS_TYPE_TO_TAG: Record<
   string,
@@ -46,44 +48,28 @@ function formatTime(date: Date): string {
   return date.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true });
 }
 
-function formatDateGroup(ts: number): string {
-  const d = new Date(ts);
-  const today = new Date();
-  const yesterday = new Date(today);
-  yesterday.setDate(yesterday.getDate() - 1);
-  if (d.toDateString() === today.toDateString()) return "Today";
-  if (d.toDateString() === yesterday.toDateString()) return "Yesterday";
-  return d.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
-}
-
-function formatWeekGroup(ts: number): string {
-  const d = new Date(ts);
-  const dayOfWeek = d.getDay();
-  const monday = new Date(d);
-  monday.setDate(d.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1));
-  return `Week of ${monday.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}`;
-}
-
-function getWeekKey(ts: number): string {
-  const d = new Date(ts);
-  const dayOfWeek = d.getDay();
-  const monday = new Date(d);
-  monday.setDate(d.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1));
-  return monday.toISOString().slice(0, 10);
-}
-
 export function GlobalAnalysisView({ favoritesWindow = false }: { favoritesWindow?: boolean }) {
   const { assets } = useAssets();
   const [list, setList] = useState<GlobalAnalysis[]>([]);
   const [loading, setLoading] = useState(true);
   const [analysisFilter, setAnalysisFilter] = useState<string>("all");
   const [dateRange, setDateRange] = useState<DateRange>(null);
-  const favoritesPopupOpen = useFavoritesPopupOpen();
+  /** When true, only entries whose scope is full "global" (all assets) */
+  const [globalOnly, setGlobalOnly] = useState(false);
+  const [favoritesSidebarOpen, setFavoritesSidebarOpen] = useState(false);
+  const [globalFiltersMenuOpen, setGlobalFiltersMenuOpen] = useState(false);
   const [editing, setEditing] = useState<GlobalAnalysis | null>(null);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [pendingFocusId, setPendingFocusId] = useState<string | null>(null);
   const entryRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const streamScrollRef = useRef<HTMLDivElement | null>(null);
+  const globalFiltersButtonRef = useRef<HTMLButtonElement | null>(null);
+  const globalFiltersPanelRef = useRef<HTMLDivElement | null>(null);
+  const [globalFiltersDropdownPos, setGlobalFiltersDropdownPos] = useState<{
+    top: number;
+    left: number;
+    width: number;
+  } | null>(null);
   const didInitialAutoScrollRef = useRef(false);
   const filtersHydratedRef = useRef(false);
   const skipNextFilterPersistRef = useRef(true);
@@ -100,6 +86,9 @@ export function GlobalAnalysisView({ favoritesWindow = false }: { favoritesWindo
       if (stored) {
         setAnalysisFilter(stored.analysisFilter);
         setDateRange(deserializeDateRangeFromStorage(stored.dateRange));
+        setGlobalOnly(!!stored.globalOnly);
+      } else {
+        setGlobalOnly(false);
       }
     }
     filtersHydratedRef.current = true;
@@ -121,9 +110,48 @@ export function GlobalAnalysisView({ favoritesWindow = false }: { favoritesWindo
         analysisFilter,
         favoritesOnly: false,
         dateRange: serializeDateRangeForStorage(dateRange),
+        globalOnly,
       });
     }
-  }, [analysisFilter, favoritesWindow, dateRange]);
+  }, [analysisFilter, favoritesWindow, dateRange, globalOnly]);
+
+  const updateGlobalFiltersDropdownPosition = useCallback(() => {
+    if (!globalFiltersMenuOpen || !globalFiltersButtonRef.current) return;
+    const rect = globalFiltersButtonRef.current.getBoundingClientRect();
+    const width = Math.min(320, Math.max(260, window.innerWidth - 16));
+    let left = rect.left;
+    if (left + width > window.innerWidth - 8) left = Math.max(8, window.innerWidth - 8 - width);
+    if (left < 8) left = 8;
+    setGlobalFiltersDropdownPos({ top: rect.bottom + 6, left, width });
+  }, [globalFiltersMenuOpen]);
+
+  useLayoutEffect(() => {
+    if (!globalFiltersMenuOpen) {
+      setGlobalFiltersDropdownPos(null);
+      return;
+    }
+    updateGlobalFiltersDropdownPosition();
+    const onResize = () => updateGlobalFiltersDropdownPosition();
+    window.addEventListener("resize", onResize);
+    window.addEventListener("scroll", onResize, true);
+    return () => {
+      window.removeEventListener("resize", onResize);
+      window.removeEventListener("scroll", onResize, true);
+    };
+  }, [globalFiltersMenuOpen, updateGlobalFiltersDropdownPosition]);
+
+  useEffect(() => {
+    if (!globalFiltersMenuOpen) return;
+    const onDown = (e: MouseEvent) => {
+      const t = e.target as Node;
+      if (globalFiltersButtonRef.current?.contains(t)) return;
+      if (globalFiltersPanelRef.current?.contains(t)) return;
+      if ((t as Element | null)?.closest?.("[data-date-range-picker-panel]")) return;
+      setGlobalFiltersMenuOpen(false);
+    };
+    document.addEventListener("mousedown", onDown, true);
+    return () => document.removeEventListener("mousedown", onDown, true);
+  }, [globalFiltersMenuOpen]);
 
   const fetchList = useCallback(async () => {
     setLoading(true);
@@ -222,6 +250,24 @@ export function GlobalAnalysisView({ favoritesWindow = false }: { favoritesWindo
     [list]
   );
 
+  const handleReorderImages = useCallback(
+    async (gaId: string, orderedPaths: string[]) => {
+      const ga = list.find((g) => g.id === gaId);
+      if (!ga) return;
+      const oldOrder = ga.images ?? [];
+      if (orderedPaths.length !== oldOrder.length) return;
+      const nameByPath = new Map(oldOrder.map((p, i) => [p, ga.imageNames?.[i] ?? ""]));
+      const nextImageNames = orderedPaths.map((p) => nameByPath.get(p) ?? "");
+      const updated = await globalAnalysisService.update(gaId, {
+        images: orderedPaths,
+        imageNames: nextImageNames.length > 0 || (ga.imageNames?.length ?? 0) > 0 ? nextImageNames : undefined,
+      });
+      setList((prev) => prev.map((g) => (g.id === gaId ? { ...g, ...updated } : g)));
+      broadcastAnalysisOrFavoriteChanged();
+    },
+    [list]
+  );
+
   const handleToggleFavorite = useCallback(async (id: string, next: boolean) => {
     try {
       const updated = await globalAnalysisService.update(id, { favorite: next });
@@ -232,8 +278,13 @@ export function GlobalAnalysisView({ favoritesWindow = false }: { favoritesWindo
     }
   }, []);
 
+  const visibleGlobalList = useMemo(() => {
+    if (favoritesWindow || !globalOnly) return list;
+    return list.filter((ga) => ga.scope === "global");
+  }, [list, globalOnly, favoritesWindow]);
+
   const mappedEntries = useMemo((): StreamEntry[] => {
-    const entries = list.map((ga) => {
+    const entries = visibleGlobalList.map((ga) => {
       const createdAt = new Date(ga.createdAt).getTime();
       const imageList = ga.images ?? [];
       const names = ga.imageNames ?? [];
@@ -259,7 +310,7 @@ export function GlobalAnalysisView({ favoritesWindow = false }: { favoritesWindo
     });
     /** Oldest first, newest at bottom (same as asset analysis stream) */
     return entries.sort((a, b) => (a.createdAt ?? 0) - (b.createdAt ?? 0));
-  }, [list]);
+  }, [visibleGlobalList]);
 
   const filteredEntries = useMemo(() => {
     let entries = mappedEntries;
@@ -292,27 +343,14 @@ export function GlobalAnalysisView({ favoritesWindow = false }: { favoritesWindo
     return entries;
   }, [mappedEntries, analysisFilter, dateRange, favoritesWindow]);
 
-  const entriesWithGroups = useMemo(() => {
-    let lastWeekKey: string | undefined;
-    let lastDateKey: string | undefined;
-    return filteredEntries.map((entry, index) => {
-      const ts = entry.createdAt ?? 0;
-      const weekKey = ts ? getWeekKey(ts) : undefined;
-      const dateKey = ts ? new Date(ts).toDateString() : undefined;
-      const isNewWeek = weekKey && weekKey !== lastWeekKey;
-      const isNewDay = dateKey && dateKey !== lastDateKey;
-      if (weekKey) lastWeekKey = weekKey;
-      if (dateKey) lastDateKey = dateKey;
-      let separatorType: "same-day" | "new-day" | "new-week" | "first" = "first";
-      if (index > 0) {
-        if (isNewWeek) separatorType = "new-week";
-        else if (isNewDay) separatorType = "new-day";
-        else separatorType = "same-day";
-      }
-      const weekGroup = (isNewWeek || index === 0) && ts ? formatWeekGroup(ts) : undefined;
-      const dateGroup = (isNewDay || index === 0) && ts ? formatDateGroup(ts) : undefined;
-      return { entry, separatorType, weekGroup, dateGroup };
-    });
+  const entriesWithGroups = useMemo(
+    () => buildStreamEntryGroups(filteredEntries),
+    [filteredEntries]
+  );
+
+  const favoritesEntriesWithGroups = useMemo(() => {
+    const favOnly = filteredEntries.filter((e) => e.favorite);
+    return buildStreamEntryGroups(favOnly);
   }, [filteredEntries]);
 
   useEffect(() => {
@@ -346,107 +384,235 @@ export function GlobalAnalysisView({ favoritesWindow = false }: { favoritesWindo
     el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
   }, []);
 
+  const globalFiltersPanel = (
+    <div className="space-y-3">
+      <div className="space-y-1">
+        <span className="text-xs font-medium text-dashboard-foreground/70">Analysis type</span>
+        <select
+          value={analysisFilter}
+          onChange={(e) => setAnalysisFilter(e.target.value)}
+          className="w-full rounded-lg border border-sidebar-border bg-sidebar px-3 py-2 text-sm text-dashboard-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+        >
+          {ANALYSIS_FILTER_OPTIONS.map((opt) => (
+            <option key={opt.value} value={opt.value}>
+              {opt.label}
+            </option>
+          ))}
+        </select>
+      </div>
+      {!favoritesWindow && (
+        <button
+          type="button"
+          onClick={() => setFavoritesSidebarOpen((o) => !o)}
+          className={`flex w-full items-center justify-center gap-2 rounded-lg border p-2 text-sm font-medium transition-colors ${
+            favoritesSidebarOpen
+              ? "border-sky-500 bg-sky-500/15 text-sky-500"
+              : "border-sidebar-border bg-sidebar text-dashboard-foreground/70 hover:bg-sidebar-hover hover:text-dashboard-foreground"
+          }`}
+          aria-pressed={favoritesSidebarOpen}
+          title="Show favorite analyses"
+          aria-label="Show favorite analyses"
+        >
+          <Star className={`h-4 w-4 shrink-0 ${favoritesSidebarOpen ? "fill-current" : ""}`} />
+          Favorite analyses
+        </button>
+      )}
+      <div className="space-y-1">
+        <span className="text-xs font-medium text-dashboard-foreground/70">Date range</span>
+        <DateRangePicker
+          value={dateRange}
+          onChange={setDateRange}
+          className="w-full"
+          dropdownPlacement="beside"
+        />
+      </div>
+      {!favoritesWindow && (
+        <button
+          type="button"
+          role="switch"
+          aria-checked={globalOnly}
+          onClick={() => setGlobalOnly((v) => !v)}
+          title={
+            globalOnly
+              ? "Show all global analysis entries"
+              : "Show only analyses applied to all assets (global scope)"
+          }
+          className={`w-full rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
+            globalOnly
+              ? "border-primary bg-primary/15 text-dashboard-foreground"
+              : "border-sidebar-border bg-sidebar text-dashboard-foreground/70 hover:bg-sidebar-hover hover:text-dashboard-foreground"
+          }`}
+        >
+          Global only
+        </button>
+      )}
+    </div>
+  );
+
+  const globalHeaderBar = (
+    <div className="h-11 shrink-0 flex items-center gap-3 px-4 sm:px-6 border-b border-sidebar-border overflow-visible">
+      <SidebarTrigger />
+      <div className="relative shrink-0">
+        <button
+          ref={globalFiltersButtonRef}
+          type="button"
+          onClick={() => setGlobalFiltersMenuOpen((o) => !o)}
+          className="shrink-0 rounded-lg border border-sidebar-border p-2 text-header-muted hover:bg-sidebar-hover hover:text-primary"
+          title="Filters"
+          aria-label="Analysis filters"
+          aria-expanded={globalFiltersMenuOpen}
+          aria-haspopup="dialog"
+        >
+          <SlidersHorizontal className="h-4 w-4" />
+        </button>
+      </div>
+      <h2 className="flex-1 min-w-0 truncate text-center text-sm font-semibold text-dashboard-foreground sm:text-left">
+        Global Analysis
+      </h2>
+    </div>
+  );
+
+  const favoritesPanel =
+    favoritesEntriesWithGroups.length === 0 ? (
+      <p className="py-8 text-center text-sm text-dashboard-foreground/70">
+        No favorites match the current filters.
+      </p>
+    ) : (
+      <div className="min-w-0 w-full max-w-full space-y-0 pb-4">
+        {favoritesEntriesWithGroups.map(({ entry, separatorType, weekGroup, dateGroup }) => (
+          <div key={`fav-${entry.id}`}>
+            <StreamEntryComponent
+              entry={entry}
+              separatorType={separatorType}
+              weekGroup={weekGroup}
+              dateGroup={dateGroup}
+              fillColumnWidth
+              onDelete={() => handleDelete(entry.id)}
+              onUpdateImageName={(path, name) => handleUpdateImageName(entry.id, path, name)}
+              onReorderImages={(ordered) => handleReorderImages(entry.id, ordered)}
+              onEdit={() => {
+                const ga = list.find((g) => g.id === entry.id);
+                if (ga) handleEdit(ga);
+              }}
+              onToggleFavorite={() => handleToggleFavorite(entry.id, !entry.favorite)}
+            />
+          </div>
+        ))}
+      </div>
+    );
+
   return (
     <>
-      <div className="flex h-full min-h-0 flex-col overflow-auto">
-        <div className="shrink-0 flex flex-wrap items-center gap-3 px-6 py-3 border-b border-sidebar-border bg-sidebar/30">
-          <h2 className="hidden lg:block text-sm font-semibold text-dashboard-foreground truncate shrink-0 max-w-full">
-            Global Analysis
-          </h2>
-          <span className="text-sm text-dashboard-foreground/70 shrink-0">Filter:</span>
-          <select
-            value={analysisFilter}
-            onChange={(e) => setAnalysisFilter(e.target.value)}
-            className="rounded-lg border border-sidebar-border bg-sidebar px-3 py-2 text-sm text-dashboard-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary shrink-0"
+      {typeof document !== "undefined" &&
+        globalFiltersMenuOpen &&
+        globalFiltersDropdownPos &&
+        createPortal(
+          <div
+            ref={globalFiltersPanelRef}
+            className="fixed max-h-[min(70vh,520px)] overflow-y-auto rounded-lg border border-sidebar-border bg-sidebar p-3 shadow-xl"
+            style={{
+              top: globalFiltersDropdownPos.top,
+              left: globalFiltersDropdownPos.left,
+              width: globalFiltersDropdownPos.width,
+              zIndex: 10000,
+            }}
+            role="dialog"
+            aria-label="Global analysis filters"
           >
-            {ANALYSIS_FILTER_OPTIONS.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
-          {!favoritesWindow && (
-            <button
-              type="button"
-              onClick={() => openFavoritesWindow("/fundamental-analysis/favorites/global")}
-              className={`shrink-0 rounded-lg border p-2 transition-colors ${
-                favoritesPopupOpen
-                  ? "border-sky-500 bg-sky-500/15 text-sky-500"
-                  : "border-sidebar-border bg-sidebar text-dashboard-foreground/70 hover:bg-sidebar-hover hover:text-dashboard-foreground"
-              }`}
-              aria-pressed={favoritesPopupOpen}
-              title="Open favorite analyses in a window"
-              aria-label="Open favorite analyses in a window"
-            >
-              <Star className={`h-4 w-4 ${favoritesPopupOpen ? "fill-current" : ""}`} />
-            </button>
-          )}
-          <DateRangePicker value={dateRange} onChange={setDateRange} />
-        </div>
-        <div className="flex-1 flex flex-col min-h-0 w-full">
-          {/* Buttons are outside the scroll layer so they stay fixed to this panel’s bottom-right */}
-          <div className="flex-1 min-h-0 relative w-full">
-            <div
-              ref={streamScrollRef}
-              className="absolute inset-0 overflow-x-hidden overflow-y-auto px-6"
-            >
-              <div className="w-full max-w-full space-y-0 pb-4">
-                {loading ? (
-                  <p className="text-sm text-dashboard-foreground/70 py-4">Loading...</p>
-                ) : (
-                  entriesWithGroups.map(({ entry, separatorType, weekGroup, dateGroup }) => (
-                    <div
-                      key={entry.id}
-                      ref={(el) => {
-                        entryRefs.current[entry.id] = el;
-                      }}
+            {globalFiltersPanel}
+          </div>,
+          document.body
+        )}
+      <div className="flex h-full min-h-0 flex-col overflow-auto">
+        <div className="relative flex min-h-0 flex-1 flex-col">
+          <div className="relative flex min-h-0 flex-1 flex-col min-h-0 min-w-0 overflow-hidden">
+            {globalHeaderBar}
+            <div className="relative flex min-h-0 flex-1 flex-col min-w-0 overflow-hidden">
+            <div className="relative flex min-h-0 min-w-0 flex-1 flex-col">
+              <div className="relative min-h-0 flex-1 overflow-hidden">
+                <div
+                  ref={streamScrollRef}
+                  className="absolute inset-0 overflow-x-hidden overflow-y-auto px-6"
+                >
+                  <div className="w-full max-w-full space-y-0 pb-4">
+                    {loading ? (
+                      <p className="py-4 text-sm text-dashboard-foreground/70">Loading...</p>
+                    ) : (
+                      entriesWithGroups.map(({ entry, separatorType, weekGroup, dateGroup }) => (
+                        <div
+                          key={entry.id}
+                          ref={(el) => {
+                            entryRefs.current[entry.id] = el;
+                          }}
+                        >
+                          <StreamEntryComponent
+                            entry={entry}
+                            separatorType={separatorType}
+                            weekGroup={weekGroup}
+                            dateGroup={dateGroup}
+                            onDelete={() => handleDelete(entry.id)}
+                            onUpdateImageName={(path, name) => handleUpdateImageName(entry.id, path, name)}
+                            onReorderImages={(ordered) => handleReorderImages(entry.id, ordered)}
+                            onEdit={() => {
+                              const ga = list.find((g) => g.id === entry.id);
+                              if (ga) handleEdit(ga);
+                            }}
+                            onToggleFavorite={() =>
+                              handleToggleFavorite(entry.id, !entry.favorite)
+                            }
+                          />
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+
+                <div className="pointer-events-none absolute inset-0 z-20">
+                  <div
+                    className={
+                      favoritesSidebarOpen && !favoritesWindow
+                        ? "pointer-events-auto absolute bottom-4 right-[calc(50%+1rem)] flex flex-col gap-2"
+                        : "pointer-events-auto absolute bottom-4 right-8 flex flex-col gap-2"
+                    }
+                  >
+                    <button
+                      type="button"
+                      onClick={scrollToTop}
+                      className="h-9 w-9 rounded-lg border border-sidebar-border bg-sidebar/95 text-dashboard-foreground hover:bg-sidebar-hover transition-colors shadow-md backdrop-blur-sm"
+                      aria-label="Go to top"
+                      title="Go to top"
                     >
-                      <StreamEntryComponent
-                        entry={entry}
-                        separatorType={separatorType}
-                        weekGroup={weekGroup}
-                        dateGroup={dateGroup}
-                        onDelete={() => handleDelete(entry.id)}
-                        onUpdateImageName={(path, name) => handleUpdateImageName(entry.id, path, name)}
-                        onEdit={() => {
-                          const ga = list.find((g) => g.id === entry.id);
-                          if (ga) handleEdit(ga);
-                        }}
-                        onToggleFavorite={() =>
-                          handleToggleFavorite(entry.id, !entry.favorite)
-                        }
-                      />
-                    </div>
-                  ))
-                )}
+                      <ChevronUp className="h-5 w-5 mx-auto" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={scrollToBottom}
+                      className="h-9 w-9 rounded-lg border border-sidebar-border bg-sidebar/95 text-dashboard-foreground hover:bg-sidebar-hover transition-colors shadow-md backdrop-blur-sm"
+                      aria-label="Go to bottom"
+                      title="Go to bottom"
+                    >
+                      <ChevronDown className="h-5 w-5 mx-auto" />
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
 
-            <div className="pointer-events-none absolute inset-0 z-20">
-              <div className="pointer-events-auto absolute bottom-4 right-8 flex flex-col gap-2">
-                <button
-                  type="button"
-                  onClick={scrollToTop}
-                  className="h-9 w-9 rounded-lg border border-sidebar-border bg-sidebar/95 text-dashboard-foreground hover:bg-sidebar-hover transition-colors shadow-md backdrop-blur-sm"
-                  aria-label="Go to top"
-                  title="Go to top"
-                >
-                  <ChevronUp className="h-5 w-5 mx-auto" />
-                </button>
-                <button
-                  type="button"
-                  onClick={scrollToBottom}
-                  className="h-9 w-9 rounded-lg border border-sidebar-border bg-sidebar/95 text-dashboard-foreground hover:bg-sidebar-hover transition-colors shadow-md backdrop-blur-sm"
-                  aria-label="Go to bottom"
-                  title="Go to bottom"
-                >
-                  <ChevronDown className="h-5 w-5 mx-auto" />
-                </button>
-              </div>
             </div>
+
+            {!favoritesWindow && (
+              <FavoritesAnalysisSidebar
+                open={favoritesSidebarOpen}
+                onOpenChange={setFavoritesSidebarOpen}
+                title="Favorite analyses"
+              >
+                {favoritesPanel}
+              </FavoritesAnalysisSidebar>
+            )}
           </div>
+
           {!favoritesWindow && (
-            <div className="shrink-0 w-full px-6 pb-6 pt-3 border-t border-sidebar-border/50 bg-dashboard-bg">
+            <div className="relative z-[70] w-full shrink-0 border-t border-sidebar-border/50 bg-dashboard-bg px-6 pb-6 pt-3">
               <PostGlobalAnalysisInput
                 placeholder="Post a new global analysis..."
                 assets={assets}
