@@ -36,7 +36,7 @@ const DialogContent = React.forwardRef<
     /** When true, overlay and content are confined to main area (sidebar stays visible) */
     containToMain?: boolean;
   }
->(({ className = "", children, showClose = true, containToMain = false, ...props }, ref) => (
+>(({ className = "", children, showClose = true, containToMain = false, onInteractOutside, onPointerDownOutside, onFocusOutside, ...props }, ref) => (
   <DialogPortal>
     <DialogOverlay containToMain={containToMain} />
     <DialogPrimitive.Content
@@ -47,6 +47,30 @@ const DialogContent = React.forwardRef<
           : "left-[50%] top-[50%] w-[100dvw] max-w-[100dvw]"
       } ${className}`}
       {...props}
+      onInteractOutside={(e) => {
+        const el = e.target as HTMLElement | null;
+        if (el?.closest("[data-image-lightbox-root]")) {
+          e.preventDefault();
+          return;
+        }
+        onInteractOutside?.(e);
+      }}
+      onPointerDownOutside={(e) => {
+        const el = e.target as HTMLElement | null;
+        if (el?.closest("[data-image-lightbox-root]")) {
+          e.preventDefault();
+          return;
+        }
+        onPointerDownOutside?.(e);
+      }}
+      onFocusOutside={(e) => {
+        const rel = (e as unknown as FocusEvent).relatedTarget as HTMLElement | null;
+        if (rel?.closest("[data-image-lightbox-root]")) {
+          e.preventDefault();
+          return;
+        }
+        onFocusOutside?.(e);
+      }}
     >
       <DialogTitle className="sr-only">Dialog</DialogTitle>
       {showClose && (

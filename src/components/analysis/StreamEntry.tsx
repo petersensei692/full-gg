@@ -117,6 +117,20 @@ export function StreamEntry({
       }
     })();
 
+  /** Shared lightbox gallery for all attachments on this analysis card */
+  const imageGallery =
+    entry.images?.map((p, i) => {
+      const savedName = entry.imageNames?.[i] ?? "";
+      const dn = p in draftNames ? draftNames[p] : savedName;
+      const fb = `Chart ${i + 1}`;
+      const label = (dn || "").trim() || fb;
+      return {
+        src: getImageUrl(p),
+        alt: label,
+        caption: label,
+      };
+    }) ?? [];
+
   return (
     <>
     <article className="pb-3 last:pb-0">
@@ -264,6 +278,8 @@ export function StreamEntry({
                       caption={displayName || fallbackLabel}
                       unoptimized
                       className="w-full max-h-[280px] object-contain"
+                      gallery={imageGallery}
+                      galleryIndex={index}
                     />
                     {onDeleteImage && (
                       <button

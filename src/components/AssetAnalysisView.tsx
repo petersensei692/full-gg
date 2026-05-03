@@ -942,7 +942,7 @@ export function AssetAnalysisView({ asset, favoritesWindow = false }: AssetAnaly
               )}
             </div>
 
-            {!favoritesWindow && (
+            {!favoritesWindow && !editModalOpen && (
               <div className="relative z-[70] shrink-0 w-full border-t border-sidebar-border/50 bg-dashboard-bg px-6 pb-6 pt-3">
                 <PostAnalysisInput placeholder={resolvedAsset.placeholder} onCreated={handleCreate} />
               </div>

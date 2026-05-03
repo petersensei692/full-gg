@@ -605,7 +605,7 @@ export function GlobalAnalysisView({ favoritesWindow = false }: { favoritesWindo
             )}
           </div>
 
-          {!favoritesWindow && (
+          {!favoritesWindow && !editModalOpen && (
             <div className="relative z-[70] w-full shrink-0 border-t border-sidebar-border/50 bg-dashboard-bg px-6 pb-6 pt-3">
               <PostGlobalAnalysisInput
                 placeholder="Post a new global analysis..."

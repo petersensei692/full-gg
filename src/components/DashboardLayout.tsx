@@ -29,9 +29,9 @@ export function DashboardLayout({ children, favoritesNav = false }: DashboardLay
   const isFavoritesGlobalPage =
     favoritesNav && pathname === "/fundamental-analysis/favorites/global";
 
-  /** Mobile-only title in top bar (desktop title lives in GlobalAnalysisView filter row). */
-  const showMobileGlobalAnalysisTitle =
-    isFavoritesGlobalPage || pathname === "/global-analysis";
+  /** Global Analysis already has in-stream chrome; hide duplicate slim header + hamburger row on mobile. */
+  const hideMobileTopBarOnGlobalAnalysis =
+    pathname === "/global-analysis" || isFavoritesGlobalPage;
 
   /** Radix dialogs portal to `body`; expose width so `containToMain` can center in the main column. */
   useEffect(() => {
@@ -72,15 +72,12 @@ export function DashboardLayout({ children, favoritesNav = false }: DashboardLay
         )}
 
         <div className="flex flex-1 flex-col min-w-0 relative">
-          {/* On non–asset-analysis pages (mobile), show a slim bar with hamburger so menu is always reachable */}
-          {!isDesktop && !isAssetAnalysisPage && (
+          {/* On non–asset-analysis pages (mobile), slim bar with hamburger — omitted on Global Analysis */}
+          {!isDesktop &&
+            !isAssetAnalysisPage &&
+            !hideMobileTopBarOnGlobalAnalysis && (
             <div className="shrink-0 h-11 flex items-center gap-3 px-4 border-b border-sidebar-border bg-dashboard-bg lg:hidden">
               <SidebarTrigger />
-              {showMobileGlobalAnalysisTitle && (
-                <h2 className="text-sm font-semibold text-dashboard-foreground truncate min-w-0">
-                  Global Analysis
-                </h2>
-              )}
             </div>
           )}
           <main className="flex-1 overflow-auto">

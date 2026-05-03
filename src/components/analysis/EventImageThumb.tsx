@@ -14,8 +14,9 @@ type EventImageThumbProps = {
   className?: string;
 };
 
+/** Subtle selected/focus hint — kept visible but lighter than ring-2 + large offset */
 const ringClass =
-  "ring-2 ring-primary ring-offset-2 ring-offset-background shadow-[0_0_0_1px_rgba(0,0,0,0.06)] z-[1] relative";
+  "ring-1 ring-primary/45 ring-offset-1 ring-offset-background shadow-none z-[1] relative";
 
 /**
  * Click highlights the thumbnail and opens a zoomed lightbox; Escape / backdrop / close exits.
@@ -72,15 +73,16 @@ export function EventImageThumb({
     const onKey = (ev: KeyboardEvent) => {
       if (ev.key === "Escape") {
         ev.preventDefault();
+        ev.stopPropagation();
         closeLightbox();
       }
     };
     const prevOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
-    document.addEventListener("keydown", onKey);
+    document.addEventListener("keydown", onKey, true);
     queueMicrotask(() => closeBtnRef.current?.focus());
     return () => {
-      document.removeEventListener("keydown", onKey);
+      document.removeEventListener("keydown", onKey, true);
       document.body.style.overflow = prevOverflow;
     };
   }, [lightboxOpen, closeLightbox]);
@@ -90,6 +92,7 @@ export function EventImageThumb({
     lightboxOpen &&
     createPortal(
       <div
+        data-image-lightbox-root
         className="fixed inset-0 z-[300] flex items-center justify-center bg-black/85 p-4 backdrop-blur-[2px]"
         role="dialog"
         aria-modal="true"
@@ -100,7 +103,7 @@ export function EventImageThumb({
           ref={closeBtnRef}
           type="button"
           onClick={closeLightbox}
-          className="absolute right-3 top-3 z-[301] rounded-lg bg-white/10 p-2 text-white hover:bg-white/20 focus:outline-none focus:ring-2 focus:ring-white"
+          className="absolute right-3 top-3 z-[301] rounded-lg bg-white/10 p-2 text-white hover:bg-white/20 focus:outline-none focus-visible:ring-1 focus-visible:ring-white/70 focus-visible:ring-offset-0"
           aria-label="Close zoomed image"
         >
           <X className="h-5 w-5" />
@@ -125,7 +128,7 @@ export function EventImageThumb({
         role="button"
         tabIndex={0}
         aria-haspopup="dialog"
-        className={`inline-block max-w-full rounded outline-none cursor-zoom-in transition-shadow ${active ? ringClass : ""} focus:outline-none ${className}`}
+        className={`inline-block max-w-full rounded outline-none cursor-zoom-in transition-[box-shadow,ring] duration-150 ${active ? ringClass : ""} ${className}`}
         onPointerDown={(e) => {
           e.stopPropagation();
           setActive(true);
