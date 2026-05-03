@@ -1,10 +1,6 @@
-import { DashboardLayout } from "@/components/DashboardLayout";
-import { CalendarView } from "@/components/watchlist-calendar/CalendarView";
+import { redirect } from "next/navigation";
 
+/** Legacy `/calendar` route removed; weekly calendar module deleted. */
 export default function CalendarPage() {
-  return (
-    <DashboardLayout>
-      <CalendarView />
-    </DashboardLayout>
-  );
+  redirect("/watch-list");
 }

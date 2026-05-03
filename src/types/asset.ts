@@ -58,7 +58,7 @@ export interface AssetConfig {
   id?: string; // UUID from API
   slug: string;
   label: string;
-  type?: string; // currency | commodity | stocks | crypto | bond
+  type?: string; // currency | commodity | stocks | crypto (legacy DB rows may still have bond)
   sortOrder?: number;
   /** Position within the asset's type section (1, 2, 3, ...). */
   place?: number;

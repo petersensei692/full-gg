@@ -256,7 +256,6 @@ export function WatchListView() {
       open={createWatchlistModalOpen}
       onOpenChange={setCreateWatchlistModalOpen}
       mode="create"
-      variant="watchlist"
       onSubmit={async (dto) => {
         await createWeeklyWatchlist(dto);
         setCreateWatchlistModalOpen(false);
@@ -266,7 +265,6 @@ export function WatchListView() {
       open={editModalOpen}
       onOpenChange={setEditModalOpen}
       mode="edit"
-      variant="watchlist"
       initialStartDate={editingWatchlist?.startDate}
       initialEndDate={editingWatchlist?.endDate}
       onSubmit={async (dto) => {

@@ -8,19 +8,15 @@ import {
   startOfDay,
   endOfDay,
 } from "@/components/analytics/AnalyticsStyleDateRangePanel";
-import type { CreateWeeklyCalendarDto, CreateWeeklyWatchlistDto } from "@/types/api";
-
-const WEEKLY_CALENDAR_MIN_YEAR = 2026;
+const WEEKLY_WATCHLIST_MIN_YEAR = 2026;
 
 interface WeeklyCalendarModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  /** When "watchlist", shows "Weekly Watchlist" title/button (e.g. for Pair Watchlist tab). */
-  variant?: "calendar" | "watchlist";
   mode?: "create" | "edit";
   initialStartDate?: string;
   initialEndDate?: string;
-  onSubmit: (dto: CreateWeeklyCalendarDto | CreateWeeklyWatchlistDto) => void;
+  onSubmit: (dto: { startDate: string; endDate: string }) => void;
 }
 
 function defaultWeekRange(): { from: Date; to: Date } {
@@ -66,27 +62,14 @@ function localRangeToIsoPayload(from: Date, to: Date): { startDate: string; endD
 export function WeeklyCalendarModal({
   open,
   onOpenChange,
-  variant = "calendar",
   mode = "create",
   initialStartDate,
   initialEndDate,
   onSubmit,
 }: WeeklyCalendarModalProps) {
-  const isWatchlist = variant === "watchlist";
-  const title = isWatchlist
-    ? mode === "edit"
-      ? "Edit Weekly Watchlist"
-      : "Create Weekly Watchlist"
-    : mode === "edit"
-      ? "Edit Weekly Calendar"
-      : "Create Weekly Calendar";
-  const applyLabel = isWatchlist
-    ? mode === "edit"
-      ? "Save watchlist"
-      : "Create watchlist"
-    : mode === "edit"
-      ? "Save calendar"
-      : "Create calendar";
+  const title =
+    mode === "edit" ? "Edit Weekly Watchlist" : "Create Weekly Watchlist";
+  const applyLabel = mode === "edit" ? "Save watchlist" : "Create watchlist";
 
   const { from: initialFrom, to: initialTo } = useMemo(
     () => parseInitialRange(initialStartDate, initialEndDate),
@@ -95,7 +78,7 @@ export function WeeklyCalendarModal({
 
   const calendarBounds = useMemo(() => {
     const y = new Date().getFullYear();
-    return { minYear: WEEKLY_CALENDAR_MIN_YEAR, maxYear: y + 1 };
+    return { minYear: WEEKLY_WATCHLIST_MIN_YEAR, maxYear: y + 1 };
   }, [open]);
 
   return (

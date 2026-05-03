@@ -9,7 +9,6 @@ const ASSET_TYPES = [
   { value: "commodity", label: "Commodity" },
   { value: "stocks", label: "Stocks" },
   { value: "crypto", label: "Crypto" },
-  { value: "bond", label: "Bond" },
 ];
 
 interface CreateAssetModalProps {

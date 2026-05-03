@@ -66,7 +66,7 @@ export function DashboardLayout({ children, favoritesNav = false }: DashboardLay
           <button
             type="button"
             aria-label="Close menu"
-            className="fixed inset-0 z-40 bg-black/50 lg:hidden"
+            className="fixed inset-0 z-[95] bg-black/50 lg:hidden"
             onClick={() => setOverlayOpen(false)}
           />
         )}

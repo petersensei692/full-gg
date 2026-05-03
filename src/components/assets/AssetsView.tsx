@@ -9,13 +9,12 @@ import { CreateAssetModal } from "./CreateAssetModal";
 import { EditAssetModal } from "./EditAssetModal";
 import { assetAnalysisHref } from "@/lib/assetRoutes";
 
-const ASSET_TYPE_ORDER = ["currency", "commodity", "stocks", "crypto", "bond"] as const;
+const ASSET_TYPE_ORDER = ["currency", "commodity", "stocks", "crypto"] as const;
 const ASSET_TYPE_LABELS: Record<string, string> = {
   currency: "Currencies",
   commodity: "Commodities",
   stocks: "Stocks",
   crypto: "Crypto",
-  bond: "Bonds",
 };
 
 export function AssetsView() {
@@ -45,7 +44,8 @@ export function AssetsView() {
     const m: Record<string, AssetWithStats[]> = {};
     for (const t of ASSET_TYPE_ORDER) m[t] = [];
     for (const a of list) {
-      const t = a.type ?? "currency";
+      const raw = a.type ?? "currency";
+      const t = raw === "bond" ? "stocks" : raw;
       if (!m[t]) m[t] = [];
       m[t].push(a);
     }

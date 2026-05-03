@@ -7,7 +7,6 @@ import {
   BookOpen,
   BarChart3,
   Eye,
-  Calendar,
   Settings,
   ChevronDown,
   ChevronRight,
@@ -35,10 +34,7 @@ const navItems = [
     label: "Fundamental Analysis",
     icon: BarChart3,
     assets: ASSETS,
-    subNav: [
-      { href: "/watch-list", label: "Watch List", icon: Eye },
-      { href: "/calendar", label: "Calendar", icon: Calendar },
-    ],
+    subNav: [{ href: "/watch-list", label: "Watch List", icon: Eye }],
   },
   { href: "/settings", label: "Settings", icon: Settings },
 ];

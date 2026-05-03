@@ -28,20 +28,22 @@ import type { AssetConfig } from "@/types/asset";
 
 const SIDEBAR_OPEN_TYPE_KEY = "sidebar-open-asset-type";
 
-const ASSET_TYPE_ORDER = ["currency", "commodity", "stocks", "crypto", "bond"] as const;
+const ASSET_TYPE_ORDER = ["currency", "commodity", "stocks", "crypto"] as const;
 const ASSET_TYPE_LABELS: Record<string, string> = {
   currency: "Currencies",
   commodity: "Commodities",
   stocks: "Stocks",
   crypto: "Crypto",
-  bond: "Bonds",
 };
 
 const CURRENCY_NAMES = new Set(["USD", "EUR", "GBP", "JPY", "CAD", "CHF", "AUD", "NZD"]);
 const COMMODITY_NAMES = new Set(["XAU", "XAG"]);
 
 function getAssetType(asset: AssetConfig): string {
-  if (asset.type) return asset.type;
+  if (asset.type) {
+    if (asset.type === "bond") return "stocks";
+    return asset.type;
+  }
   const name = (asset.label ?? asset.slug?.toUpperCase().replace(/-/g, " ") ?? "").toUpperCase();
   if (CURRENCY_NAMES.has(name)) return "currency";
   if (COMMODITY_NAMES.has(name)) return "commodity";
@@ -231,25 +233,25 @@ export function Sidebar({
   return (
     <aside
       className={`flex h-full shrink-0 flex-col border-r border-sidebar-border bg-sidebar transition-[width,transform] duration-200 ease-out ${widthClass} ${
-        showAsOverlay ? "fixed inset-y-0 left-0 z-50 shadow-xl" : ""
+        showAsOverlay ? "fixed inset-y-0 left-0 z-[100] shadow-xl" : ""
       }`}
       style={showAsOverlay && !overlayOpen ? { transform: "translateX(-100%)" } : undefined}
     >
       {/* Branding + hamburger */}
-      <div className="flex h-14 shrink-0 items-center gap-2 border-b border-sidebar-border px-2 lg:px-4">
+      <div className="flex h-11 shrink-0 items-center gap-2 border-b border-sidebar-border px-2 lg:px-4">
         <button
           type="button"
           onClick={isOverlayMode ? onOverlayClose : onToggleCollapsed}
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-sidebar-foreground hover:bg-sidebar-hover transition-colors"
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-sidebar-foreground hover:bg-sidebar-hover transition-colors"
           aria-label={isOverlayMode ? "Close menu" : collapsed ? "Expand sidebar" : "Collapse sidebar"}
           title={isOverlayMode ? "Close menu" : collapsed ? "Expand sidebar" : "Collapse sidebar"}
         >
-          <Menu className="h-5 w-5" />
+          <Menu className="h-4 w-4" />
         </button>
         {isExpanded && (
           <>
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded bg-primary/20 text-primary">
-              <BarChart3 className="h-5 w-5" />
+            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded bg-primary/20 text-primary">
+              <BarChart3 className="h-4 w-4" />
             </div>
             <div className="flex min-w-0 flex-col overflow-hidden">
               <span className="text-sm font-semibold text-sidebar-foreground truncate">

@@ -18,20 +18,22 @@ const ANALYSIS_TYPES = [
   { value: "yearly", label: "Yearly" },
 ] as const;
 
-const ASSET_TYPE_ORDER = ["currency", "commodity", "stocks", "crypto", "bond"] as const;
+const ASSET_TYPE_ORDER = ["currency", "commodity", "stocks", "crypto"] as const;
 const ASSET_TYPE_LABELS: Record<string, string> = {
   currency: "Currencies",
   commodity: "Commodities",
   stocks: "Stocks",
   crypto: "Crypto",
-  bond: "Bonds",
 };
 
 const CURRENCY_NAMES = new Set(["USD", "EUR", "GBP", "JPY", "CAD", "CHF", "AUD", "NZD"]);
 const COMMODITY_NAMES = new Set(["XAU", "XAG"]);
 
 function getAssetType(asset: AssetConfig): string {
-  if (asset.type) return asset.type;
+  if (asset.type) {
+    if (asset.type === "bond") return "stocks";
+    return asset.type;
+  }
   const name = (asset.label ?? asset.slug?.toUpperCase().replace(/-/g, " ") ?? "").toUpperCase();
   if (CURRENCY_NAMES.has(name)) return "currency";
   if (COMMODITY_NAMES.has(name)) return "commodity";

@@ -1,7 +1,6 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AssetsModule } from './assets/assets.module';
-import { EventsModule } from './assets/events/events.module';
 import { WatchItemsModule } from './assets/watch-items/watch-items.module';
 import { AnalysisModule } from './assets/analysis/analysis.module';
 import { NotesModule } from './notes/notes.module';
@@ -12,9 +11,8 @@ import { GlobalAnalysisController } from './global-analysis/global-analysis.cont
 import { GlobalAnalysisService } from './global-analysis/global-analysis.service';
 
 @Module({
-  // Import events, watch-items, analysis, notes BEFORE assets so their routes register before assets' parametric routes
+  // Import watch-items, analysis, notes BEFORE assets so their routes register before assets' parametric routes
   imports: [
-    EventsModule,
     WatchItemsModule,
     AnalysisModule,
     NotesModule,

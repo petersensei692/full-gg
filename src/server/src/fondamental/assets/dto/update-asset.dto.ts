@@ -13,7 +13,7 @@ export class UpdateAssetDto {
   name?: string;
 
   @ApiPropertyOptional({
-    description: 'Asset type: currency, commodity, stocks, crypto, bond',
+    description: 'Asset type: currency, commodity, stocks, crypto',
     example: 'currency',
     maxLength: 50,
   })

@@ -7,7 +7,7 @@ import { WatchItem } from './watch-items/entities/watch-item.entity';
 import { CreateAssetDto } from './dto/create-asset.dto';
 import { UpdateAssetDto } from './dto/update-asset.dto';
 
-const TYPE_ORDER = ['currency', 'commodity', 'stocks', 'crypto', 'bond'];
+const TYPE_ORDER = ['currency', 'commodity', 'stocks', 'crypto'];
 
 export interface AssetWithStats extends Asset {
   analysisCount: number;
@@ -50,7 +50,8 @@ export class AssetsService {
       order: { place: 'ASC', name: 'ASC' },
     });
     const typeRank = (t: string) => {
-      const i = TYPE_ORDER.indexOf(t);
+      const normalized = t === 'bond' ? 'stocks' : t;
+      const i = TYPE_ORDER.indexOf(normalized);
       return i >= 0 ? i : TYPE_ORDER.length;
     };
     return list.sort((a, b) => typeRank(a.type) - typeRank(b.type) || (a.place ?? 1) - (b.place ?? 1) || a.name.localeCompare(b.name));

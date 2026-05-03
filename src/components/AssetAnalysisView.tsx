@@ -566,10 +566,7 @@ export function AssetAnalysisView({ asset, favoritesWindow = false }: AssetAnaly
   const displayTitle = resolvedAsset.symbol
     ? `${resolvedAsset.label} (${resolvedAsset.symbol})`
     : resolvedAsset.label;
-  const fullTitle =
-    resolvedAsset.slug === "usd"
-      ? `US Dollar Index (${resolvedAsset.symbol ?? resolvedAsset.label})`
-      : displayTitle;
+  const fullTitle = resolvedAsset.slug === "usd" ? "USD" : displayTitle;
 
   const streamFiltersPanel = (
     <div className="space-y-3">
@@ -901,13 +898,7 @@ export function AssetAnalysisView({ asset, favoritesWindow = false }: AssetAnaly
                     </div>
 
                     <div className="pointer-events-none absolute inset-0 z-20">
-                      <div
-                        className={
-                          favoritesSidebarOpen && !favoritesWindow
-                            ? "pointer-events-auto absolute bottom-4 right-[calc(50%+1rem)] flex flex-col gap-2"
-                            : "pointer-events-auto absolute bottom-4 right-8 flex flex-col gap-2"
-                        }
-                      >
+                      <div className="pointer-events-auto absolute bottom-4 right-8 flex flex-col gap-2">
                         <button
                           type="button"
                           onClick={() => {

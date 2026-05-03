@@ -31,26 +31,6 @@ export interface AssetWithStats extends Asset {
   watchCount: number;
 }
 
-/** Weekly calendar entry */
-export interface WeeklyCalendar {
-  id: string;
-  startDate: string; // ISO 8601
-  endDate: string; // ISO 8601
-  createdAt: string;
-  updatedAt: string;
-}
-
-/** Asset calendar - links a weekly calendar to a specific asset */
-export interface AssetCalendar {
-  id: string;
-  startDate: string;
-  endDate: string;
-  weeklyCalendar: WeeklyCalendar;
-  asset: Asset;
-  createdAt: string;
-  updatedAt: string;
-}
-
 /** Weekly watchlist entry */
 export interface WeeklyWatchlist {
   id: string;
@@ -58,18 +38,6 @@ export interface WeeklyWatchlist {
   endDate: string; // ISO 8601
   createdAt: string;
   updatedAt: string;
-}
-
-/** Body for creating a weekly calendar */
-export interface CreateWeeklyCalendarDto {
-  startDate: string;
-  endDate: string;
-}
-
-/** Body for updating a weekly calendar */
-export interface UpdateWeeklyCalendarDto {
-  startDate?: string;
-  endDate?: string;
 }
 
 /** Asset watchlist - links a weekly watchlist to a specific asset */
@@ -93,36 +61,6 @@ export interface CreateWeeklyWatchlistDto {
 export interface UpdateWeeklyWatchlistDto {
   startDate?: string;
   endDate?: string;
-}
-
-/** Single event returned by the API */
-export interface Event {
-  id: string;
-  calendar: WeeklyCalendar | null;
-  assetCalendar: AssetCalendar | null;
-  day: string;
-  asset: Asset;
-  /** Pasted images (typically data URLs) */
-  eventsImages: string[];
-  createdAt: string;
-  updatedAt: string;
-}
-
-/** Body for creating an event */
-export interface CreateEventDto {
-  assetCalendarId?: string;
-  calendarId?: string;
-  day: string;
-  assetId?: string;
-  eventsImages: string[];
-}
-
-/** Body for updating an event */
-export interface UpdateEventDto {
-  calendarId?: string;
-  day?: string;
-  assetId?: string;
-  eventsImages?: string[];
 }
 
 export interface Thesis {

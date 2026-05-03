@@ -6,18 +6,16 @@ import { Asset } from './entities/asset.entity';
 import { Analysis } from './analysis/entities/analysis.entity';
 import { WatchItem } from './watch-items/entities/watch-item.entity';
 import { WatchItemsModule } from './watch-items/watch-items.module';
-import { EventsModule } from './events/events.module';
 import { AnalysisModule } from './analysis/analysis.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Asset, Analysis, WatchItem]),
     WatchItemsModule,
-    EventsModule,
     AnalysisModule,
   ],
   controllers: [AssetsController],
   providers: [AssetsService],
-  exports: [AssetsService, WatchItemsModule, EventsModule, AnalysisModule],
+  exports: [AssetsService, WatchItemsModule, AnalysisModule],
 })
 export class AssetsModule {}
