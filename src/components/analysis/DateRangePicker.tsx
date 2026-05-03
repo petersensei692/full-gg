@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useLayoutEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { CalendarIcon, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
 
@@ -73,29 +73,71 @@ interface DateRangePickerProps {
   value: DateRange;
   onChange: (range: DateRange) => void;
   className?: string;
+  /** Open the calendar popup beside the trigger (to the right) instead of below. */
+  dropdownPlacement?: "below" | "beside";
 }
 
-export function DateRangePicker({ value, onChange, className = "" }: DateRangePickerProps) {
+const PANEL_WIDTH = 320;
+const PANEL_HEIGHT_EST = 440;
+
+export function DateRangePicker({
+  value,
+  onChange,
+  className = "",
+  dropdownPlacement = "below",
+}: DateRangePickerProps) {
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState<DateRange>(value);
   const [currentMonth, setCurrentMonth] = useState(() => new Date());
   const [selecting, setSelecting] = useState<"start" | "end">("start");
   const containerRef = useRef<HTMLDivElement>(null);
   const dropdownRef = useRef<HTMLDivElement | null>(null);
-  const [dropdownRect, setDropdownRect] = useState<{ top: number; left: number; width: number } | null>(null);
+  const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number } | null>(null);
 
   useEffect(() => {
     if (open) setDraft(value);
   }, [open, value]);
 
-  useEffect(() => {
-    if (open && containerRef.current) {
-      const rect = containerRef.current.getBoundingClientRect();
-      setDropdownRect({ top: rect.bottom + 4, left: rect.left, width: rect.width });
+  const updateDropdownPosition = useCallback(() => {
+    if (!open || !containerRef.current) return;
+    const rect = containerRef.current.getBoundingClientRect();
+    const gap = 8;
+    let top: number;
+    let left: number;
+    if (dropdownPlacement === "beside") {
+      left = rect.right + gap;
+      top = rect.top;
+      if (left + PANEL_WIDTH > window.innerWidth - gap) {
+        left = rect.left - PANEL_WIDTH - gap;
+      }
+      if (left < gap) left = gap;
+      if (top + PANEL_HEIGHT_EST > window.innerHeight - gap) {
+        top = Math.max(gap, window.innerHeight - gap - PANEL_HEIGHT_EST);
+      }
     } else {
-      setDropdownRect(null);
+      top = rect.bottom + gap;
+      left = Math.max(0, rect.left + rect.width - PANEL_WIDTH);
+      if (left + PANEL_WIDTH > window.innerWidth - gap) {
+        left = Math.max(gap, window.innerWidth - gap - PANEL_WIDTH);
+      }
     }
-  }, [open]);
+    setDropdownPos({ top, left });
+  }, [open, dropdownPlacement]);
+
+  useLayoutEffect(() => {
+    if (!open) {
+      setDropdownPos(null);
+      return;
+    }
+    updateDropdownPosition();
+    const onResize = () => updateDropdownPosition();
+    window.addEventListener("resize", onResize);
+    window.addEventListener("scroll", onResize, true);
+    return () => {
+      window.removeEventListener("resize", onResize);
+      window.removeEventListener("scroll", onResize, true);
+    };
+  }, [open, updateDropdownPosition]);
 
   useEffect(() => {
     if (!open) return;
@@ -219,14 +261,14 @@ export function DateRangePicker({ value, onChange, className = "" }: DateRangePi
     );
   };
 
-  const PANEL_WIDTH = 320;
-  const dropdownContent = open && dropdownRect && typeof document !== "undefined" && (
+  const dropdownContent = open && dropdownPos && typeof document !== "undefined" && (
     <div
       ref={(el) => { dropdownRef.current = el; }}
-      className="fixed z-[9999] rounded-xl border border-sidebar-border bg-sidebar shadow-xl p-4 min-w-[320px]"
+      data-date-range-picker-panel="true"
+      className="fixed z-[9999] rounded-xl border border-sidebar-border bg-sidebar shadow-xl p-4 w-[320px] max-w-[min(320px,calc(100vw-16px))]"
       style={{
-        top: dropdownRect.top,
-        left: Math.max(0, dropdownRect.left + dropdownRect.width - PANEL_WIDTH),
+        top: dropdownPos.top,
+        left: dropdownPos.left,
       }}
     >
       <div className="mb-3">
@@ -270,13 +312,14 @@ export function DateRangePicker({ value, onChange, className = "" }: DateRangePi
   );
 
   return (
-    <div ref={containerRef} className={`relative ${className}`}>
+    <div ref={containerRef} className={`relative w-full ${className}`}>
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="flex items-center gap-2 rounded-lg border border-sidebar-border bg-sidebar px-3 py-2 text-sm text-dashboard-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary min-w-[200px] justify-between"
+        aria-expanded={open}
+        className="flex w-full min-w-0 items-center gap-2 rounded-lg border border-sidebar-border bg-sidebar px-3 py-2 text-sm text-dashboard-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary justify-between"
       >
-        <span className="truncate">{formatRange(value)}</span>
+        <span className="min-w-0 truncate text-left">{formatRange(value)}</span>
         <CalendarIcon className="h-4 w-4 shrink-0 text-dashboard-foreground/60" />
       </button>
 
