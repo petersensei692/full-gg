@@ -29,9 +29,11 @@ export function DashboardLayout({ children, favoritesNav = false }: DashboardLay
   const isFavoritesGlobalPage =
     favoritesNav && pathname === "/fundamental-analysis/favorites/global";
 
-  /** Global Analysis already has in-stream chrome; hide duplicate slim header + hamburger row on mobile. */
-  const hideMobileTopBarOnGlobalAnalysis =
-    pathname === "/global-analysis" || isFavoritesGlobalPage;
+  /** Pages with their own in-stream header/trigger: hide duplicate slim mobile top bar. */
+  const hideMobileTopBarForDedicatedHeaderPage =
+    pathname === "/global-analysis" ||
+    pathname === "/all-analysis" ||
+    isFavoritesGlobalPage;
 
   /** Radix dialogs portal to `body`; expose width so `containToMain` can center in the main column. */
   useEffect(() => {
@@ -75,7 +77,7 @@ export function DashboardLayout({ children, favoritesNav = false }: DashboardLay
           {/* On non–asset-analysis pages (mobile), slim bar with hamburger — omitted on Global Analysis */}
           {!isDesktop &&
             !isAssetAnalysisPage &&
-            !hideMobileTopBarOnGlobalAnalysis && (
+            !hideMobileTopBarForDedicatedHeaderPage && (
             <div className="shrink-0 h-11 flex items-center gap-3 px-4 border-b border-sidebar-border bg-dashboard-bg lg:hidden">
               <SidebarTrigger />
             </div>

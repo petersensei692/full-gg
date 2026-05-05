@@ -29,6 +29,10 @@ export class GlobalAnalysis {
   @Column({ type: 'text' })
   notes: string;
 
+  /** Short headline on stream cards (optional); propagated to asset copies when scoped. */
+  @Column({ type: 'varchar', length: 500, nullable: true })
+  title: string | null;
+
   @Column({ type: 'text', nullable: true, transformer: stringArrayTransformer })
   images: string[] | null;
 

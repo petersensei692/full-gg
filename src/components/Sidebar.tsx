@@ -221,6 +221,7 @@ export function Sidebar({
     return [
       assetsItem,
       { href: "/global-analysis", label: "Global Analysis", icon: Globe },
+      { href: "/all-analysis", label: "All Analysis", icon: Globe },
       { href: "/watch-list", label: "Weekly watchlist", icon: Calendar },
       ...otherNavItems,
     ];

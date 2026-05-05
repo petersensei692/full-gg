@@ -12,7 +12,12 @@ import { isHtmlEffectivelyEmpty } from "@/lib/html-empty";
 interface PostAnalysisInputProps {
   placeholder: string;
   /** Called when user clicks Create with editor HTML and selected analysis type */
-  onCreated?: (payload: { notes: string; images: string[]; analysisType: string }) => void;
+  onCreated?: (payload: {
+    notes: string;
+    images: string[];
+    analysisType: string;
+    title?: string;
+  }) => void;
 }
 
 const ANALYSIS_TYPES = [
@@ -26,6 +31,7 @@ const ANALYSIS_TYPES = [
 export function PostAnalysisInput({ placeholder, onCreated }: PostAnalysisInputProps) {
   const editorRef = useRef<HTMLDivElement>(null);
   const [zoomedImageSrc, setZoomedImageSrc] = useState<string | null>(null);
+  const [streamTitle, setStreamTitle] = useState("");
   const [analysisType, setAnalysisType] = useState<string>("daily");
   const [images, setImages] = useState<Array<{ path: string; url: string }>>([]);
   const [, setEditorBump] = useState(0);
@@ -69,16 +75,32 @@ export function PostAnalysisInput({ placeholder, onCreated }: PostAnalysisInputP
       notes: html,
       images: images.map((img) => img.path),
       analysisType,
+      title: streamTitle.trim() ? streamTitle.trim() : undefined,
     });
     if (editorRef.current) {
       editorRef.current.innerHTML = "";
     }
     setImages([]);
-  }, [analysisType, onCreated, images]);
+    setStreamTitle("");
+  }, [analysisType, streamTitle, onCreated, images]);
 
   return (
     <>
     <div className="rounded-xl border border-sidebar-border bg-sidebar/50 p-3 mt-6">
+      <div className="space-y-1 mb-2">
+        <label htmlFor="asset-analysis-new-title" className="text-xs font-medium text-dashboard-foreground/70">
+          Title <span className="font-normal text-dashboard-foreground/50">(optional)</span>
+        </label>
+        <input
+          id="asset-analysis-new-title"
+          type="text"
+          value={streamTitle}
+          onChange={(e) => setStreamTitle(e.target.value)}
+          maxLength={500}
+          placeholder="Short headline on the analysis card"
+          className="w-full rounded-lg border border-sidebar-border bg-header-input px-3 py-2 text-sm text-dashboard-foreground placeholder:text-dashboard-foreground/45 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+        />
+      </div>
       <div
         ref={editorRef}
         contentEditable

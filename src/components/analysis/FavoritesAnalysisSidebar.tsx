@@ -2,12 +2,14 @@
 
 import type { ReactNode } from "react";
 import { useRef } from "react";
-import { ChevronDown, ChevronUp, X } from "lucide-react";
+import { ChevronDown, ChevronUp, Download, X } from "lucide-react";
 
 type FavoritesAnalysisSidebarProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   title?: string;
+  onExport?: () => void;
+  exportDisabled?: boolean;
   children: ReactNode;
 };
 
@@ -21,6 +23,8 @@ export function FavoritesAnalysisSidebar({
   open,
   onOpenChange,
   title = "Favorite analyses",
+  onExport,
+  exportDisabled = false,
   children,
 }: FavoritesAnalysisSidebarProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -59,6 +63,18 @@ export function FavoritesAnalysisSidebar({
         >
           <ChevronDown className="h-4 w-4" />
         </button>
+        {onExport && (
+          <button
+            type="button"
+            onClick={onExport}
+            disabled={exportDisabled}
+            className="rounded-lg border border-sidebar-border p-2 text-dashboard-foreground/80 hover:bg-sidebar-hover hover:text-dashboard-foreground transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            aria-label="Export favorite analyses"
+            title="Export favorites (.txt)"
+          >
+            <Download className="h-4 w-4" />
+          </button>
+        )}
         <button
           type="button"
           onClick={() => onOpenChange(false)}

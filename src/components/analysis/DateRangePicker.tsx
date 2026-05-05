@@ -265,7 +265,7 @@ export function DateRangePicker({
     <div
       ref={(el) => { dropdownRef.current = el; }}
       data-date-range-picker-panel="true"
-      className="fixed z-[9999] rounded-xl border border-sidebar-border bg-sidebar shadow-xl p-4 w-[320px] max-w-[min(320px,calc(100vw-16px))]"
+      className="fixed z-[20000] rounded-xl border border-sidebar-border bg-sidebar shadow-xl p-4 w-[320px] max-w-[min(320px,calc(100vw-16px))]"
       style={{
         top: dropdownPos.top,
         left: dropdownPos.left,

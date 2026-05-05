@@ -24,4 +24,9 @@ export class CreateAnalysisDto {
   @IsArray()
   @IsString({ each: true })
   imageNames?: string[];
+
+  @ApiPropertyOptional({ description: 'Optional headline for stream cards', maxLength: 500 })
+  @IsOptional()
+  @IsString()
+  title?: string;
 }

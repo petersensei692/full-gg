@@ -347,6 +347,8 @@ export interface Analysis {
   assetId: string;
   asset?: Asset;
   notes: string;
+  /** Optional stream card headline */
+  title?: string | null;
   images: string[] | null;
   imageNames?: string[] | null;
   /** "GLOBAL", "USD•EUR•...", or null for single-asset analysis */
@@ -363,6 +365,7 @@ export interface CreateAnalysisDto {
   assetId: string;
   notes: string;
   images?: string[];
+  title?: string;
 }
 
 /** Body for updating an analysis */
@@ -372,12 +375,14 @@ export interface UpdateAnalysisDto {
   images?: string[] | null;
   imageNames?: string[] | null;
   favorite?: boolean;
+  title?: string | null;
 }
 
 /** Global analysis (template applied to one or more assets) */
 export interface GlobalAnalysis {
   id: string;
   notes: string;
+  title?: string | null;
   images: string[] | null;
   imageNames: string[] | null;
   scope: "global" | string[];
@@ -395,6 +400,7 @@ export interface CreateGlobalAnalysisDto {
   imageNames?: string[];
   scope: "global" | string[];
   analysisType?: string;
+  title?: string;
 }
 
 /** Body for updating a global analysis */
@@ -406,6 +412,27 @@ export interface UpdateGlobalAnalysisDto {
   /** When set and different from current scope, child analyses are recreated for the new assets */
   scope?: "global" | string[];
   favorite?: boolean;
+  title?: string | null;
+}
+
+/** Unified analysis row from GET /fondamental/all-analysis */
+export interface AllAnalysisItem {
+  id: string;
+  source: "global" | "asset";
+  notes: string;
+  title?: string | null;
+  images: string[] | null;
+  imageNames?: string[] | null;
+  analysisType?: string;
+  favorite?: boolean;
+  createdAt: string;
+  scopeLabel?: string | null;
+  globalFullScope?: boolean;
+  assetId?: string | null;
+  assetName?: string | null;
+  assetType?: string | null;
+  assetSortOrder?: number | null;
+  assetPlace?: number | null;
 }
 
 export type NoteTier = "tier_1" | "tier_2" | "tier_3";

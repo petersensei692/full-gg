@@ -32,6 +32,10 @@ export class Analysis {
   @Column({ type: 'text' })
   notes: string;
 
+  /** Short headline shown on stream cards (optional). */
+  @Column({ type: 'varchar', length: 500, nullable: true })
+  title: string | null;
+
   @Column({ type: 'text', nullable: true, transformer: stringArrayTransformer })
   images: string[] | null;
 

@@ -42,6 +42,7 @@ interface PostGlobalAnalysisInputProps {
     imageNames?: string[];
     scope: "global" | string[];
     analysisType: string;
+    title?: string;
   }) => void;
 }
 
@@ -60,6 +61,7 @@ export function PostGlobalAnalysisInput({
 }: PostGlobalAnalysisInputProps) {
   const editorRef = useRef<HTMLDivElement>(null);
   const [zoomedImageSrc, setZoomedImageSrc] = useState<string | null>(null);
+  const [streamTitle, setStreamTitle] = useState("");
   const [scopeMode, setScopeMode] = useState<"global" | "assets">("global");
   const [selectedAssetIds, setSelectedAssetIds] = useState<Set<string>>(new Set());
   const [analysisType, setAnalysisType] = useState<string>("daily");
@@ -142,11 +144,13 @@ export function PostGlobalAnalysisInput({
       images: images.map((img) => img.path),
       scope,
       analysisType,
+      title: streamTitle.trim() ? streamTitle.trim() : undefined,
     });
     if (editorRef.current) editorRef.current.innerHTML = "";
     setImages([]);
+    setStreamTitle("");
     setEditorBump((n) => n + 1);
-  }, [scopeMode, selectedAssetIds, analysisType, onCreated, images]);
+  }, [scopeMode, selectedAssetIds, analysisType, streamTitle, onCreated, images]);
 
   const scopeOk =
     scopeMode === "global" || (scopeMode === "assets" && selectedAssetIds.size > 0);
@@ -157,6 +161,20 @@ export function PostGlobalAnalysisInput({
   return (
     <>
     <div className="rounded-xl border border-sidebar-border bg-sidebar/50 p-3 mt-6">
+      <div className="space-y-1 mb-2">
+        <label htmlFor="global-analysis-new-title" className="text-xs font-medium text-dashboard-foreground/70">
+          Title <span className="font-normal text-dashboard-foreground/50">(optional)</span>
+        </label>
+        <input
+          id="global-analysis-new-title"
+          type="text"
+          value={streamTitle}
+          onChange={(e) => setStreamTitle(e.target.value)}
+          maxLength={500}
+          placeholder="Short headline on the analysis card"
+          className="w-full rounded-lg border border-sidebar-border bg-header-input px-3 py-2 text-sm text-dashboard-foreground placeholder:text-dashboard-foreground/45 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+        />
+      </div>
       <div
         ref={editorRef}
         contentEditable

@@ -27,7 +27,9 @@ const TAG_COLOR_TEXT: Record<NonNullable<StreamEntryType["tagColor"]>, string> =
 
 interface StreamEntryProps {
   entry: StreamEntryType;
-  separatorType: "same-day" | "new-day" | "new-week" | "first";
+  separatorType: "same-day" | "new-day" | "new-week" | "new-month" | "new-year" | "first";
+  yearGroup?: string;
+  monthGroup?: string;
   weekGroup?: string;
   dateGroup?: string;
   onDelete?: () => void;
@@ -47,6 +49,8 @@ interface StreamEntryProps {
 export function StreamEntry({
   entry,
   separatorType,
+  yearGroup,
+  monthGroup,
   weekGroup,
   dateGroup,
   onDelete,
@@ -75,35 +79,47 @@ export function StreamEntry({
   const borderClass = TAG_COLOR_BORDER[tagColor] ?? TAG_COLOR_BORDER.blue;
   const textColorClass = TAG_COLOR_TEXT[tagColor] ?? TAG_COLOR_TEXT.blue;
 
+  const separatorLine = (label: string, tone: "year" | "month" | "week" | "day", py: string) => (
+    <div className={`flex items-center gap-3 ${py}`}>
+      <div className="flex-1 h-px bg-sidebar-border" />
+      <span
+        className={
+          tone === "year"
+            ? "text-sm font-semibold text-dashboard-foreground/80 px-3 py-1 rounded-full bg-sidebar/85 border border-sidebar-border"
+            : tone === "month"
+              ? "text-sm font-medium text-dashboard-foreground/75 px-3 py-1 rounded-full bg-sidebar/70 border border-sidebar-border"
+              : tone === "week"
+                ? "text-xs font-semibold text-dashboard-foreground/70 px-3 py-1 rounded-full bg-sidebar/80 border border-sidebar-border"
+                : "text-xs font-medium text-dashboard-foreground/70 px-3 py-1 rounded-full bg-sidebar/60 border border-sidebar-border"
+        }
+      >
+        {label}
+      </span>
+      <div className="flex-1 h-px bg-sidebar-border" />
+    </div>
+  );
+
   const separatorTop =
-    separatorType === "first" ? (
-      dateGroup ? (
-        <div className="flex items-center gap-3 pb-4">
-          <div className="flex-1 h-px bg-sidebar-border" />
-          <span className="text-xs font-medium text-dashboard-foreground/70 px-3 py-1 rounded-full bg-sidebar/60 border border-sidebar-border">
-            {dateGroup}
-          </span>
-          <div className="flex-1 h-px bg-sidebar-border" />
-        </div>
-      ) : null
-    ) : separatorType === "new-week" ? (
-      <div className="flex items-center gap-3 py-6">
-        <div className="flex-1 h-px bg-sidebar-border" />
-        <span className="text-xs font-semibold text-dashboard-foreground/70 px-3 py-1 rounded-full bg-sidebar/80 border border-sidebar-border">
-          {weekGroup}
-        </span>
-        <div className="flex-1 h-px bg-sidebar-border" />
-      </div>
-    ) : separatorType === "new-day" ? (
-      <div className="flex items-center gap-3 py-4">
-        <div className="flex-1 h-px bg-sidebar-border" />
-        <span className="text-xs font-medium text-dashboard-foreground/70 px-3 py-1 rounded-full bg-sidebar/60 border border-sidebar-border">
-          {dateGroup}
-        </span>
-        <div className="flex-1 h-px bg-sidebar-border" />
-      </div>
-    ) : (
+    separatorType === "same-day" ? (
       <div className="mt-2 pt-1" aria-hidden />
+    ) : (
+      <div className={separatorType === "first" ? "" : "mt-2"}>
+        {(separatorType === "first" || separatorType === "new-year") && yearGroup
+          ? separatorLine(yearGroup, "year", separatorType === "first" ? "pb-2" : "pt-6 pb-2")
+          : null}
+        {(separatorType === "first" || separatorType === "new-year" || separatorType === "new-month") &&
+        monthGroup
+          ? separatorLine(monthGroup, "month", "pb-2")
+          : null}
+        {(separatorType === "first" ||
+          separatorType === "new-year" ||
+          separatorType === "new-month" ||
+          separatorType === "new-week") &&
+        weekGroup
+          ? separatorLine(weekGroup, "week", "pb-2")
+          : null}
+        {dateGroup ? separatorLine(dateGroup, "day", "pb-4") : null}
+      </div>
     );
 
   const hasTextContent =
@@ -198,6 +214,11 @@ export function StreamEntry({
             )}
           </div>
         </div>
+        {entry.title != null && String(entry.title).trim() !== "" ? (
+          <h1 className="text-xl font-bold text-dashboard-foreground leading-snug mb-2 break-words">
+            {String(entry.title).trim()}
+          </h1>
+        ) : null}
         {hasTextContent ? (
           <div
             className="stream-entry-content min-w-0 max-w-full break-words text-sm text-dashboard-foreground leading-relaxed mb-2 antialiased [&_*]:break-words [&_*]:min-w-0 [&_*]:max-w-full [&_img]:max-w-[min(50%,480px)] [&_img]:max-h-[300px] [&_img]:h-auto [&_img]:w-auto [&_img]:object-contain [&_img]:rounded-lg [&_img]:my-2 [&_img]:cursor-pointer [&_h1]:text-xl [&_h1]:font-bold [&_h2]:text-lg [&_h2]:font-semibold [&_h3]:text-base [&_h3]:font-medium"

@@ -57,6 +57,7 @@ export class GlobalAnalysisService implements OnModuleInit {
           SELECT '<!--analysis-type:' || g.analysis_type || '-->' || COALESCE(g.notes, '')
           FROM global_analysis g WHERE g.id = a.global_analysis_id
         ),
+        title = (SELECT g.title FROM global_analysis g WHERE g.id = a.global_analysis_id),
         images = (SELECT g.images FROM global_analysis g WHERE g.id = a.global_analysis_id),
         image_names = (SELECT g.image_names FROM global_analysis g WHERE g.id = a.global_analysis_id),
         favorite = COALESCE((SELECT g.favorite FROM global_analysis g WHERE g.id = a.global_analysis_id), ${favDefault})
@@ -124,7 +125,8 @@ export class GlobalAnalysisService implements OnModuleInit {
     const touchesContent =
       updateDto.notes !== undefined ||
       updateDto.images !== undefined ||
-      updateDto.imageNames !== undefined;
+      updateDto.imageNames !== undefined ||
+      updateDto.title !== undefined;
     const favoriteOnly =
       updateDto.favorite !== undefined && !touchesContent;
 
@@ -157,6 +159,10 @@ export class GlobalAnalysisService implements OnModuleInit {
     if (updateDto.imageNames !== undefined) {
       ga.imageNames = updateDto.imageNames;
     }
+    if (updateDto.title !== undefined) {
+      const t = (updateDto.title ?? '').trim();
+      ga.title = t.length > 0 ? t : null;
+    }
     if (updateDto.favorite !== undefined) {
       ga.favorite = updateDto.favorite;
     }
@@ -171,6 +177,7 @@ export class GlobalAnalysisService implements OnModuleInit {
       images: saved.images,
       imageNames: saved.imageNames,
       favorite: saved.favorite,
+      title: saved.title ?? null,
     });
 
     return this.analysisService.findOne(assetAnalysisId);
@@ -186,8 +193,11 @@ export class GlobalAnalysisService implements OnModuleInit {
     const analysisType = dto.analysisType ?? 'daily';
     const { assetIds, scopeLabel } = await this.resolveScope(scope);
 
+    const titleTrim = (dto.title ?? '').trim();
+    const titleNorm = titleTrim.length > 0 ? titleTrim : null;
     const globalAnalysis = this.globalAnalysisRepository.create({
       notes: dto.notes,
+      title: titleNorm,
       images: dto.images ?? null,
       imageNames: dto.imageNames ?? null,
       scope,
@@ -209,6 +219,7 @@ export class GlobalAnalysisService implements OnModuleInit {
         scopeLabel,
         saved.id,
         saved.favorite ?? false,
+        saved.title ?? null,
       );
     }
 
@@ -269,7 +280,8 @@ export class GlobalAnalysisService implements OnModuleInit {
       dto.images === undefined &&
       dto.imageNames === undefined &&
       dto.analysisType === undefined &&
-      dto.scope === undefined;
+      dto.scope === undefined &&
+      dto.title === undefined;
 
     if (onlyFavorite) {
       ga.favorite = dto.favorite as boolean;
@@ -298,6 +310,10 @@ export class GlobalAnalysisService implements OnModuleInit {
       if (dto.notes !== undefined) ga.notes = dto.notes;
       if (dto.images !== undefined) ga.images = dto.images;
       if (dto.imageNames !== undefined) ga.imageNames = dto.imageNames;
+      if (dto.title !== undefined) {
+        const t = (dto.title ?? '').trim();
+        ga.title = t.length > 0 ? t : null;
+      }
       if (dto.analysisType !== undefined) ga.analysisType = dto.analysisType;
       if (dto.favorite !== undefined) ga.favorite = dto.favorite;
       ga.scope = nextScope;
@@ -320,6 +336,7 @@ export class GlobalAnalysisService implements OnModuleInit {
           scopeLabel,
           saved.id,
           saved.favorite ?? false,
+          saved.title ?? null,
         );
       }
       return { ...saved, scopeDisplay: scopeLabel };
@@ -328,6 +345,10 @@ export class GlobalAnalysisService implements OnModuleInit {
     if (dto.notes !== undefined) ga.notes = dto.notes;
     if (dto.images !== undefined) ga.images = dto.images;
     if (dto.imageNames !== undefined) ga.imageNames = dto.imageNames;
+    if (dto.title !== undefined) {
+      const t = (dto.title ?? '').trim();
+      ga.title = t.length > 0 ? t : null;
+    }
     if (dto.analysisType !== undefined) ga.analysisType = dto.analysisType;
     if (dto.favorite !== undefined) ga.favorite = dto.favorite;
     const saved = await this.globalAnalysisRepository.save(ga);
@@ -341,6 +362,7 @@ export class GlobalAnalysisService implements OnModuleInit {
       images: saved.images,
       imageNames: saved.imageNames,
       favorite: saved.favorite,
+      title: saved.title ?? null,
     });
     return { ...saved, scopeDisplay: await this.getScopeDisplay(saved.scope) };
   }

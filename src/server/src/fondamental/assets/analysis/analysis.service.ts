@@ -23,6 +23,11 @@ function isTradeNoteAnalysisNotes(notes: string | null | undefined): boolean {
   return (notes ?? '').includes(TRADE_NOTE_MARKER);
 }
 
+function normalizeAnalysisTitle(raw?: string | null): string | null {
+  const t = (raw ?? '').trim();
+  return t.length > 0 ? t : null;
+}
+
 @Injectable()
 export class AnalysisService {
   constructor(
@@ -36,6 +41,7 @@ export class AnalysisService {
     const analysis = this.analysisRepository.create({
       assetId: createDto.assetId,
       notes: createDto.notes,
+      title: normalizeAnalysisTitle(createDto.title),
       images: createDto.images || null,
       imageNames: createDto.imageNames ?? null,
     });
@@ -51,10 +57,12 @@ export class AnalysisService {
     scopeLabel: string,
     globalAnalysisId: string,
     favorite = false,
+    title: string | null = null,
   ): Promise<Analysis> {
     const analysis = this.analysisRepository.create({
       assetId,
       notes,
+      title,
       images,
       imageNames,
       scopeLabel,
@@ -75,6 +83,7 @@ export class AnalysisService {
       images?: string[] | null;
       imageNames?: string[] | null;
       favorite?: boolean;
+      title?: string | null;
     },
   ): Promise<void> {
     await this.analysisRepository.update({ globalAnalysisId }, data);
@@ -128,7 +137,8 @@ export class AnalysisService {
       updateDto.assetId !== undefined ||
       updateDto.notes !== undefined ||
       updateDto.images !== undefined ||
-      updateDto.imageNames !== undefined;
+      updateDto.imageNames !== undefined ||
+      updateDto.title !== undefined;
 
     const favoriteOnly =
       updateDto.favorite !== undefined && !touchesContent;
@@ -171,6 +181,9 @@ export class AnalysisService {
     }
     if (updateDto.imageNames !== undefined) {
       analysis.imageNames = updateDto.imageNames;
+    }
+    if (updateDto.title !== undefined) {
+      analysis.title = normalizeAnalysisTitle(updateDto.title);
     }
     if (updateDto.favorite !== undefined) {
       analysis.favorite = updateDto.favorite;

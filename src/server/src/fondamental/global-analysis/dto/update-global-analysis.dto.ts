@@ -36,4 +36,9 @@ export class UpdateGlobalAnalysisDto {
   @IsOptional()
   @IsBoolean()
   favorite?: boolean;
+
+  @ApiPropertyOptional({ description: 'Optional headline for stream cards', maxLength: 500 })
+  @IsOptional()
+  @IsString()
+  title?: string | null;
 }

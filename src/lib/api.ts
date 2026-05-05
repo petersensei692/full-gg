@@ -6,6 +6,7 @@ export { assetWatchlistService } from "./services/asset-watchlist.service";
 export { weeklyWatchlistService } from "./services/weekly-watchlist.service";
 export { notesService } from "./services/notes.service";
 export { globalAnalysisService } from "./services/global-analysis.service";
+export { allAnalysisService } from "./services/all-analysis.service";
 export { tradesService as tradesApi } from "./services/trades.service";
 export { dashboardAnalyticsService } from "./services/dashboard-analytics.service";
 export { performanceAnalyticsService } from "./services/performance-analytics.service";

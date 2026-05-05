@@ -46,11 +46,15 @@ export type EditAnalysisSubmitPayload = {
   images: string[];
   analysisType?: string;
   scope?: "global" | string[];
+  /** Stream card headline; omit undefined when unchanged if callers distinguish — modal always sends null when cleared */
+  title?: string | null;
 };
 
 interface EditAnalysisModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** Stream card headline (optional) */
+  initialTitle?: string;
   initialNotes: string;
   initialImages: string[];
   onSubmit: (payload: EditAnalysisSubmitPayload) => void;
@@ -66,6 +70,7 @@ interface EditAnalysisModalProps {
 export function EditAnalysisModal({
   open,
   onOpenChange,
+  initialTitle = "",
   initialNotes,
   initialImages,
   onSubmit,
@@ -74,6 +79,7 @@ export function EditAnalysisModal({
 }: EditAnalysisModalProps) {
   const editorRef = useRef<HTMLDivElement>(null);
   const [images, setImages] = useState<string[]>([]);
+  const [streamTitle, setStreamTitle] = useState("");
   const [analysisType, setAnalysisType] = useState("daily");
   const [scopeMode, setScopeMode] = useState<"global" | "assets">("global");
   const [selectedAssetIds, setSelectedAssetIds] = useState<Set<string>>(new Set());
@@ -99,6 +105,7 @@ export function EditAnalysisModal({
 
   useEffect(() => {
     if (!open) return;
+    setStreamTitle(initialTitle);
     setImages(initialImages);
     setAnalysisType(initialAnalysisType ?? "daily");
     setScopeError("");
@@ -127,7 +134,7 @@ export function EditAnalysisModal({
       clearTimeout(t);
       clearTimeout(t2);
     };
-  }, [open, initialNotes, initialImages, initialAnalysisType, globalScopeEditor]);
+  }, [open, initialTitle, initialNotes, initialImages, initialAnalysisType, globalScopeEditor]);
 
   const { handlePaste } = useAnalysisEditorPaste({
     editorRef,
@@ -175,6 +182,7 @@ export function EditAnalysisModal({
 
   const handleSave = () => {
     const notes = editorRef.current?.innerHTML?.trim() ?? "";
+    const titleNorm = streamTitle.trim() ? streamTitle.trim() : null;
     setScopeError("");
     if (globalScopeEditor) {
       const scope: "global" | string[] =
@@ -188,11 +196,12 @@ export function EditAnalysisModal({
         images,
         analysisType,
         scope,
+        title: titleNorm,
       });
     } else if (initialAnalysisType !== undefined) {
-      onSubmit({ notes, images, analysisType });
+      onSubmit({ notes, images, analysisType, title: titleNorm });
     } else {
-      onSubmit({ notes, images });
+      onSubmit({ notes, images, title: titleNorm });
     }
     onOpenChange(false);
   };
@@ -211,6 +220,21 @@ export function EditAnalysisModal({
         <div className="scrollbar-modal flex flex-col min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
           <div className="space-y-4 min-w-0 overflow-x-hidden p-6">
             <h3 className="text-lg font-semibold text-dashboard-foreground">Edit Analysis</h3>
+
+            <div className="space-y-1">
+              <label htmlFor="analysis-edit-title" className="text-xs font-medium text-dashboard-foreground/70">
+                Title <span className="font-normal text-dashboard-foreground/50">(optional)</span>
+              </label>
+              <input
+                id="analysis-edit-title"
+                type="text"
+                value={streamTitle}
+                onChange={(e) => setStreamTitle(e.target.value)}
+                maxLength={500}
+                placeholder="Short headline on the analysis card"
+                className="w-full rounded-lg border border-sidebar-border bg-header-input px-3 py-2 text-sm text-dashboard-foreground placeholder:text-dashboard-foreground/45 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+              />
+            </div>
 
             {(showTypeSelect || showScope) && (
               <div className="flex flex-wrap items-center gap-3 rounded-lg border border-sidebar-border bg-sidebar/60 px-3 py-2.5">

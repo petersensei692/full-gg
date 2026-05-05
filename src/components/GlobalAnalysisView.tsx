@@ -10,7 +10,7 @@ import { StreamEntry as StreamEntryComponent } from "./analysis/StreamEntry";
 import { PostGlobalAnalysisInput } from "./PostGlobalAnalysisInput";
 import { EditAnalysisModal } from "./analysis/EditAnalysisModal";
 import { DateRangePicker, type DateRange } from "./analysis/DateRangePicker";
-import { ChevronUp, ChevronDown, SlidersHorizontal, Star } from "lucide-react";
+import { ChevronUp, ChevronDown, Download, SlidersHorizontal, Star } from "lucide-react";
 import { SidebarTrigger } from "./SidebarTrigger";
 import {
   deserializeDateRangeFromStorage,
@@ -23,6 +23,7 @@ import {
 import { broadcastAnalysisOrFavoriteChanged, subscribeAnalysisOrFavoriteChanged } from "@/lib/analysisBroadcast";
 import { buildStreamEntryGroups } from "@/lib/analysis-stream-entry-groups";
 import { FavoritesAnalysisSidebar } from "./analysis/FavoritesAnalysisSidebar";
+import { buildAnalysisExportText, downloadAnalysisTxt } from "@/lib/analysis-export";
 
 const ANALYSIS_TYPE_TO_TAG: Record<
   string,
@@ -54,6 +55,7 @@ export function GlobalAnalysisView({ favoritesWindow = false }: { favoritesWindo
   const [loading, setLoading] = useState(true);
   const [analysisFilter, setAnalysisFilter] = useState<string>("all");
   const [dateRange, setDateRange] = useState<DateRange>(null);
+  const [favoritesOnly, setFavoritesOnly] = useState(true);
   /** When true, only entries whose scope is full "global" (all assets) */
   const [globalOnly, setGlobalOnly] = useState(false);
   const [favoritesSidebarOpen, setFavoritesSidebarOpen] = useState(false);
@@ -86,8 +88,10 @@ export function GlobalAnalysisView({ favoritesWindow = false }: { favoritesWindo
       if (stored) {
         setAnalysisFilter(stored.analysisFilter);
         setDateRange(deserializeDateRangeFromStorage(stored.dateRange));
+        setFavoritesOnly(!!stored.favoritesOnly);
         setGlobalOnly(!!stored.globalOnly);
       } else {
+        setFavoritesOnly(true);
         setGlobalOnly(false);
       }
     }
@@ -108,12 +112,12 @@ export function GlobalAnalysisView({ favoritesWindow = false }: { favoritesWindo
     } else {
       saveGlobalAnalysisStreamFilters({
         analysisFilter,
-        favoritesOnly: false,
+        favoritesOnly,
         dateRange: serializeDateRangeForStorage(dateRange),
         globalOnly,
       });
     }
-  }, [analysisFilter, favoritesWindow, dateRange, globalOnly]);
+  }, [analysisFilter, favoritesWindow, dateRange, globalOnly, favoritesOnly]);
 
   const updateGlobalFiltersDropdownPosition = useCallback(() => {
     if (!globalFiltersMenuOpen || !globalFiltersButtonRef.current) return;
@@ -180,6 +184,7 @@ export function GlobalAnalysisView({ favoritesWindow = false }: { favoritesWindo
       imageNames?: string[];
       scope: "global" | string[];
       analysisType: string;
+      title?: string;
     }) => {
       const created = await globalAnalysisService.create({
         notes: payload.notes,
@@ -187,6 +192,7 @@ export function GlobalAnalysisView({ favoritesWindow = false }: { favoritesWindo
         imageNames: payload.imageNames,
         scope: payload.scope,
         analysisType: payload.analysisType,
+        title: payload.title?.trim() ? payload.title.trim() : undefined,
       });
       setPendingFocusId(created.id);
       await fetchList();
@@ -215,6 +221,7 @@ export function GlobalAnalysisView({ favoritesWindow = false }: { favoritesWindo
       images: string[];
       analysisType?: string;
       scope?: "global" | string[];
+      title?: string | null;
     }) => {
       if (!editing) return;
       const updated = await globalAnalysisService.update(editing.id, {
@@ -222,6 +229,12 @@ export function GlobalAnalysisView({ favoritesWindow = false }: { favoritesWindo
         images: payload.images.length > 0 ? payload.images : null,
         analysisType: payload.analysisType,
         scope: payload.scope,
+        title:
+          payload.title === undefined
+            ? undefined
+            : payload.title?.trim()
+              ? payload.title.trim()
+              : null,
       });
       setPendingFocusId(updated.id);
       setEditing(null);
@@ -299,6 +312,7 @@ export function GlobalAnalysisView({ favoritesWindow = false }: { favoritesWindo
         time: formatTime(new Date(ga.createdAt)),
         tag,
         tagColor,
+        title: ga.title ?? null,
         content: ga.notes,
         createdAt,
         analysisType,
@@ -340,8 +354,11 @@ export function GlobalAnalysisView({ favoritesWindow = false }: { favoritesWindo
     if (favoritesWindow) {
       entries = entries.filter((e) => e.favorite);
     }
+    if (!favoritesOnly) {
+      entries = entries.filter((e) => !e.favorite);
+    }
     return entries;
-  }, [mappedEntries, analysisFilter, dateRange, favoritesWindow]);
+  }, [mappedEntries, analysisFilter, dateRange, favoritesWindow, favoritesOnly]);
 
   const entriesWithGroups = useMemo(
     () => buildStreamEntryGroups(filteredEntries),
@@ -352,6 +369,13 @@ export function GlobalAnalysisView({ favoritesWindow = false }: { favoritesWindo
     const favOnly = filteredEntries.filter((e) => e.favorite);
     return buildStreamEntryGroups(favOnly);
   }, [filteredEntries]);
+
+  const handleExportEntries = useCallback((entries: StreamEntry[], kind: "main" | "favorites") => {
+    const text = buildAnalysisExportText(entries);
+    const stamp = new Date().toISOString().slice(0, 10);
+    const filename = `global-analysis-${kind}-${stamp}.txt`;
+    downloadAnalysisTxt(filename, text);
+  }, []);
 
   useEffect(() => {
     if (!pendingFocusId || loading) return;
@@ -400,23 +424,6 @@ export function GlobalAnalysisView({ favoritesWindow = false }: { favoritesWindo
           ))}
         </select>
       </div>
-      {!favoritesWindow && (
-        <button
-          type="button"
-          onClick={() => setFavoritesSidebarOpen((o) => !o)}
-          className={`flex w-full items-center justify-center gap-2 rounded-lg border p-2 text-sm font-medium transition-colors ${
-            favoritesSidebarOpen
-              ? "border-sky-500 bg-sky-500/15 text-sky-500"
-              : "border-sidebar-border bg-sidebar text-dashboard-foreground/70 hover:bg-sidebar-hover hover:text-dashboard-foreground"
-          }`}
-          aria-pressed={favoritesSidebarOpen}
-          title="Show favorite analyses"
-          aria-label="Show favorite analyses"
-        >
-          <Star className={`h-4 w-4 shrink-0 ${favoritesSidebarOpen ? "fill-current" : ""}`} />
-          Favorite analyses
-        </button>
-      )}
       <div className="space-y-1">
         <span className="text-xs font-medium text-dashboard-foreground/70">Date range</span>
         <DateRangePicker
@@ -426,6 +433,21 @@ export function GlobalAnalysisView({ favoritesWindow = false }: { favoritesWindo
           dropdownPlacement="beside"
         />
       </div>
+      {!favoritesWindow && (
+        <button
+          type="button"
+          role="switch"
+          aria-checked={favoritesOnly}
+          onClick={() => setFavoritesOnly((v) => !v)}
+          className={`w-full rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
+            favoritesOnly
+              ? "border-primary bg-primary/15 text-dashboard-foreground"
+              : "border-sidebar-border bg-sidebar text-dashboard-foreground/70 hover:bg-sidebar-hover hover:text-dashboard-foreground"
+          }`}
+        >
+          Favorites
+        </button>
+      )}
       {!favoritesWindow && (
         <button
           type="button"
@@ -466,6 +488,32 @@ export function GlobalAnalysisView({ favoritesWindow = false }: { favoritesWindo
           <SlidersHorizontal className="h-4 w-4" />
         </button>
       </div>
+      <button
+        type="button"
+        onClick={() => handleExportEntries(filteredEntries, "main")}
+        disabled={loading || filteredEntries.length === 0}
+        className="shrink-0 rounded-lg border border-sidebar-border p-2 text-header-muted hover:bg-sidebar-hover hover:text-primary disabled:opacity-40 disabled:cursor-not-allowed"
+        title="Export filtered analyses (.txt)"
+        aria-label="Export filtered analyses"
+      >
+        <Download className="h-4 w-4" />
+      </button>
+      {!favoritesWindow && (
+        <button
+          type="button"
+          onClick={() => setFavoritesSidebarOpen((o) => !o)}
+          className={`shrink-0 rounded-lg border p-2 transition-colors ${
+            favoritesSidebarOpen
+              ? "border-sky-500 bg-sky-500/15 text-sky-500"
+              : "border-sidebar-border bg-sidebar text-dashboard-foreground/70 hover:bg-sidebar-hover hover:text-dashboard-foreground"
+          }`}
+          aria-pressed={favoritesSidebarOpen}
+          title="Show favorite analyses"
+          aria-label="Show favorite analyses"
+        >
+          <Star className={`h-4 w-4 ${favoritesSidebarOpen ? "fill-current" : ""}`} />
+        </button>
+      )}
       <h2 className="flex-1 min-w-0 truncate text-center text-sm font-semibold text-dashboard-foreground sm:text-left">
         Global Analysis
       </h2>
@@ -479,11 +527,13 @@ export function GlobalAnalysisView({ favoritesWindow = false }: { favoritesWindo
       </p>
     ) : (
       <div className="min-w-0 w-full max-w-full space-y-0 pb-4">
-        {favoritesEntriesWithGroups.map(({ entry, separatorType, weekGroup, dateGroup }) => (
+        {favoritesEntriesWithGroups.map(({ entry, separatorType, yearGroup, monthGroup, weekGroup, dateGroup }) => (
           <div key={`fav-${entry.id}`}>
             <StreamEntryComponent
               entry={entry}
               separatorType={separatorType}
+              yearGroup={yearGroup}
+              monthGroup={monthGroup}
               weekGroup={weekGroup}
               dateGroup={dateGroup}
               fillColumnWidth
@@ -538,7 +588,7 @@ export function GlobalAnalysisView({ favoritesWindow = false }: { favoritesWindo
                     {loading ? (
                       <p className="py-4 text-sm text-dashboard-foreground/70">Loading...</p>
                     ) : (
-                      entriesWithGroups.map(({ entry, separatorType, weekGroup, dateGroup }) => (
+                      entriesWithGroups.map(({ entry, separatorType, yearGroup, monthGroup, weekGroup, dateGroup }) => (
                         <div
                           key={entry.id}
                           ref={(el) => {
@@ -548,6 +598,8 @@ export function GlobalAnalysisView({ favoritesWindow = false }: { favoritesWindo
                           <StreamEntryComponent
                             entry={entry}
                             separatorType={separatorType}
+                            yearGroup={yearGroup}
+                            monthGroup={monthGroup}
                             weekGroup={weekGroup}
                             dateGroup={dateGroup}
                             onDelete={() => handleDelete(entry.id)}
@@ -599,6 +651,8 @@ export function GlobalAnalysisView({ favoritesWindow = false }: { favoritesWindo
                 open={favoritesSidebarOpen}
                 onOpenChange={setFavoritesSidebarOpen}
                 title="Favorite analyses"
+                onExport={() => handleExportEntries(filteredEntries.filter((e) => e.favorite), "favorites")}
+                exportDisabled={filteredEntries.filter((e) => e.favorite).length === 0}
               >
                 {favoritesPanel}
               </FavoritesAnalysisSidebar>
@@ -621,6 +675,7 @@ export function GlobalAnalysisView({ favoritesWindow = false }: { favoritesWindo
         <EditAnalysisModal
           open={editModalOpen}
           onOpenChange={setEditModalOpen}
+          initialTitle={editing.title ?? ""}
           initialNotes={editing.notes}
           initialImages={editing.images ?? []}
           initialAnalysisType={editing.analysisType ?? "daily"}

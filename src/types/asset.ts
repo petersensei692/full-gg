@@ -24,6 +24,8 @@ export interface StreamEntry {
   time: string;
   tag: StreamEntryTag;
   tagColor: StreamEntryTagColor;
+  /** Optional headline shown below the tag/time row on cards */
+  title?: string | null;
   content: string; // plain text or HTML from editor
   images?: string[]; // stored image paths
   /** Display names for each image (same order as images); optional. */

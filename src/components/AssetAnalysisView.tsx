@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useMemo, useRef, useEffect, useLayoutEffect } from "react";
 import { createPortal } from "react-dom";
-import { Calendar, ChevronDown, ChevronUp, Plus, SlidersHorizontal, Star } from "lucide-react";
+import { Calendar, ChevronDown, ChevronUp, Download, Plus, SlidersHorizontal, Star } from "lucide-react";
 import type { AssetConfig, StreamEntry } from "@/types/asset";
 import type { Analysis, AssetWatchlist, CreateWatchItemDto, WatchItem } from "@/types/api";
 import { analysisService, assetWatchlistService } from "@/lib/api";
@@ -29,6 +29,7 @@ import { FavoritesAnalysisSidebar } from "./analysis/FavoritesAnalysisSidebar";
 import { StreamTabs } from "./analysis/StreamTabs";
 import { PairWatchlistView } from "./analysis/PairWatchlistView";
 import { CreatePairModal } from "./analysis/CreatePairModal";
+import { buildAnalysisExportText, downloadAnalysisTxt } from "@/lib/analysis-export";
 
 const ANALYSIS_TYPE_TO_TAG: Record<
   string,
@@ -84,6 +85,7 @@ export function AssetAnalysisView({ asset, favoritesWindow = false }: AssetAnaly
   const [analyses, setAnalyses] = useState<Analysis[]>([]);
   const [analysisFilter, setAnalysisFilter] = useState<string>("all");
   const [dateRange, setDateRange] = useState<DateRange>(null);
+  const [favoritesOnly, setFavoritesOnly] = useState(true);
   /** When true, rows with full global scope are hidden on this asset stream only */
   const [hideGlobalScoped, setHideGlobalScoped] = useState(false);
   const [favoritesSidebarOpen, setFavoritesSidebarOpen] = useState(false);
@@ -276,7 +278,8 @@ export function AssetAnalysisView({ asset, favoritesWindow = false }: AssetAnaly
     [editingWatchItem, createWatchItem, updateWatchItem, refetchAll]
   );
 
-  const handleCreate = useCallback(async (payload: { notes: string; images: string[]; analysisType: string }) => {
+  const handleCreate = useCallback(
+    async (payload: { notes: string; images: string[]; analysisType: string; title?: string }) => {
     if (!resolvedAsset.id) {
       throw new Error("Asset ID is required to create analysis. Ensure the API is connected.");
     }
@@ -285,6 +288,7 @@ export function AssetAnalysisView({ asset, favoritesWindow = false }: AssetAnaly
       assetId: resolvedAsset.id,
       notes: notesWithMarker,
       images: payload.images,
+      title: payload.title?.trim() ? payload.title.trim() : undefined,
     });
     setAnalyses((prev) => [...prev, created]);
     broadcastAnalysisOrFavoriteChanged();
@@ -389,10 +393,12 @@ export function AssetAnalysisView({ asset, favoritesWindow = false }: AssetAnaly
       if (stored) {
         setAnalysisFilter(stored.analysisFilter);
         setDateRange(deserializeDateRangeFromStorage(stored.dateRange));
+        setFavoritesOnly(true);
         setHideGlobalScoped(!!stored.hideGlobalScoped);
       } else {
         setAnalysisFilter("all");
         setDateRange(null);
+        setFavoritesOnly(true);
         setHideGlobalScoped(false);
       }
     } else {
@@ -400,10 +406,12 @@ export function AssetAnalysisView({ asset, favoritesWindow = false }: AssetAnaly
       if (stored) {
         setAnalysisFilter(stored.analysisFilter);
         setDateRange(deserializeDateRangeFromStorage(stored.dateRange));
+        setFavoritesOnly(!!stored.favoritesOnly);
         setHideGlobalScoped(!!stored.hideGlobalScoped);
       } else {
         setAnalysisFilter("all");
         setDateRange(null);
+        setFavoritesOnly(true);
         setHideGlobalScoped(false);
       }
     }
@@ -425,12 +433,12 @@ export function AssetAnalysisView({ asset, favoritesWindow = false }: AssetAnaly
     } else {
       saveAssetAnalysisStreamFilters(resolvedAsset.id, {
         analysisFilter,
-        favoritesOnly: false,
+        favoritesOnly,
         dateRange: serializeDateRangeForStorage(dateRange),
         hideGlobalScoped,
       });
     }
-  }, [resolvedAsset.id, favoritesWindow, analysisFilter, dateRange, hideGlobalScoped]);
+  }, [resolvedAsset.id, favoritesWindow, analysisFilter, dateRange, hideGlobalScoped, favoritesOnly]);
 
   const refetchAnalyses = useCallback(() => {
     if (!resolvedAsset.id) return;
@@ -495,6 +503,7 @@ export function AssetAnalysisView({ asset, favoritesWindow = false }: AssetAnaly
           time: formatTime(new Date(analysis.createdAt)),
           tag,
           tagColor,
+          title: analysis.title ?? null,
           content: cleanedNotes,
           createdAt,
           analysisType,
@@ -525,11 +534,14 @@ export function AssetAnalysisView({ asset, favoritesWindow = false }: AssetAnaly
     if (favoritesWindow) {
       list = list.filter((e) => e.favorite);
     }
+    if (!favoritesOnly) {
+      list = list.filter((e) => !e.favorite);
+    }
     if (hideGlobalScoped) {
       list = list.filter((e) => !e.globalFullScope);
     }
     return list;
-  }, [mappedEntries, analysisFilter, dateRange, favoritesWindow, hideGlobalScoped]);
+  }, [mappedEntries, analysisFilter, dateRange, favoritesWindow, hideGlobalScoped, favoritesOnly]);
 
   const entriesWithGroups = useMemo(
     () => buildStreamEntryGroups(filteredEntries),
@@ -540,6 +552,22 @@ export function AssetAnalysisView({ asset, favoritesWindow = false }: AssetAnaly
     const favOnly = filteredEntries.filter((e) => e.favorite);
     return buildStreamEntryGroups(favOnly);
   }, [filteredEntries]);
+
+  const favoriteFilteredEntries = useMemo(
+    () => filteredEntries.filter((e) => e.favorite),
+    [filteredEntries]
+  );
+
+  const handleExportEntries = useCallback(
+    (entries: StreamEntry[], kind: "main" | "favorites") => {
+      const text = buildAnalysisExportText(entries);
+      const assetSlug = resolvedAsset.slug || "asset";
+      const stamp = new Date().toISOString().slice(0, 10);
+      const filename = `${assetSlug}-analysis-${kind}-${stamp}.txt`;
+      downloadAnalysisTxt(filename, text);
+    },
+    [resolvedAsset.slug]
+  );
 
   /** Newest analyses are at the bottom; scroll there when opening the stream or when the list changes. */
   useLayoutEffect(() => {
@@ -600,6 +628,19 @@ export function AssetAnalysisView({ asset, favoritesWindow = false }: AssetAnaly
       <button
         type="button"
         role="switch"
+        aria-checked={favoritesOnly}
+        onClick={() => setFavoritesOnly((v) => !v)}
+        className={`w-full rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
+          favoritesOnly
+            ? "border-primary bg-primary/15 text-dashboard-foreground"
+            : "border-sidebar-border bg-sidebar text-dashboard-foreground/70 hover:bg-sidebar-hover hover:text-dashboard-foreground"
+        }`}
+      >
+        Favorites
+      </button>
+      <button
+        type="button"
+        role="switch"
         aria-checked={!hideGlobalScoped}
         onClick={() => setHideGlobalScoped((h) => !h)}
         title={
@@ -649,6 +690,18 @@ export function AssetAnalysisView({ asset, favoritesWindow = false }: AssetAnaly
               aria-label="Show favorite analyses"
             >
               <Star className={`h-4 w-4 ${favoritesSidebarOpen ? "fill-current" : ""}`} />
+            </button>
+          )}
+          {(favoritesWindow || activeTab === "stream") && (
+            <button
+              type="button"
+              onClick={() => handleExportEntries(filteredEntries, "main")}
+              disabled={filteredEntries.length === 0}
+              className="shrink-0 rounded-lg border border-sidebar-border p-2 text-header-muted hover:bg-sidebar-hover hover:text-primary disabled:opacity-40 disabled:cursor-not-allowed"
+              title="Export filtered analyses (.txt)"
+              aria-label="Export filtered analyses"
+            >
+              <Download className="h-4 w-4" />
             </button>
           )}
         </div>
@@ -714,7 +767,7 @@ export function AssetAnalysisView({ asset, favoritesWindow = false }: AssetAnaly
       </p>
     ) : (
       <div className="min-w-0 w-full max-w-full space-y-0 pb-4">
-        {favoritesEntriesWithGroups.map(({ entry, separatorType, weekGroup, dateGroup }) => {
+        {favoritesEntriesWithGroups.map(({ entry, separatorType, yearGroup, monthGroup, weekGroup, dateGroup }) => {
           const analysis = analyses.find((a) => a.id === entry.id);
           const fromFullGlobalOnAsset =
             !!analysis?.globalAnalysisId && analysis?.scopeLabel === "GLOBAL";
@@ -726,6 +779,8 @@ export function AssetAnalysisView({ asset, favoritesWindow = false }: AssetAnaly
               key={`fav-${entry.id}`}
               entry={entry}
               separatorType={separatorType}
+              yearGroup={yearGroup}
+              monthGroup={monthGroup}
               weekGroup={weekGroup}
               dateGroup={dateGroup}
               fillColumnWidth
@@ -858,7 +913,7 @@ export function AssetAnalysisView({ asset, favoritesWindow = false }: AssetAnaly
                       className="absolute inset-0 overflow-x-hidden overflow-y-auto px-6"
                     >
                       <div className="w-full max-w-full space-y-0 pb-4">
-                        {entriesWithGroups.map(({ entry, separatorType, weekGroup, dateGroup }) => {
+                        {entriesWithGroups.map(({ entry, separatorType, yearGroup, monthGroup, weekGroup, dateGroup }) => {
                           const analysis = analyses.find((a) => a.id === entry.id);
                           const fromFullGlobalOnAsset =
                             !!analysis?.globalAnalysisId && analysis?.scopeLabel === "GLOBAL";
@@ -870,6 +925,8 @@ export function AssetAnalysisView({ asset, favoritesWindow = false }: AssetAnaly
                               key={entry.id}
                               entry={entry}
                               separatorType={separatorType}
+                              yearGroup={yearGroup}
+                              monthGroup={monthGroup}
                               weekGroup={weekGroup}
                               dateGroup={dateGroup}
                               onDelete={
@@ -936,6 +993,8 @@ export function AssetAnalysisView({ asset, favoritesWindow = false }: AssetAnaly
                   open={favoritesSidebarOpen}
                   onOpenChange={setFavoritesSidebarOpen}
                   title="Favorite analyses"
+                  onExport={() => handleExportEntries(favoriteFilteredEntries, "favorites")}
+                  exportDisabled={favoriteFilteredEntries.length === 0}
                 >
                   {favoritesPanel}
                 </FavoritesAnalysisSidebar>
@@ -991,16 +1050,23 @@ export function AssetAnalysisView({ asset, favoritesWindow = false }: AssetAnaly
         <EditAnalysisModal
           open={editModalOpen}
           onOpenChange={setEditModalOpen}
+          initialTitle={editingAnalysis.title ?? ""}
           initialNotes={extractAnalysisType(editingAnalysis.notes).cleanedNotes}
           initialImages={editingAnalysis.images ?? []}
           initialAnalysisType={editingAnalysisType}
-          onSubmit={async ({ notes, images, analysisType: nextType }) => {
+          onSubmit={async ({ notes, images, analysisType: nextType, title: nextTitle }) => {
             if (!editingAnalysis) return;
             const type = nextType ?? editingAnalysisType;
             const notesWithMarker = addAnalysisTypeMarker(notes, type);
             const updated = await analysisService.update(editingAnalysis.id, {
               notes: notesWithMarker,
               images,
+              title:
+                nextTitle === undefined
+                  ? undefined
+                  : nextTitle?.trim()
+                    ? nextTitle.trim()
+                    : null,
             });
             setAnalyses((prev) => prev.map((a) => (a.id === updated.id ? updated : a)));
             broadcastAnalysisOrFavoriteChanged();
