@@ -77,7 +77,7 @@ const DialogContent = React.forwardRef<
       <DialogTitle className="sr-only">Dialog</DialogTitle>
       {showClose && (
         <DialogPrimitive.Close
-          className="absolute right-0 top-4 rounded-lg p-2 text-white/80 hover:bg-white/10 hover:text-white transition-colors z-10"
+          className="absolute right-0 top-4 z-10 rounded-lg border border-sidebar-border bg-sidebar p-2 text-dashboard-foreground/80 shadow-sm hover:bg-sidebar-hover hover:text-dashboard-foreground transition-colors"
           aria-label="Close"
         >
           <X className="h-5 w-5" />
