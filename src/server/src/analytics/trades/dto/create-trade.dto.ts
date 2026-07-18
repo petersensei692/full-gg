@@ -127,10 +127,19 @@ class TradeNoteDto {
 }
 
 export class CreateTradeDto {
-  @ApiPropertyOptional({ description: 'Pair (e.g. EURUSD). If omitted and pairWatchedId is set, pairName is used.' })
-  @IsOptional()
-  @IsString()
-  pair?: string;
+  @ApiProperty({
+    description: 'Catalog trading pair ID',
+    example: '123e4567-e89b-12d3-a456-426614174000',
+  })
+  @IsUUID()
+  pairId: string;
+
+  @ApiProperty({
+    description: 'Strategy ID',
+    example: '123e4567-e89b-12d3-a456-426614174000',
+  })
+  @IsUUID()
+  strategyId: string;
 
   @ApiPropertyOptional({ description: 'Linked watch item ID', example: '123e4567-e89b-12d3-a456-426614174000' })
   @IsOptional()

@@ -1,9 +1,9 @@
 import { DataSource } from 'typeorm';
 import { readAppConfig, resolveDatabasePath } from '../app-config';
 import { seedAssets } from './asset.seed';
-import { seedPairsPipsValues, seedTradesForPairs } from './analytics.seed';
+import { seedPairs, seedTradesForPairs } from './analytics.seed';
 import { Asset } from '../../fondamental/assets/entities/asset.entity';
-import { PairPipsValue } from '../../analytics/pairs-pips-values/entities/pair-pips-value.entity';
+import { Pair } from '../../analytics/pairs/entities/pair.entity';
 import { Trade } from '../../analytics/trades/entities/trade.entity';
 import { WatchItem } from '../../fondamental/assets/watch-items/entities/watch-item.entity';
 import { WeeklyWatchlist } from '../../fondamental/weekly/weekly-watchlist/entities/weekly-watchlist.entity';
@@ -15,7 +15,7 @@ const databasePath = resolveDatabasePath(appConfig);
 const dataSource = new DataSource({
   type: 'better-sqlite3',
   database: databasePath,
-  entities: [Asset, PairPipsValue, Trade, WatchItem, WeeklyWatchlist, AssetWatchlist],
+  entities: [Asset, Pair, Trade, WatchItem, WeeklyWatchlist, AssetWatchlist],
   synchronize: true,
 });
 
@@ -26,8 +26,8 @@ async function runSeeds(): Promise<void> {
 
     console.log('Seeding assets...');
     await seedAssets(dataSource);
-    console.log('\nSeeding pairs pips values...');
-    await seedPairsPipsValues(dataSource);
+    console.log('\nSeeding trading pairs...');
+    await seedPairs(dataSource);
     console.log('\nSeeding trades...');
     await seedTradesForPairs(dataSource);
 

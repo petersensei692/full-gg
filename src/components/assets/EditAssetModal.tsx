@@ -16,7 +16,7 @@ interface EditAssetModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   asset: AssetWithStats | null;
-  onSave: (id: string, data: { name?: string; type?: string }) => Promise<void>;
+  onSave: (id: string, data: { name?: string; type?: string; isTradable?: boolean }) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
 }
 
@@ -29,6 +29,7 @@ export function EditAssetModal({
 }: EditAssetModalProps) {
   const [name, setName] = useState("");
   const [type, setType] = useState("currency");
+  const [isTradable, setIsTradable] = useState(true);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState("");
@@ -38,6 +39,7 @@ export function EditAssetModal({
     if (asset && open) {
       setName(asset.name);
       setType(asset.type === "bond" ? "stocks" : (asset.type ?? "currency"));
+      setIsTradable(asset.isTradable ?? asset.type !== "stocks");
       setError("");
     }
   }, [asset, open]);
@@ -48,7 +50,7 @@ export function EditAssetModal({
     setError("");
     setSaving(true);
     try {
-      await onSave(asset.id, { name: name.trim(), type });
+      await onSave(asset.id, { name: name.trim(), type, isTradable });
       onOpenChange(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save");
@@ -106,6 +108,15 @@ export function EditAssetModal({
                 ))}
               </select>
             </div>
+            <label className="flex items-center gap-2 text-sm text-dashboard-foreground cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={isTradable}
+                onChange={(e) => setIsTradable(e.target.checked)}
+                className="rounded border-sidebar-border"
+              />
+              Tradable (can be used in trading pairs)
+            </label>
             {error && <p className="text-sm text-red-400">{error}</p>}
             <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
               <button

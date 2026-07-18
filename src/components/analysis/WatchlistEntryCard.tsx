@@ -8,6 +8,10 @@ import { Check, Trash2 } from "lucide-react";
 import { WatchlistFocusDialog } from "./WatchlistFocusDialog";
 import { ConfirmDeleteDialog } from "@/components/ui/ConfirmDeleteDialog";
 
+function watchPairLabel(entry: WatchItem): string {
+  return entry.tradingPair?.pair ?? entry.pairName;
+}
+
 function watchItemDeleteDetails(entry: WatchItem): string {
   const wl =
     entry.watchlist ??
@@ -19,7 +23,7 @@ function watchItemDeleteDetails(entry: WatchItem): string {
       ? `${wl.startDate} → ${wl.endDate}`
       : "—";
   return [
-    `Pair: ${entry.pairName}`,
+    `Pair: ${watchPairLabel(entry)}`,
     `Bias: ${entry.bias}`,
     `Watchlist week: ${week}`,
     `Thesis images: ${entry.thesis?.images?.length ?? 0}`,
@@ -71,7 +75,7 @@ export function WatchlistEntryCard({ entry, onEdit }: WatchlistEntryCardProps) {
       >
         <div className="px-4 py-3 border-b border-sidebar-border flex items-center justify-between gap-2 shrink-0">
           <h4 className="text-base font-semibold text-dashboard-foreground truncate">
-            {entry.pairName}
+            {watchPairLabel(entry)}
           </h4>
           <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
             <button
@@ -123,7 +127,7 @@ export function WatchlistEntryCard({ entry, onEdit }: WatchlistEntryCardProps) {
           {firstImage ? (
             <img
               src={getImageUrl(firstImage)}
-              alt={entry.pairName}
+              alt={watchPairLabel(entry)}
               className="max-w-full max-h-[180px] w-auto h-auto object-contain rounded-lg"
             />
           ) : (

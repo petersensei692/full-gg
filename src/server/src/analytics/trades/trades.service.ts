@@ -5,7 +5,8 @@ import { Trade, TradeNote } from './entities/trade.entity';
 import { CreateTradeDto } from './dto/create-trade.dto';
 import { UpdateTradeDto } from './dto/update-trade.dto';
 import { WatchItem } from '../../fondamental/assets/watch-items/entities/watch-item.entity';
-import { PairPipsValue } from '../pairs-pips-values/entities/pair-pips-value.entity';
+import { Pair } from '../pairs/entities/pair.entity';
+import { Strategy } from '../strategies/entities/strategy.entity';
 import { Asset } from '../../fondamental/assets/entities/asset.entity';
 import { AnalysisService } from '../../fondamental/assets/analysis/analysis.service';
 import { splitPairSymbol } from '../analytics-pair-filters';
@@ -19,8 +20,10 @@ export class TradesService {
     private readonly tradesRepository: Repository<Trade>,
     @InjectRepository(WatchItem)
     private readonly watchItemsRepository: Repository<WatchItem>,
-    @InjectRepository(PairPipsValue)
-    private readonly pairsPipsRepository: Repository<PairPipsValue>,
+    @InjectRepository(Pair)
+    private readonly pairsRepository: Repository<Pair>,
+    @InjectRepository(Strategy)
+    private readonly strategiesRepository: Repository<Strategy>,
     @InjectRepository(Asset)
     private readonly assetsRepository: Repository<Asset>,
     private readonly analysisService: AnalysisService,
@@ -38,12 +41,77 @@ export class TradesService {
     return 0.0001;
   }
 
-  private async resolvePipStep(pair: string): Promise<number> {
-    const normalized = this.normalizePair(pair);
-    const all = await this.pairsPipsRepository.find();
+  private async resolvePipStepForTrade(trade: Trade): Promise<number> {
+    if (trade.pairId) {
+      const row =
+        trade.tradingPair ??
+        (await this.pairsRepository.findOne({ where: { id: trade.pairId } }));
+      if (row) return row.pairFormat;
+    }
+    const normalized = this.normalizePair(trade.pair);
+    const all = await this.pairsRepository.find();
     const match = all.find((row) => this.normalizePair(row.pair) === normalized);
     if (match) return match.pairFormat;
-    return this.inferFallbackPipStep(pair);
+    return this.inferFallbackPipStep(trade.pair);
+  }
+
+  private assertCatalogPairTradable(match: Pair): void {
+    if (match.pipValue == null) {
+      throw new BadRequestException(
+        `No pip value configured for ${match.pair}. Set it on the Pairs page.`,
+      );
+    }
+    if (match.baseAsset && !match.baseAsset.isTradable) {
+      throw new BadRequestException(
+        `Base asset ${match.baseAsset.name} is not tradable. Enable it on Assets.`,
+      );
+    }
+    if (match.quoteAsset && !match.quoteAsset.isTradable) {
+      throw new BadRequestException(
+        `Quote asset ${match.quoteAsset.name} is not tradable. Enable it on Assets.`,
+      );
+    }
+  }
+
+  private async loadCatalogPair(pairId: string): Promise<Pair> {
+    const match = await this.pairsRepository.findOne({
+      where: { id: pairId },
+      relations: ['baseAsset', 'quoteAsset'],
+    });
+    if (!match) {
+      throw new NotFoundException(`Trading pair ${pairId} not found`);
+    }
+    this.assertCatalogPairTradable(match);
+    return match;
+  }
+
+  private async resolveStrategy(strategyId: string): Promise<Strategy> {
+    const strategy = await this.strategiesRepository.findOne({
+      where: { id: strategyId },
+    });
+    if (!strategy) {
+      throw new NotFoundException(`Strategy with id ${strategyId} not found`);
+    }
+    return strategy;
+  }
+
+  /** Backfill pair_id on trades that only have a denormalized pair string. */
+  async backfillTradePairIds(): Promise<number> {
+    const allPairs = await this.pairsRepository.find();
+    const byNorm = new Map(allPairs.map((p) => [this.normalizePair(p.pair), p]));
+    const allTrades = await this.tradesRepository.find();
+    let n = 0;
+    for (const t of allTrades) {
+      if (t.pairId) continue;
+      const match = byNorm.get(this.normalizePair(t.pair));
+      if (!match) continue;
+      t.pairId = match.id;
+      t.tradingPair = match;
+      t.pair = match.pair;
+      await this.tradesRepository.save(t);
+      n++;
+    }
+    return n;
   }
 
   private async recalculateProfitFactorEarned(trade: Trade): Promise<void> {
@@ -59,7 +127,7 @@ export class TradesService {
       return;
     }
 
-    const pipStep = await this.resolvePipStep(trade.pair);
+    const pipStep = await this.resolvePipStepForTrade(trade);
     const riskPips = riskPriceAbs / pipStep;
     if (riskPips <= 0) {
       trade.profitFactorEarned = { earnings: [], earningsNumber: 0, totalEarned: 0 };
@@ -142,12 +210,21 @@ export class TradesService {
     if (pairWatchedId == null || pairWatchedId === '') return null;
     const pairWatched = await this.watchItemsRepository.findOne({
       where: { id: pairWatchedId },
-      relations: ['baseAsset', 'quoteAsset', 'watchlist'],
+      relations: ['baseAsset', 'quoteAsset', 'watchlist', 'tradingPair'],
     });
     if (!pairWatched) {
       throw new NotFoundException(`Watch item with id ${pairWatchedId} not found`);
     }
     return pairWatched;
+  }
+
+  private assertWatchMatchesTradePair(trade: Trade, pairWatched: WatchItem | null): void {
+    if (!pairWatched?.tradingPairId || !trade.pairId) return;
+    if (pairWatched.tradingPairId !== trade.pairId) {
+      throw new BadRequestException(
+        'Linked watch item does not match the selected trading pair',
+      );
+    }
   }
 
   private async syncWatchItemFinished(watchItemId: string, finished: boolean): Promise<void> {
@@ -224,7 +301,10 @@ export class TradesService {
 
     let baseCode: string | null = null;
     let quoteCode: string | null = null;
-    if (trade.pairWatched?.baseAsset && trade.pairWatched?.quoteAsset) {
+    if (trade.tradingPair?.baseAsset && trade.tradingPair?.quoteAsset) {
+      baseCode = trade.tradingPair.baseAsset.name;
+      quoteCode = trade.tradingPair.quoteAsset.name;
+    } else if (trade.pairWatched?.baseAsset && trade.pairWatched?.quoteAsset) {
       baseCode = trade.pairWatched.baseAsset.name;
       quoteCode = trade.pairWatched.quoteAsset.name;
     } else {
@@ -272,10 +352,16 @@ export class TradesService {
   }
 
   async create(dto: CreateTradeDto): Promise<Trade> {
+    const catalogPair = await this.loadCatalogPair(dto.pairId);
+    const strategy = await this.resolveStrategy(dto.strategyId);
     const pairWatched = await this.resolvePairWatched(dto.pairWatchedId);
-    const pair = dto.pair?.trim() || pairWatched?.pairName;
-    if (!pair) {
-      throw new BadRequestException('pair is required when pairWatchedId is not provided');
+    if (
+      pairWatched?.tradingPairId &&
+      pairWatched.tradingPairId !== catalogPair.id
+    ) {
+      throw new BadRequestException(
+        'Linked watch item does not match the selected trading pair',
+      );
     }
 
     const hasExec = dto.executionTime != null && String(dto.executionTime).trim() !== '';
@@ -293,7 +379,11 @@ export class TradesService {
 
     const pfe = dto.profitFactorEarned;
     const trade = this.tradesRepository.create({
-      pair,
+      pair: catalogPair.pair,
+      pairId: catalogPair.id,
+      tradingPair: catalogPair,
+      strategyId: strategy.id,
+      strategy,
       type: dto.type,
       executionType: dto.executionType,
       executionTime,
@@ -382,7 +472,15 @@ export class TradesService {
   async findOne(id: string): Promise<Trade> {
     const trade = await this.tradesRepository.findOne({
       where: { id },
-      relations: ['pairWatched', 'pairWatched.baseAsset', 'pairWatched.quoteAsset'],
+      relations: [
+        'pairWatched',
+        'pairWatched.baseAsset',
+        'pairWatched.quoteAsset',
+        'tradingPair',
+        'tradingPair.baseAsset',
+        'tradingPair.quoteAsset',
+        'strategy',
+      ],
     });
     if (!trade) {
       throw new NotFoundException(`Trade with id ${id} not found`);
@@ -398,7 +496,7 @@ export class TradesService {
       dto.initialSlPrice !== undefined ||
       dto.positionSize !== undefined ||
       dto.type !== undefined ||
-      dto.pair !== undefined ||
+      dto.pairId !== undefined ||
       dto.profitFactorEarned !== undefined
     );
   }
@@ -423,7 +521,18 @@ export class TradesService {
         await this.syncWatchItemFinished(trade.pairWatched.id, true);
       }
     }
-    if (dto.pair !== undefined) trade.pair = dto.pair.trim();
+    if (dto.pairId !== undefined) {
+      const catalogPair = await this.loadCatalogPair(dto.pairId);
+      trade.pairId = catalogPair.id;
+      trade.tradingPair = catalogPair;
+      trade.pair = catalogPair.pair;
+    }
+    if (dto.strategyId !== undefined) {
+      const strategy = await this.resolveStrategy(dto.strategyId);
+      trade.strategyId = strategy.id;
+      trade.strategy = strategy;
+    }
+    this.assertWatchMatchesTradePair(trade, trade.pairWatched);
     if (dto.type !== undefined) trade.type = dto.type;
     if (dto.executionType !== undefined) trade.executionType = dto.executionType;
     if (dto.executionTime !== undefined) {

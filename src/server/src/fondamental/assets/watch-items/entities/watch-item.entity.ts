@@ -18,6 +18,7 @@ const stringArrayTransformer: ValueTransformer = {
 import { WeeklyWatchlist } from '../../../weekly/weekly-watchlist/entities/weekly-watchlist.entity';
 import { AssetWatchlist } from '../../../weekly/weekly-watchlist/asset-watchlist/entities/asset-watchlist.entity';
 import { Asset } from '../../entities/asset.entity';
+import { Pair } from '../../../../analytics/pairs/entities/pair.entity';
 
 export interface Thesis {
   notes: string;
@@ -41,6 +42,13 @@ export class WatchItem {
   @ManyToOne(() => AssetWatchlist, { onDelete: 'CASCADE', nullable: true })
   @JoinColumn({ name: 'quote_asset_watchlist_id' })
   quoteAssetWatchlist: AssetWatchlist | null;
+
+  @Column({ type: 'uuid', name: 'trading_pair_id', nullable: true })
+  tradingPairId: string | null;
+
+  @ManyToOne(() => Pair, { nullable: true, onDelete: 'SET NULL', eager: true })
+  @JoinColumn({ name: 'trading_pair_id' })
+  tradingPair: Pair | null;
 
   @ManyToOne(() => Asset)
   @JoinColumn({ name: 'base_asset_id' })

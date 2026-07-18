@@ -31,6 +31,14 @@ class ThesisDto {
 }
 
 export class CreateWatchItemDto {
+  @ApiProperty({
+    description: 'Catalog trading pair ID',
+    example: '123e4567-e89b-12d3-a456-426614174000',
+  })
+  @IsUUID()
+  @IsNotEmpty()
+  tradingPairId: string;
+
   @ApiPropertyOptional({
     description: 'UUID of the base asset watchlist (required with quoteAssetWatchlistId)',
     example: '123e4567-e89b-12d3-a456-426614174000',
@@ -51,22 +59,6 @@ export class CreateWatchItemDto {
   @IsOptional()
   @IsUUID()
   watchlistId?: string;
-
-  @ApiProperty({ description: 'UUID of the base asset', example: '123e4567-e89b-12d3-a456-426614174000' })
-  @IsUUID()
-  @IsNotEmpty()
-  baseAssetId: string;
-
-  @ApiProperty({ description: 'UUID of the quote asset', example: '123e4567-e89b-12d3-a456-426614174000' })
-  @IsUUID()
-  @IsNotEmpty()
-  quoteAssetId: string;
-
-  @ApiProperty({ description: 'Pair name (e.g. BTC/USD)', example: 'BTC/USD', maxLength: 255 })
-  @IsString()
-  @IsNotEmpty()
-  @MaxLength(255)
-  pairName: string;
 
   @ApiProperty({ description: 'Bias (e.g. bullish, bearish)', example: 'bullish', maxLength: 100 })
   @IsString()

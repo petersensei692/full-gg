@@ -258,7 +258,7 @@ export function AssetAnalysisView({ asset, favoritesWindow = false }: AssetAnaly
     async (dto: CreateWatchItemDto) => {
       if (editingWatchItem) {
         await updateWatchItem(editingWatchItem.id, {
-          pairName: dto.pairName,
+          tradingPairId: dto.tradingPairId,
           bias: dto.bias,
           thesis: dto.thesis
             ? {
@@ -1078,9 +1078,18 @@ export function AssetAnalysisView({ asset, favoritesWindow = false }: AssetAnaly
             if (!editingAnalysis) return;
             const type = nextType ?? editingAnalysisType;
             const notesWithMarker = addAnalysisTypeMarker(notes, type);
+            const oldImages = editingAnalysis.images ?? [];
+            const nameByPath = new Map(
+              oldImages.map((p, i) => [p, editingAnalysis.imageNames?.[i] ?? ""]),
+            );
+            const nextImageNames = images.map((p) => nameByPath.get(p) ?? "");
             const updated = await analysisService.update(editingAnalysis.id, {
               notes: notesWithMarker,
               images,
+              imageNames:
+                nextImageNames.length > 0 || (editingAnalysis.imageNames?.length ?? 0) > 0
+                  ? nextImageNames
+                  : undefined,
               title:
                 nextTitle === undefined
                   ? undefined

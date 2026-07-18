@@ -24,6 +24,10 @@ export class Asset {
   @Column({ type: 'int', default: 1 })
   place: number;
 
+  /** When false, asset cannot be used as a leg of a trading pair. */
+  @Column({ type: 'boolean', name: 'is_tradable', default: true })
+  isTradable: boolean;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 

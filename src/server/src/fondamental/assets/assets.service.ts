@@ -41,6 +41,7 @@ export class AssetsService {
       type,
       sortOrder: createAssetDto.sortOrder ?? 0,
       place: place ?? 1,
+      isTradable: createAssetDto.isTradable ?? type !== 'stocks',
     });
     return this.assetRepository.save(asset);
   }

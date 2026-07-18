@@ -4,7 +4,7 @@ import { IsIn, IsNotEmpty, IsOptional, IsString, IsArray, MaxLength } from 'clas
 export const NOTE_TIERS = ['tier_1', 'tier_2', 'tier_3'] as const;
 export type NoteTier = (typeof NOTE_TIERS)[number];
 
-export const NOTE_TYPES = ['macro', 'technical', 'other'] as const;
+export const NOTE_TYPES = ['macro', 'technical', 'strategy', 'other'] as const;
 export type NoteType = (typeof NOTE_TYPES)[number];
 
 export class CreateNoteDto {
@@ -37,7 +37,7 @@ export class CreateNoteDto {
   tier: string;
 
   @ApiProperty({
-    description: 'Note type (macro, technical, other)',
+    description: 'Note type (macro, technical, strategy, other)',
     enum: NOTE_TYPES,
     example: 'other',
   })

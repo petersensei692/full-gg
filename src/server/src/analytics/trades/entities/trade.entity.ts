@@ -8,6 +8,8 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 import { WatchItem } from '../../../fondamental/assets/watch-items/entities/watch-item.entity';
+import { Pair } from '../../pairs/entities/pair.entity';
+import { Strategy } from '../../strategies/entities/strategy.entity';
 
 export type TradeType = 'buy' | 'sell';
 export type TradeExecutionType =
@@ -100,6 +102,20 @@ export class Trade {
 
   @Column({ type: 'varchar', length: 64 })
   pair: string;
+
+  @Column({ type: 'uuid', name: 'pair_id', nullable: true })
+  pairId: string | null;
+
+  @ManyToOne(() => Pair, { nullable: true, onDelete: 'SET NULL', eager: true })
+  @JoinColumn({ name: 'pair_id' })
+  tradingPair: Pair | null;
+
+  @Column({ type: 'uuid', name: 'strategy_id', nullable: true })
+  strategyId: string | null;
+
+  @ManyToOne(() => Strategy, { nullable: true, onDelete: 'SET NULL', eager: true })
+  @JoinColumn({ name: 'strategy_id' })
+  strategy: Strategy | null;
 
   @Column({ type: 'varchar', length: 10 })
   type: TradeType;

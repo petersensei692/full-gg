@@ -6,6 +6,7 @@ import { Dialog, DialogContent } from "@/components/ui/Dialog";
 import { useAnalysisEditorPaste } from "@/hooks/useAnalysisEditorPaste";
 import { deleteStoredImage } from "@/lib/imageUpload";
 import { ConfirmDeleteDialog } from "@/components/ui/ConfirmDeleteDialog";
+import { AttachedImagesStrip } from "@/components/analysis/AttachedImagesStrip";
 import { getImageUrl } from "@/lib/imageUrls";
 import type { Note, NoteTier, NoteType } from "@/types/api";
 import { clearDraft, loadDraftJson, saveDraftJson } from "@/lib/form-drafts";
@@ -19,6 +20,7 @@ const TIER_OPTIONS: { value: NoteTier; label: string }[] = [
 const TYPE_OPTIONS: { value: NoteType; label: string }[] = [
   { value: "macro", label: "Macro" },
   { value: "technical", label: "Technical" },
+  { value: "strategy", label: "Strategy" },
   { value: "other", label: "Other" },
 ];
 
@@ -59,7 +61,6 @@ export function CreateNoteModal({
   const [tier, setTier] = useState<NoteTier>("tier_2");
   const [type, setType] = useState<NoteType>("other");
   const [noteImages, setNoteImages] = useState<Array<{ path: string; url: string }>>([]);
-  const [zoomedImageSrc, setZoomedImageSrc] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [imagePendingRemove, setImagePendingRemove] = useState<string | null>(null);
@@ -80,7 +81,6 @@ export function CreateNoteModal({
       setError("");
       setSubmitting(false);
       setNoteImages([]);
-      setZoomedImageSrc(null);
       return;
     }
     const stored = loadDraftJson<NoteModalDraftV1>(draftStorageKey);
@@ -367,32 +367,13 @@ export function CreateNoteModal({
               suppressHydrationWarning
             />
             {noteImages.length > 0 && (
-              <div className="mt-3 flex flex-wrap gap-2">
-                {noteImages.map((img) => (
-                  <div key={img.path} className="relative">
-                    <button
-                      type="button"
-                      onClick={() => setZoomedImageSrc(img.url)}
-                      className="block"
-                    >
-                      <img
-                        src={img.url}
-                        alt="Note attachment"
-                        className="h-20 w-28 object-cover rounded-lg border border-sidebar-border hover:border-primary/50 transition-colors"
-                      />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setImagePendingRemove(img.path)}
-                      className="absolute -top-2 -right-2 rounded-full bg-red-500 text-white text-xs w-5 h-5 flex items-center justify-center shadow"
-                      aria-label="Remove image"
-                      title="Remove image"
-                    >
-                      ×
-                    </button>
-                  </div>
-                ))}
-              </div>
+              <AttachedImagesStrip
+                items={noteImages}
+                onReorder={setNoteImages}
+                onRemove={(path) => setImagePendingRemove(path)}
+                variant="cover"
+                label="Attached images — click to preview · drag to reorder"
+              />
             )}
           </div>
 
@@ -421,19 +402,6 @@ export function CreateNoteModal({
           </button>
           </div>
         </div>
-        {zoomedImageSrc && (
-          <Dialog open={!!zoomedImageSrc} onOpenChange={(o) => !o && setZoomedImageSrc(null)}>
-            <DialogContent showClose className="bg-black/95 border-0">
-              <div className="relative w-full h-[90dvh] flex items-center justify-center">
-                <img
-                  src={zoomedImageSrc}
-                  alt="Note attachment"
-                  className="max-w-full max-h-full w-auto h-auto object-contain"
-                />
-              </div>
-            </DialogContent>
-          </Dialog>
-        )}
       </DialogContent>
     </Dialog>
 

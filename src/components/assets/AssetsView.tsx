@@ -61,7 +61,7 @@ export function AssetsView() {
   );
 
   const handleSave = useCallback(
-    async (id: string, data: { name?: string; type?: string }) => {
+    async (id: string, data: { name?: string; type?: string; isTradable?: boolean }) => {
       await assetsService.update(id, data);
       setEditingAsset(null);
       await fetchList();

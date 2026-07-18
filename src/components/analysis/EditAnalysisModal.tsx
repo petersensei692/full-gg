@@ -5,7 +5,7 @@ import { Dialog, DialogContent } from "@/components/ui/Dialog";
 import { Bold, Italic, Underline, Check, ChevronDown } from "lucide-react";
 import { useAnalysisEditorPaste } from "@/hooks/useAnalysisEditorPaste";
 import { getImageUrl } from "@/lib/imageUrls";
-import { EventImageThumb } from "@/components/analysis/EventImageThumb";
+import { AttachedImagesStrip } from "@/components/analysis/AttachedImagesStrip";
 import { deleteStoredImage } from "@/lib/imageUpload";
 import { ConfirmDeleteDialog } from "@/components/ui/ConfirmDeleteDialog";
 import type { AssetConfig } from "@/types/asset";
@@ -483,29 +483,11 @@ export function EditAnalysisModal({
               suppressHydrationWarning
             />
             {images.length > 0 && (
-              <div className="space-y-2">
-                <p className="text-xs font-medium text-dashboard-foreground/70">Attached images — click to preview</p>
-                <div className="flex flex-wrap gap-3">
-                  {images.map((path) => (
-                    <div key={path} className="relative inline-block">
-                      <EventImageThumb
-                        src={getImageUrl(path)}
-                        alt="Analysis attachment"
-                        imgClassName="h-24 max-w-[200px] rounded-lg border border-sidebar-border object-contain bg-black/10"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setImagePendingRemove(path)}
-                        className="absolute -top-2 -right-2 z-[2] rounded-full bg-red-500 text-white text-xs w-5 h-5 flex items-center justify-center shadow"
-                        aria-label="Remove image"
-                        title="Remove image"
-                      >
-                        ×
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
+              <AttachedImagesStrip
+                items={images.map((path) => ({ path, url: getImageUrl(path) }))}
+                onReorder={(ordered) => setImages(ordered.map((i) => i.path))}
+                onRemove={(path) => setImagePendingRemove(path)}
+              />
             )}
             <div className="flex justify-end gap-2 pt-2 border-t border-sidebar-border">
               <button

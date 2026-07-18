@@ -7,6 +7,7 @@ import { UpdateWatchItemDto } from './dto/update-watch-item.dto';
 import { WeeklyWatchlist } from '../../weekly/weekly-watchlist/entities/weekly-watchlist.entity';
 import { AssetWatchlist } from '../../weekly/weekly-watchlist/asset-watchlist/entities/asset-watchlist.entity';
 import { Asset } from '../entities/asset.entity';
+import { Pair } from '../../../analytics/pairs/entities/pair.entity';
 
 @Injectable()
 export class WatchItemsService {
@@ -19,26 +20,79 @@ export class WatchItemsService {
     private readonly assetWatchlistRepository: Repository<AssetWatchlist>,
     @InjectRepository(Asset)
     private readonly assetRepository: Repository<Asset>,
+    @InjectRepository(Pair)
+    private readonly pairsRepository: Repository<Pair>,
   ) {}
 
-  async create(createDto: CreateWatchItemDto): Promise<WatchItem> {
-    const baseAsset = await this.assetRepository.findOne({
-      where: { id: createDto.baseAssetId },
-    });
-    if (!baseAsset) {
-      throw new NotFoundException(
-        `Base asset with id ${createDto.baseAssetId} not found`,
-      );
-    }
+  private normalizePair(value: string): string {
+    return value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+  }
 
-    const quoteAsset = await this.assetRepository.findOne({
-      where: { id: createDto.quoteAssetId },
+  private async loadCatalogPair(tradingPairId: string): Promise<Pair> {
+    const pair = await this.pairsRepository.findOne({
+      where: { id: tradingPairId },
+      relations: ['baseAsset', 'quoteAsset'],
     });
-    if (!quoteAsset) {
-      throw new NotFoundException(
-        `Quote asset with id ${createDto.quoteAssetId} not found`,
+    if (!pair) {
+      throw new NotFoundException(`Trading pair ${tradingPairId} not found`);
+    }
+    return pair;
+  }
+
+  private assertAwMatchesPair(
+    pair: Pair,
+    baseAW: AssetWatchlist | null,
+    quoteAW: AssetWatchlist | null,
+  ): void {
+    if (baseAW && baseAW.asset?.id && baseAW.asset.id !== pair.baseAssetId) {
+      throw new BadRequestException(
+        'Base asset watchlist does not match the catalog pair base asset',
       );
     }
+    if (quoteAW && quoteAW.asset?.id && quoteAW.asset.id !== pair.quoteAssetId) {
+      throw new BadRequestException(
+        'Quote asset watchlist does not match the catalog pair quote asset',
+      );
+    }
+  }
+
+  /** Backfill trading_pair_id from denormalized pairName / assets. */
+  async backfillTradingPairIds(): Promise<number> {
+    const allPairs = await this.pairsRepository.find({
+      relations: ['baseAsset', 'quoteAsset'],
+    });
+    const byNorm = new Map(allPairs.map((p) => [this.normalizePair(p.pair), p]));
+    const byAssets = new Map(
+      allPairs.map((p) => [`${p.baseAssetId}:${p.quoteAssetId}`, p]),
+    );
+    const items = await this.watchItemRepository.find({
+      relations: ['baseAsset', 'quoteAsset'],
+    });
+    let n = 0;
+    for (const item of items) {
+      if (item.tradingPairId) continue;
+      const byName = byNorm.get(this.normalizePair(item.pairName));
+      const byAsset =
+        item.baseAsset?.id && item.quoteAsset?.id
+          ? byAssets.get(`${item.baseAsset.id}:${item.quoteAsset.id}`)
+          : undefined;
+      const match = byName ?? byAsset;
+      if (!match) continue;
+      item.tradingPairId = match.id;
+      item.tradingPair = match;
+      item.baseAsset = match.baseAsset;
+      item.quoteAsset = match.quoteAsset;
+      item.pairName = match.pair;
+      await this.watchItemRepository.save(item);
+      n++;
+    }
+    return n;
+  }
+
+  async create(createDto: CreateWatchItemDto): Promise<WatchItem> {
+    const catalogPair = await this.loadCatalogPair(createDto.tradingPairId);
+    const baseAsset = catalogPair.baseAsset;
+    const quoteAsset = catalogPair.quoteAsset;
 
     let watchlist: WeeklyWatchlist | null = null;
     let baseAssetWatchlist: AssetWatchlist | null = null;
@@ -68,6 +122,7 @@ export class WatchItemsService {
           'Base and quote asset watchlists must belong to the same weekly watchlist',
         );
       }
+      this.assertAwMatchesPair(catalogPair, baseAW, quoteAW);
       baseAssetWatchlist = baseAW;
       quoteAssetWatchlist = quoteAW;
       watchlist = baseAW.weeklyWatchlist;
@@ -101,9 +156,11 @@ export class WatchItemsService {
       watchlist,
       baseAssetWatchlist,
       quoteAssetWatchlist,
+      tradingPairId: catalogPair.id,
+      tradingPair: catalogPair,
       baseAsset,
       quoteAsset,
-      pairName: createDto.pairName,
+      pairName: catalogPair.pair,
       bias: createDto.bias,
       thesis: createDto.thesis || null,
       finished: createDto.finished ?? false,
@@ -126,10 +183,13 @@ export class WatchItemsService {
         'watchlist',
         'baseAsset',
         'quoteAsset',
+        'tradingPair',
         'baseAssetWatchlist',
         'baseAssetWatchlist.weeklyWatchlist',
+        'baseAssetWatchlist.asset',
         'quoteAssetWatchlist',
         'quoteAssetWatchlist.weeklyWatchlist',
+        'quoteAssetWatchlist.asset',
       ],
       order: { createdAt: 'DESC' },
     });
@@ -142,10 +202,13 @@ export class WatchItemsService {
         'watchlist',
         'baseAsset',
         'quoteAsset',
+        'tradingPair',
         'baseAssetWatchlist',
         'baseAssetWatchlist.weeklyWatchlist',
+        'baseAssetWatchlist.asset',
         'quoteAssetWatchlist',
         'quoteAssetWatchlist.weeklyWatchlist',
+        'quoteAssetWatchlist.asset',
       ],
     });
     if (!watchItem) {
@@ -169,33 +232,20 @@ export class WatchItemsService {
       watchItem.watchlist = watchlist;
     }
 
-    if (updateDto.baseAssetId) {
-      const baseAsset = await this.assetRepository.findOne({
-        where: { id: updateDto.baseAssetId },
-      });
-      if (!baseAsset) {
-        throw new NotFoundException(
-          `Base asset with id ${updateDto.baseAssetId} not found`,
-        );
-      }
-      watchItem.baseAsset = baseAsset;
+    if (updateDto.tradingPairId !== undefined) {
+      const catalogPair = await this.loadCatalogPair(updateDto.tradingPairId);
+      this.assertAwMatchesPair(
+        catalogPair,
+        watchItem.baseAssetWatchlist,
+        watchItem.quoteAssetWatchlist,
+      );
+      watchItem.tradingPairId = catalogPair.id;
+      watchItem.tradingPair = catalogPair;
+      watchItem.baseAsset = catalogPair.baseAsset;
+      watchItem.quoteAsset = catalogPair.quoteAsset;
+      watchItem.pairName = catalogPair.pair;
     }
 
-    if (updateDto.quoteAssetId) {
-      const quoteAsset = await this.assetRepository.findOne({
-        where: { id: updateDto.quoteAssetId },
-      });
-      if (!quoteAsset) {
-        throw new NotFoundException(
-          `Quote asset with id ${updateDto.quoteAssetId} not found`,
-        );
-      }
-      watchItem.quoteAsset = quoteAsset;
-    }
-
-    if (updateDto.pairName !== undefined) {
-      watchItem.pairName = updateDto.pairName;
-    }
     if (updateDto.bias !== undefined) {
       watchItem.bias = updateDto.bias;
     }

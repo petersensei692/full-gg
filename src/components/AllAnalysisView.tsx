@@ -292,13 +292,13 @@ export function AllAnalysisView() {
         } else {
           await analysisService.delete(entryId);
         }
-        await fetchAll({ silent: true });
+        setRows((prev) => prev.filter((r) => r.id !== entryId));
         broadcastAnalysisOrFavoriteChanged();
       } catch {
         /* ignore */
       }
     },
-    [rows, fetchAll],
+    [rows],
   );
 
   const openEdit = useCallback(
@@ -329,9 +329,18 @@ export function AllAnalysisView() {
   const handleGlobalEditSubmit = useCallback(
     async (payload: EditAnalysisSubmitPayload) => {
       if (!editingGlobal) return;
-      await globalAnalysisService.update(editingGlobal.id, {
+      const oldImages = editingGlobal.images ?? [];
+      const nameByPath = new Map(
+        oldImages.map((p, i) => [p, editingGlobal.imageNames?.[i] ?? ""]),
+      );
+      const nextImageNames = payload.images.map((p) => nameByPath.get(p) ?? "");
+      const updated = await globalAnalysisService.update(editingGlobal.id, {
         notes: payload.notes,
         images: payload.images.length > 0 ? payload.images : null,
+        imageNames:
+          nextImageNames.length > 0 || (editingGlobal.imageNames?.length ?? 0) > 0
+            ? nextImageNames
+            : undefined,
         analysisType: payload.analysisType,
         scope: payload.scope,
         title:
@@ -342,13 +351,30 @@ export function AllAnalysisView() {
               : null,
       });
       const scrollId = editingGlobal.id;
+      setRows((prev) =>
+        prev.map((r) =>
+          r.id === updated.id
+            ? {
+                ...r,
+                notes: updated.notes,
+                title: updated.title ?? null,
+                images: updated.images,
+                imageNames: updated.imageNames,
+                analysisType: updated.analysisType,
+                favorite: updated.favorite,
+                scopeLabel: updated.scopeDisplay,
+                globalFullScope: updated.scope === "global",
+                scopedAssetIds: Array.isArray(updated.scope) ? updated.scope : null,
+              }
+            : r,
+        ),
+      );
       setEditingGlobal(null);
       setEditModalOpen(false);
       pendingScrollToEntryIdRef.current = scrollId;
-      await fetchAll({ silent: true });
       broadcastAnalysisOrFavoriteChanged();
     },
-    [editingGlobal, fetchAll],
+    [editingGlobal],
   );
 
   const handleAssetEditSubmit = useCallback(
@@ -356,9 +382,18 @@ export function AllAnalysisView() {
       if (!editingAsset) return;
       const type = payload.analysisType ?? editingAssetAnalysisType;
       const notesWithMarker = addAnalysisTypeMarker(payload.notes, type);
-      await analysisService.update(editingAsset.id, {
+      const oldImages = editingAsset.images ?? [];
+      const nameByPath = new Map(
+        oldImages.map((p, i) => [p, editingAsset.imageNames?.[i] ?? ""]),
+      );
+      const nextImageNames = payload.images.map((p) => nameByPath.get(p) ?? "");
+      const updated = await analysisService.update(editingAsset.id, {
         notes: notesWithMarker,
         images: payload.images,
+        imageNames:
+          nextImageNames.length > 0 || (editingAsset.imageNames?.length ?? 0) > 0
+            ? nextImageNames
+            : undefined,
         title:
           payload.title === undefined
             ? undefined
@@ -367,13 +402,26 @@ export function AllAnalysisView() {
               : null,
       });
       const scrollId = editingAsset.id;
+      setRows((prev) =>
+        prev.map((r) =>
+          r.id === updated.id
+            ? {
+                ...r,
+                notes: updated.notes,
+                title: updated.title ?? null,
+                images: updated.images,
+                imageNames: updated.imageNames ?? nextImageNames,
+                favorite: updated.favorite ?? r.favorite,
+              }
+            : r,
+        ),
+      );
       setEditingAsset(null);
       setEditModalOpen(false);
       pendingScrollToEntryIdRef.current = scrollId;
-      await fetchAll({ silent: true });
       broadcastAnalysisOrFavoriteChanged();
     },
-    [editingAsset, editingAssetAnalysisType, fetchAll],
+    [editingAsset, editingAssetAnalysisType],
   );
 
   const handleUpdateImageName = useCallback(
@@ -385,20 +433,21 @@ export function AllAnalysisView() {
       if (index < 0) return;
       const currentNames = row.imageNames ?? [];
       const nextImageNames = imageList.map((_, i) => (i === index ? name : (currentNames[i] ?? "")));
+      setRows((prev) =>
+        prev.map((r) => (r.id === entryId ? { ...r, imageNames: nextImageNames } : r)),
+      );
       try {
         if (row.source === "global") {
           await globalAnalysisService.update(entryId, { imageNames: nextImageNames });
         } else {
           await analysisService.update(entryId, { imageNames: nextImageNames });
         }
-        pendingScrollToEntryIdRef.current = entryId;
-        await fetchAll({ silent: true });
         broadcastAnalysisOrFavoriteChanged();
       } catch {
         /* ignore */
       }
     },
-    [rows, fetchAll],
+    [rows],
   );
 
   const handleReorderImages = useCallback(
@@ -409,6 +458,13 @@ export function AllAnalysisView() {
       if (orderedPaths.length !== oldOrder.length) return;
       const nameByPath = new Map(oldOrder.map((p, i) => [p, row.imageNames?.[i] ?? ""]));
       const nextImageNames = orderedPaths.map((p) => nameByPath.get(p) ?? "");
+      setRows((prev) =>
+        prev.map((r) =>
+          r.id === entryId
+            ? { ...r, images: orderedPaths, imageNames: nextImageNames }
+            : r,
+        ),
+      );
       try {
         if (row.source === "global") {
           await globalAnalysisService.update(entryId, {
@@ -423,14 +479,12 @@ export function AllAnalysisView() {
               nextImageNames.length > 0 || (row.imageNames?.length ?? 0) > 0 ? nextImageNames : undefined,
           });
         }
-        pendingScrollToEntryIdRef.current = entryId;
-        await fetchAll({ silent: true });
         broadcastAnalysisOrFavoriteChanged();
       } catch {
         /* ignore */
       }
     },
-    [rows, fetchAll],
+    [rows],
   );
 
   const handleDeleteImage = useCallback(
@@ -443,20 +497,25 @@ export function AllAnalysisView() {
       const nextImages = imageList.filter((p) => p !== imagePath);
       const currentNames = row.imageNames ?? [];
       const nextImageNames = currentNames.filter((_, i) => i !== index);
+      setRows((prev) =>
+        prev.map((r) =>
+          r.id === entryId
+            ? { ...r, images: nextImages, imageNames: nextImageNames }
+            : r,
+        ),
+      );
       try {
         await analysisService.update(entryId, {
           images: nextImages,
           imageNames: nextImageNames.length > 0 || currentNames.length > 0 ? nextImageNames : undefined,
         });
         await deleteStoredImage(imagePath).catch(() => undefined);
-        pendingScrollToEntryIdRef.current = entryId;
-        await fetchAll({ silent: true });
         broadcastAnalysisOrFavoriteChanged();
       } catch {
         /* ignore */
       }
     },
-    [rows, fetchAll],
+    [rows],
   );
 
   const buildExportSections = useCallback(

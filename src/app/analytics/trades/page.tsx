@@ -13,13 +13,16 @@ import { TradeFiltersDrawer } from "@/components/analytics/TradeFiltersDrawer";
 import { ConfirmDeleteDialog } from "@/components/ui/ConfirmDeleteDialog";
 import { uploadImageBlob } from "@/lib/imageUpload";
 import { getImageUrl } from "@/lib/imageUrls";
-import { useAssets } from "@/context/AssetsContext";
+import { pairsService } from "@/lib/services/pairs.service";
+import { strategiesService } from "@/lib/services/strategies.service";
 import type {
   Trade,
   TradeCloseType,
   TradeExecutionType,
   TradeNote,
   TradeSlEvolutionEntry,
+  TradingPair,
+  Strategy,
   WatchItem,
   WeeklyWatchlist,
 } from "@/types/api";
@@ -178,7 +181,6 @@ function isPersistedTradeId(id: string): boolean {
 
 export default function AnalyticsTradesPage() {
   type PanelTab = "metrics" | "management" | "notes" | "pairWatched";
-  const { assets: assetOptions } = useAssets();
   const [trades, setTrades] = useState<Trade[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedTrade, setSelectedTrade] = useState<Trade | null>(null);
@@ -190,8 +192,10 @@ export default function AnalyticsTradesPage() {
   const noteEditorRef = useRef<HTMLTextAreaElement>(null);
   const [linkModalOpen, setLinkModalOpen] = useState(false);
   const [addTradeOpen, setAddTradeOpen] = useState(false);
-  const [addBaseSlug, setAddBaseSlug] = useState("");
-  const [addQuoteSlug, setAddQuoteSlug] = useState("");
+  const [catalogPairs, setCatalogPairs] = useState<TradingPair[]>([]);
+  const [strategies, setStrategies] = useState<Strategy[]>([]);
+  const [addPairId, setAddPairId] = useState("");
+  const [addStrategyId, setAddStrategyId] = useState("");
   const [addType, setAddType] = useState<Trade["type"]>("buy");
   const [addExecType, setAddExecType] = useState<TradeExecutionType>("market order");
   const [addOpenPrice, setAddOpenPrice] = useState("");
@@ -241,10 +245,31 @@ export default function AnalyticsTradesPage() {
         if (!cancelled && pairs.length > 0) setPairOptionsFromApi(pairs);
       })
       .catch(() => {});
+    pairsService
+      .getAll()
+      .then((pairs) => {
+        if (!cancelled) setCatalogPairs(Array.isArray(pairs) ? pairs : []);
+      })
+      .catch(() => {
+        if (!cancelled) setCatalogPairs([]);
+      });
+    strategiesService
+      .getAll()
+      .then((list) => {
+        if (!cancelled) setStrategies(Array.isArray(list) ? list : []);
+      })
+      .catch(() => {
+        if (!cancelled) setStrategies([]);
+      });
     return () => {
       cancelled = true;
     };
   }, []);
+
+  const tradableCatalogPairs = useMemo(
+    () => catalogPairs.filter((p) => p.pipValue != null),
+    [catalogPairs],
+  );
 
   const symbolOptions = useMemo(() => {
     if (pairOptionsFromApi.length > 0) return pairOptionsFromApi;
@@ -328,11 +353,10 @@ export default function AnalyticsTradesPage() {
     tradeFilters.volumeMax,
   ]);
 
-  const addPairSymbol = useMemo(() => {
-    const base = assetOptions.find((a) => a.slug === addBaseSlug)?.label ?? addBaseSlug.toUpperCase();
-    const quote = assetOptions.find((a) => a.slug === addQuoteSlug)?.label ?? addQuoteSlug.toUpperCase();
-    return `${base}${quote}`.replace(/\s/g, "").toUpperCase();
-  }, [addBaseSlug, addQuoteSlug, assetOptions]);
+  const addSelectedPair = useMemo(
+    () => tradableCatalogPairs.find((p) => p.id === addPairId) ?? null,
+    [tradableCatalogPairs, addPairId],
+  );
 
   const rows = Array.isArray(trades) && trades.length > 0 ? trades : FALLBACK_TRADES;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
@@ -507,10 +531,8 @@ export default function AnalyticsTradesPage() {
             <button
               type="button"
               onClick={() => {
-                const first = assetOptions[0]?.slug ?? "";
-                const second = assetOptions.find((a) => a.slug !== first)?.slug ?? first;
-                setAddBaseSlug(first);
-                setAddQuoteSlug(second);
+                setAddPairId(tradableCatalogPairs[0]?.id ?? "");
+                setAddStrategyId(strategies[0]?.id ?? "");
                 setAddType("buy");
                 setAddExecType("market order");
                 setAddOpenPrice("");
@@ -1318,7 +1340,9 @@ export default function AnalyticsTradesPage() {
                       <div>
                         <p className="text-sm font-medium text-header-foreground">Linked Pair</p>
                         <p className="text-sm text-header-muted">
-                          {selectedTrade.pairWatched?.pairName ?? "No pair linked"}
+                          {selectedTrade.pairWatched?.tradingPair?.pair ??
+                            selectedTrade.pairWatched?.pairName ??
+                            "No pair linked"}
                         </p>
                       </div>
                       <div className="flex flex-wrap gap-2">
@@ -1351,7 +1375,10 @@ export default function AnalyticsTradesPage() {
 
                     {selectedTrade.pairWatched ? (
                       <div className="rounded-xl border border-sidebar-border bg-sidebar/30 p-4">
-                        <p className="text-base font-semibold text-header-foreground">{selectedTrade.pairWatched.pairName}</p>
+                        <p className="text-base font-semibold text-header-foreground">
+                          {selectedTrade.pairWatched.tradingPair?.pair ??
+                            selectedTrade.pairWatched.pairName}
+                        </p>
                         <p className="mt-2 text-sm text-header-muted">{selectedTrade.pairWatched.bias}</p>
                         {selectedTrade.pairWatched.thesis?.notes && (
                           <p className="mt-3 whitespace-pre-wrap break-words text-sm text-dashboard-foreground">
@@ -1397,7 +1424,11 @@ export default function AnalyticsTradesPage() {
               </div>
               {selectedTrade.pairWatched && (
                 <div className="mb-3 flex items-center justify-between rounded-lg border border-sidebar-border bg-header/40 px-3 py-2">
-                  <span className="text-sm text-header-foreground">Linked: {selectedTrade.pairWatched.pairName}</span>
+                  <span className="text-sm text-header-foreground">
+                    Linked:{" "}
+                    {selectedTrade.pairWatched.tradingPair?.pair ??
+                      selectedTrade.pairWatched.pairName}
+                  </span>
                   <button
                     type="button"
                     onClick={async () => {
@@ -1431,7 +1462,9 @@ export default function AnalyticsTradesPage() {
                       }}
                       className="w-full rounded-lg border border-sidebar-border bg-header px-3 py-2 text-left hover:border-primary/60"
                     >
-                      <p className="text-sm font-medium text-header-foreground">{item.pairName}</p>
+                      <p className="text-sm font-medium text-header-foreground">
+                        {item.tradingPair?.pair ?? item.pairName}
+                      </p>
                       <p className="text-xs text-header-muted">{item.bias}</p>
                     </button>
                   ))
@@ -1451,53 +1484,52 @@ export default function AnalyticsTradesPage() {
                 </button>
               </div>
               <div className="space-y-3 text-sm">
-                <div className="grid grid-cols-2 gap-2">
-                  <label className="space-y-1">
-                    <span className="text-header-muted">Base asset</span>
-                    <select
-                      value={addBaseSlug}
-                      onChange={(e) => {
-                        const next = e.target.value;
-                        setAddBaseSlug(next);
-                        if (next === addQuoteSlug) {
-                          const other = assetOptions.find((a) => a.slug !== next)?.slug ?? next;
-                          setAddQuoteSlug(other);
-                        }
-                      }}
-                      className="w-full rounded-lg border border-sidebar-border bg-header-input px-3 py-2 text-dashboard-foreground"
-                    >
-                      {assetOptions.map((a) => (
-                        <option key={a.slug} value={a.slug}>
-                          {a.label}
+                <label className="block space-y-1">
+                  <span className="text-header-muted">Trading pair</span>
+                  <select
+                    value={addPairId}
+                    onChange={(e) => setAddPairId(e.target.value)}
+                    className="w-full rounded-lg border border-sidebar-border bg-header-input px-3 py-2 text-dashboard-foreground"
+                  >
+                    {tradableCatalogPairs.length === 0 ? (
+                      <option value="">No pairs with pip value</option>
+                    ) : (
+                      tradableCatalogPairs.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.pair}
                         </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label className="space-y-1">
-                    <span className="text-header-muted">Quote asset</span>
-                    <select
-                      value={addQuoteSlug}
-                      onChange={(e) => {
-                        const next = e.target.value;
-                        setAddQuoteSlug(next);
-                        if (next === addBaseSlug) {
-                          const other = assetOptions.find((a) => a.slug !== next)?.slug ?? next;
-                          setAddBaseSlug(other);
-                        }
-                      }}
-                      className="w-full rounded-lg border border-sidebar-border bg-header-input px-3 py-2 text-dashboard-foreground"
-                    >
-                      {assetOptions.map((a) => (
-                        <option key={a.slug} value={a.slug}>
-                          {a.label}
+                      ))
+                    )}
+                  </select>
+                </label>
+                {tradableCatalogPairs.length === 0 && (
+                  <p className="text-xs text-header-muted">
+                    Configure pip values on the Pairs page before creating trades.
+                  </p>
+                )}
+                <label className="block space-y-1">
+                  <span className="text-header-muted">Strategy</span>
+                  <select
+                    value={addStrategyId}
+                    onChange={(e) => setAddStrategyId(e.target.value)}
+                    className="w-full rounded-lg border border-sidebar-border bg-header-input px-3 py-2 text-dashboard-foreground"
+                  >
+                    {strategies.length === 0 ? (
+                      <option value="">No strategies yet</option>
+                    ) : (
+                      strategies.map((s) => (
+                        <option key={s.id} value={s.id}>
+                          {s.name}
                         </option>
-                      ))}
-                    </select>
-                  </label>
-                </div>
-                <p className="rounded-lg border border-sidebar-border bg-header/40 px-3 py-2 text-sm font-medium text-header-foreground">
-                  Pair: <span className="text-primary">{addPairSymbol || "—"}</span>
-                </p>
+                      ))
+                    )}
+                  </select>
+                </label>
+                {strategies.length === 0 && (
+                  <p className="text-xs text-header-muted">
+                    Create a strategy on the Strategies page before creating trades.
+                  </p>
+                )}
                 <div className="grid grid-cols-2 gap-2">
                   <label className="space-y-1">
                     <span className="text-header-muted">Direction</span>
@@ -1590,16 +1622,15 @@ export default function AnalyticsTradesPage() {
                 </p>
                 <button
                   type="button"
-                  disabled={addSaving}
                   onClick={async () => {
-                    const pair = addPairSymbol.trim();
                     const entry = Number(addOpenPrice);
                     const tp = Number(addTp);
                     const sl = Number(addSl);
                     const lots = Number(addLots);
                     if (
-                      !pair ||
-                      addBaseSlug === addQuoteSlug ||
+                      !addPairId ||
+                      !addSelectedPair ||
+                      !addStrategyId ||
                       !Number.isFinite(entry) ||
                       !Number.isFinite(tp) ||
                       !Number.isFinite(sl) ||
@@ -1611,7 +1642,8 @@ export default function AnalyticsTradesPage() {
                     setAddSaving(true);
                     try {
                       const created = await tradesApi.create({
-                        pair,
+                        pairId: addPairId,
+                        strategyId: addStrategyId,
                         type: addType,
                         executionType: addExecType,
                         executionPrice: entry,
@@ -1629,6 +1661,13 @@ export default function AnalyticsTradesPage() {
                     }
                   }}
                   className="mt-2 w-full rounded-lg bg-primary py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+                  disabled={
+                    addSaving ||
+                    !addPairId ||
+                    !addStrategyId ||
+                    tradableCatalogPairs.length === 0 ||
+                    strategies.length === 0
+                  }
                 >
                   {addSaving ? "Saving…" : "Create trade"}
                 </button>

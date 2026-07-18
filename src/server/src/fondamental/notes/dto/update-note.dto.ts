@@ -31,7 +31,7 @@ export class UpdateNoteDto {
   tier?: string;
 
   @ApiPropertyOptional({
-    description: 'Note type (macro, technical, other)',
+    description: 'Note type (macro, technical, strategy, other)',
     enum: NOTE_TYPES,
   })
   @IsOptional()

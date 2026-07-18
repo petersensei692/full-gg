@@ -12,6 +12,7 @@ const TYPE_FILTER_OPTIONS: { value: "" | NoteType; label: string }[] = [
   { value: "", label: "All" },
   { value: "macro", label: "Macro" },
   { value: "technical", label: "Technical" },
+  { value: "strategy", label: "Strategy" },
   { value: "other", label: "Other" },
 ];
 

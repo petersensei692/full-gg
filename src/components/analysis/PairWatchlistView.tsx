@@ -88,7 +88,7 @@ export function PairWatchlistView({
   const handlePairSubmit = async (dto: CreateWatchItemDto) => {
     if (editingItem) {
       await updateWatchItem(editingItem.id, {
-        pairName: dto.pairName,
+        tradingPairId: dto.tradingPairId,
         bias: dto.bias,
         thesis: dto.thesis ? { notes: dto.thesis.notes, images: dto.thesis.images, imageNames: dto.thesis.imageNames ?? editingItem.thesis?.imageNames } : undefined,
       });

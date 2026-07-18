@@ -6,10 +6,11 @@ import { WatchItem } from './entities/watch-item.entity';
 import { WeeklyWatchlist } from '../../weekly/weekly-watchlist/entities/weekly-watchlist.entity';
 import { AssetWatchlist } from '../../weekly/weekly-watchlist/asset-watchlist/entities/asset-watchlist.entity';
 import { Asset } from '../entities/asset.entity';
+import { Pair } from '../../../analytics/pairs/entities/pair.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([WatchItem, WeeklyWatchlist, AssetWatchlist, Asset]),
+    TypeOrmModule.forFeature([WatchItem, WeeklyWatchlist, AssetWatchlist, Asset, Pair]),
   ],
   controllers: [WatchItemsController],
   providers: [WatchItemsService],

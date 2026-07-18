@@ -20,6 +20,7 @@ interface CreateAssetModalProps {
 export function CreateAssetModal({ open, onOpenChange, onCreate }: CreateAssetModalProps) {
   const [name, setName] = useState("");
   const [type, setType] = useState("currency");
+  const [isTradable, setIsTradable] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
 
@@ -30,9 +31,10 @@ export function CreateAssetModal({ open, onOpenChange, onCreate }: CreateAssetMo
     setError("");
     setSubmitting(true);
     try {
-      await onCreate({ name: trimmed, type });
+      await onCreate({ name: trimmed, type, isTradable });
       setName("");
       setType("currency");
+      setIsTradable(true);
       onOpenChange(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create asset");
@@ -62,7 +64,11 @@ export function CreateAssetModal({ open, onOpenChange, onCreate }: CreateAssetMo
               <label className="block text-sm font-medium text-dashboard-foreground/80 mb-1.5">Type</label>
               <select
                 value={type}
-                onChange={(e) => setType(e.target.value)}
+                onChange={(e) => {
+                  const next = e.target.value;
+                  setType(next);
+                  if (next === "stocks") setIsTradable(false);
+                }}
                 className="w-full rounded-lg border border-sidebar-border bg-header-input px-3 py-2 text-sm text-dashboard-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
               >
                 {ASSET_TYPES.map((opt) => (
@@ -72,6 +78,15 @@ export function CreateAssetModal({ open, onOpenChange, onCreate }: CreateAssetMo
                 ))}
               </select>
             </div>
+            <label className="flex items-center gap-2 text-sm text-dashboard-foreground cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={isTradable}
+                onChange={(e) => setIsTradable(e.target.checked)}
+                className="rounded border-sidebar-border"
+              />
+              Tradable (can be used in trading pairs)
+            </label>
             {error && <p className="text-sm text-red-400">{error}</p>}
             <div className="flex justify-end gap-2 pt-2">
               <button

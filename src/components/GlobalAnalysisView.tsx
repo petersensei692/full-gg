@@ -157,24 +157,26 @@ export function GlobalAnalysisView({ favoritesWindow = false }: { favoritesWindo
     return () => document.removeEventListener("mousedown", onDown, true);
   }, [globalFiltersMenuOpen]);
 
-  const fetchList = useCallback(async () => {
-    setLoading(true);
+  const fetchList = useCallback(async (options?: { silent?: boolean }) => {
+    if (!options?.silent) setLoading(true);
     try {
       const data = await globalAnalysisService.getAll();
       setList(data);
     } catch {
       setList([]);
     } finally {
-      setLoading(false);
+      if (!options?.silent) setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    fetchList();
+    void fetchList();
   }, [fetchList]);
 
   useEffect(() => {
-    return subscribeAnalysisOrFavoriteChanged(fetchList);
+    return subscribeAnalysisOrFavoriteChanged(() => {
+      void fetchList({ silent: true });
+    });
   }, [fetchList]);
 
   const handleCreate = useCallback(
@@ -195,20 +197,17 @@ export function GlobalAnalysisView({ favoritesWindow = false }: { favoritesWindo
         title: payload.title?.trim() ? payload.title.trim() : undefined,
       });
       setPendingFocusId(created.id);
-      await fetchList();
+      setList((prev) => [...prev, created]);
       broadcastAnalysisOrFavoriteChanged();
     },
-    [fetchList]
+    []
   );
 
-  const handleDelete = useCallback(
-    async (id: string) => {
-      await globalAnalysisService.delete(id);
-      await fetchList();
-      broadcastAnalysisOrFavoriteChanged();
-    },
-    [fetchList]
-  );
+  const handleDelete = useCallback(async (id: string) => {
+    await globalAnalysisService.delete(id);
+    setList((prev) => prev.filter((g) => g.id !== id));
+    broadcastAnalysisOrFavoriteChanged();
+  }, []);
 
   const handleEdit = useCallback((ga: GlobalAnalysis) => {
     setEditing(ga);
@@ -224,9 +223,16 @@ export function GlobalAnalysisView({ favoritesWindow = false }: { favoritesWindo
       title?: string | null;
     }) => {
       if (!editing) return;
+      const oldImages = editing.images ?? [];
+      const nameByPath = new Map(oldImages.map((p, i) => [p, editing.imageNames?.[i] ?? ""]));
+      const nextImageNames = payload.images.map((p) => nameByPath.get(p) ?? "");
       const updated = await globalAnalysisService.update(editing.id, {
         notes: payload.notes,
         images: payload.images.length > 0 ? payload.images : null,
+        imageNames:
+          nextImageNames.length > 0 || (editing.imageNames?.length ?? 0) > 0
+            ? nextImageNames
+            : undefined,
         analysisType: payload.analysisType,
         scope: payload.scope,
         title:
@@ -237,12 +243,12 @@ export function GlobalAnalysisView({ favoritesWindow = false }: { favoritesWindo
               : null,
       });
       setPendingFocusId(updated.id);
+      setList((prev) => prev.map((g) => (g.id === updated.id ? { ...g, ...updated } : g)));
       setEditing(null);
       setEditModalOpen(false);
-      await fetchList();
       broadcastAnalysisOrFavoriteChanged();
     },
-    [editing, fetchList]
+    [editing]
   );
 
   const handleUpdateImageName = useCallback(

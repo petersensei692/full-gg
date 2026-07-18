@@ -9,6 +9,7 @@ import {
   ArrowLeftRight,
   PieChart,
   Settings,
+  Link2,
   ChevronDown,
   ChevronRight,
   ChevronUp,
@@ -18,6 +19,7 @@ import {
   Menu,
   House,
   Calendar,
+  Crosshair,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useState, useCallback, useMemo, useEffect } from "react";
@@ -102,6 +104,8 @@ const otherNavItems: NavItemSimple[] = [
 const analyticsNavItems: NavItemSimple[] = [
   { href: "/analytics", label: "Dashboard", icon: LayoutDashboard },
   { href: "/analytics/trades", label: "Trades", icon: ArrowLeftRight },
+  { href: "/analytics/strategies", label: "Strategies", icon: Crosshair },
+  { href: "/pairs", label: "Pairs", icon: Link2 },
   { href: "/analytics/analytics", label: "Analytics", icon: PieChart },
 ];
 
@@ -131,6 +135,7 @@ export function Sidebar({
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const isAnalytics = pathname === "/analytics" || pathname.startsWith("/analytics/");
+  const isPairsPage = pathname === "/pairs";
   const [assetsOpen, setAssetsOpen] = useState(true);
   /** Only one type section open at a time; restored from sessionStorage so it stays open when navigating to an asset */
   const [typeSectionsOpen, setTypeSectionsOpen] = useState<Record<string, boolean>>(() =>
@@ -203,7 +208,7 @@ export function Sidebar({
   }, []);
 
   const topLevelNav = useMemo((): (NavItemWithAssets | NavItemSimple)[] => {
-    if (isAnalytics) return analyticsNavItems;
+    if (isAnalytics || isPairsPage) return analyticsNavItems;
     const assetsItem: NavItemWithAssets = {
       href: "/fundamental-analysis",
       label: "Assets",
@@ -223,9 +228,10 @@ export function Sidebar({
       { href: "/global-analysis", label: "Global Analysis", icon: Globe },
       { href: "/all-analysis", label: "All Analysis", icon: Globe },
       { href: "/watch-list", label: "Weekly watchlist", icon: Calendar },
+      { href: "/pairs", label: "Pairs", icon: Link2 },
       ...otherNavItems,
     ];
-  }, [isAnalytics, favoritesNav, assets]);
+  }, [isAnalytics, isPairsPage, favoritesNav, assets]);
 
   const showAsOverlay = isOverlayMode;
   const isExpanded = !collapsed || (isOverlayMode && overlayOpen);

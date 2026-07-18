@@ -3,7 +3,7 @@ import { existsSync, mkdirSync } from 'fs';
 import { dirname, join } from 'path';
 import { DataSource } from 'typeorm';
 import { seedAssets } from './seeds/asset.seed';
-import { seedPairsPipsValues } from './seeds/analytics.seed';
+import { seedPairs } from './seeds/analytics.seed';
 
 function entitiesGlob(): string {
   return join(__dirname, '..', '**', '*.entity.js');
@@ -32,7 +32,7 @@ export async function synchronizeAndSeedDatabaseFile(absPath: string): Promise<v
   await ds.initialize();
   try {
     await seedAssets(ds);
-    await seedPairsPipsValues(ds);
+    await seedPairs(ds);
   } finally {
     await ds.destroy();
   }

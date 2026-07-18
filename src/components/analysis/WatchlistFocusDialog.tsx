@@ -19,6 +19,10 @@ import { ConfirmDeleteDialog } from "@/components/ui/ConfirmDeleteDialog";
 
 type FocusSection = "main" | "analysis";
 
+function watchPairLabel(entry: WatchItem): string {
+  return entry.tradingPair?.pair ?? entry.pairName;
+}
+
 function watchItemDeleteDetails(entry: WatchItem): string {
   const wl =
     entry.watchlist ??
@@ -27,7 +31,7 @@ function watchItemDeleteDetails(entry: WatchItem): string {
     null;
   const week = wl != null ? `${wl.startDate} → ${wl.endDate}` : "—";
   return [
-    `Pair: ${entry.pairName}`,
+    `Pair: ${watchPairLabel(entry)}`,
     `Bias: ${entry.bias}`,
     `Watchlist week: ${week}`,
     `Thesis images: ${entry.thesis?.images?.length ?? 0}`,
@@ -288,7 +292,7 @@ export function WatchlistFocusDialog({
           <div className="px-4 sm:px-6 py-2 border-b border-sidebar-border flex items-center justify-between gap-3 shrink-0">
             <div className="flex items-center gap-2 min-w-0">
               <h3 className="text-base font-semibold text-dashboard-foreground truncate pr-2 leading-tight">
-                {displayEntry.pairName}
+                {watchPairLabel(displayEntry)}
               </h3>
               <span
                 className={`shrink-0 text-[11px] font-medium px-1.5 py-0.5 rounded ${
@@ -425,7 +429,7 @@ export function WatchlistFocusDialog({
                           onClick={() =>
                             setPendingDeleteImage({
                               path,
-                              pairName: displayEntry.pairName,
+                              pairName: watchPairLabel(displayEntry),
                               caption: displayName || fallbackLabel,
                             })
                           }

@@ -1,5 +1,5 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsOptional, IsString, MaxLength, IsInt, Min } from 'class-validator';
+import { IsOptional, IsString, MaxLength, IsInt, Min, IsBoolean } from 'class-validator';
 
 export class UpdateAssetDto {
   @ApiPropertyOptional({
@@ -33,4 +33,9 @@ export class UpdateAssetDto {
   @IsInt()
   @Min(1)
   place?: number;
+
+  @ApiPropertyOptional({ description: 'Whether this asset can be used in trading pairs' })
+  @IsOptional()
+  @IsBoolean()
+  isTradable?: boolean;
 }

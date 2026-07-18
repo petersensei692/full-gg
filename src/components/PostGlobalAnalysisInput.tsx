@@ -4,7 +4,7 @@ import { useRef, useState, useCallback, useMemo, useEffect } from "react";
 import { Bold, Italic, Underline, PenSquare, Check, ChevronDown } from "lucide-react";
 import { useAnalysisEditorPaste } from "@/hooks/useAnalysisEditorPaste";
 import { Dialog, DialogContent } from "@/components/ui/Dialog";
-import { EventImageThumb } from "@/components/analysis/EventImageThumb";
+import { AttachedImagesStrip } from "@/components/analysis/AttachedImagesStrip";
 import { deleteStoredImage } from "@/lib/imageUpload";
 import { ConfirmDeleteDialog } from "@/components/ui/ConfirmDeleteDialog";
 import { isHtmlEffectivelyEmpty } from "@/lib/html-empty";
@@ -476,28 +476,11 @@ export function PostGlobalAnalysisInput({
       </div>
 
       {images.length > 0 && (
-        <div className="mt-3 space-y-2">
-          <p className="text-xs font-medium text-dashboard-foreground/70">Attached images — click to preview</p>
-          <div className="flex flex-wrap gap-3">
-            {images.map((img) => (
-              <div key={img.path} className="relative inline-block">
-                <EventImageThumb
-                  src={img.url}
-                  alt="Attached"
-                  imgClassName="h-24 max-w-[200px] rounded-lg border border-sidebar-border object-contain bg-black/10"
-                />
-                <button
-                  type="button"
-                  onClick={() => setImagePendingRemove(img.path)}
-                  className="absolute -top-2 -right-2 z-[2] rounded-full bg-red-500 text-white text-xs w-5 h-5 flex items-center justify-center shadow"
-                  aria-label="Remove image"
-                >
-                  ×
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
+        <AttachedImagesStrip
+          items={images}
+          onReorder={setImages}
+          onRemove={(path) => setImagePendingRemove(path)}
+        />
       )}
 
       {zoomedImageSrc && (

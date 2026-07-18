@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { useRef } from "react";
+import { useLayoutEffect, useRef } from "react";
 import { ChevronDown, ChevronUp, Download, X } from "lucide-react";
 
 type FavoritesAnalysisSidebarProps = {
@@ -28,6 +28,22 @@ export function FavoritesAnalysisSidebar({
   children,
 }: FavoritesAnalysisSidebarProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Jump to latest (bottom) when the drawer opens — entries are oldest → newest.
+  useLayoutEffect(() => {
+    if (!open) return;
+    const jump = () => {
+      const el = scrollRef.current;
+      if (!el) return;
+      el.scrollTop = el.scrollHeight;
+    };
+    jump();
+    const id1 = requestAnimationFrame(() => {
+      jump();
+      requestAnimationFrame(jump);
+    });
+    return () => cancelAnimationFrame(id1);
+  }, [open]);
 
   const scrollToTop = () => {
     const el = scrollRef.current;

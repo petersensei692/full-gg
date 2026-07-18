@@ -6,6 +6,8 @@ export interface Asset {
   sortOrder?: number;
   /** Position within the asset's type section (1, 2, 3, ...). */
   place?: number;
+  /** When false, cannot be used as a trading-pair leg. */
+  isTradable?: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -15,6 +17,7 @@ export interface CreateAssetDto {
   name: string;
   type?: string;
   sortOrder?: number;
+  isTradable?: boolean;
 }
 
 /** Body for updating an asset (all fields optional) */
@@ -23,6 +26,7 @@ export interface UpdateAssetDto {
   type?: string;
   sortOrder?: number;
   place?: number;
+  isTradable?: boolean;
 }
 
 /** Asset with analysis and watch counts (for Assets page) */
@@ -77,6 +81,8 @@ export interface WatchItem {
   quoteAssetWatchlist: AssetWatchlist | null;
   baseAsset: Asset;
   quoteAsset: Asset;
+  tradingPairId?: string | null;
+  tradingPair?: TradingPair | null;
   pairName: string;
   bias: string;
   thesis: Thesis | null;
@@ -92,12 +98,10 @@ export interface WatchItem {
 
 /** Body for creating a watch item */
 export interface CreateWatchItemDto {
+  tradingPairId: string;
   baseAssetWatchlistId?: string;
   quoteAssetWatchlistId?: string;
   watchlistId?: string;
-  baseAssetId: string;
-  quoteAssetId: string;
-  pairName: string;
   bias: string;
   thesis?: Thesis;
   linkedBaseAnalysisIds?: string[];
@@ -106,10 +110,8 @@ export interface CreateWatchItemDto {
 
 /** Body for updating a watch item */
 export interface UpdateWatchItemDto {
+  tradingPairId?: string;
   watchlistId?: string;
-  baseAssetId?: string;
-  quoteAssetId?: string;
-  pairName?: string;
   bias?: string;
   thesis?: Thesis | null;
   finished?: boolean;
@@ -170,6 +172,10 @@ export interface TradesListResponse {
 export interface Trade {
   id: string;
   pair: string;
+  pairId?: string | null;
+  tradingPair?: TradingPair | null;
+  strategyId?: string | null;
+  strategy?: Strategy | null;
   type: TradeType;
   executionType: TradeExecutionType;
   executionTime: string | null;
@@ -189,8 +195,37 @@ export interface Trade {
   updatedAt: string;
 }
 
+/** Trading pair from GET /analytics/pairs */
+export interface TradingPair {
+  id: string;
+  pair: string;
+  baseAssetId: string;
+  quoteAssetId: string;
+  baseAsset?: Asset;
+  quoteAsset?: Asset;
+  pairFormat: number;
+  pipValue: number | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateTradingPairDto {
+  baseAssetId: string;
+  quoteAssetId: string;
+  pipValue?: number | null;
+}
+
+export interface UpdateTradingPairDto {
+  baseAssetId?: string;
+  quoteAssetId?: string;
+  pipValue?: number | null;
+  swapOrientation?: boolean;
+}
+
+
 export interface CreateTradeDto {
-  pair?: string;
+  pairId: string;
+  strategyId: string;
   pairWatchedId?: string | null;
   type: TradeType;
   executionType: TradeExecutionType;
@@ -208,7 +243,8 @@ export interface CreateTradeDto {
 }
 
 export interface UpdateTradeDto {
-  pair?: string;
+  pairId?: string;
+  strategyId?: string;
   pairWatchedId?: string | null;
   type?: TradeType;
   executionType?: TradeExecutionType;
@@ -446,7 +482,32 @@ export interface AllAnalysisItem {
 }
 
 export type NoteTier = "tier_1" | "tier_2" | "tier_3";
-export type NoteType = "macro" | "technical" | "other";
+export type NoteType = "macro" | "technical" | "strategy" | "other";
+
+/** Analytics trading strategy */
+export interface Strategy {
+  id: string;
+  name: string;
+  description: string;
+  images?: string[] | null;
+  imageNames?: string[] | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateStrategyDto {
+  name: string;
+  description: string;
+  images?: string[];
+  imageNames?: string[];
+}
+
+export interface UpdateStrategyDto {
+  name?: string;
+  description?: string;
+  images?: string[];
+  imageNames?: string[];
+}
 
 /** Single note returned by the API */
 export interface Note {

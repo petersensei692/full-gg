@@ -12,7 +12,9 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { DataSource } from 'typeorm';
 import { AppModule } from './app.module';
 import { seedAssets } from './database/seeds/asset.seed';
-import { seedPairsPipsValues, seedTradesForPairs } from './database/seeds/analytics.seed';
+import { seedPairs, seedTradesForPairs } from './database/seeds/analytics.seed';
+import { TradesService } from './analytics/trades/trades.service';
+import { WatchItemsService } from './fondamental/assets/watch-items/watch-items.service';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -67,10 +69,13 @@ async function bootstrap() {
   try {
     const dataSource = app.get(DataSource);
     await seedAssets(dataSource);
-    await seedPairsPipsValues(dataSource);
+    await seedPairs(dataSource);
     await seedTradesForPairs(dataSource);
+    const tradesService = app.get(TradesService);
+    await tradesService.backfillTradePairIds();
+    const watchItemsService = app.get(WatchItemsService);
+    await watchItemsService.backfillTradingPairIds();
   } catch (err) {
     console.error('Seed failed:', err);
   }
-}
-bootstrap();
+}bootstrap();

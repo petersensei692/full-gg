@@ -8,15 +8,19 @@ import type {
   AssetWatchlist,
   CreateWatchItemDto,
   WatchItem,
+  TradingPair,
 } from "@/types/api";
 import type { WatchlistBias } from "@/types/calendar";
 import { useAnalysisEditorPaste } from "@/hooks/useAnalysisEditorPaste";
 import { deleteStoredImage } from "@/lib/imageUpload";
 import { ConfirmDeleteDialog } from "@/components/ui/ConfirmDeleteDialog";
+import { AttachedImagesStrip } from "@/components/analysis/AttachedImagesStrip";
 import { getImageUrl } from "@/lib/imageUrls";
 import { useAssets } from "@/context/AssetsContext";
 import { assetWatchlistService } from "@/lib/api";
+import { pairsService } from "@/lib/services/pairs.service";
 import { clearDraft, loadDraftJson, saveDraftJson } from "@/lib/form-drafts";
+import { ScrollableSelect } from "@/components/ui/ScrollableSelect";
 
 interface CreatePairModalProps {
   open: boolean;
@@ -35,8 +39,7 @@ interface CreatePairModalProps {
 type PairModalDraftV1 = {
   v: 1;
   calendarId: string;
-  baseAsset: string;
-  quoteAsset: string;
+  tradingPairId: string;
   bias: WatchlistBias;
   html: string;
   imagePaths: string[];
@@ -61,10 +64,8 @@ export function CreatePairModal({
   const [allAssetWatchlistsForWeek, setAllAssetWatchlistsForWeek] = useState<
     AssetWatchlist[]
   >([]);
-  const [baseAsset, setBaseAsset] = useState(currentAssetSlug);
-  const [quoteAsset, setQuoteAsset] = useState(
-    currentAssetSlug === "usd" ? "eur" : "usd"
-  );
+  const [catalogPairs, setCatalogPairs] = useState<TradingPair[]>([]);
+  const [tradingPairId, setTradingPairId] = useState("");
   const [thesisHtml, setThesisHtml] = useState("");
   const [bias, setBias] = useState<WatchlistBias>("bullish");
   const [zoomedImageSrc, setZoomedImageSrc] = useState<string | null>(null);
@@ -78,10 +79,43 @@ export function CreatePairModal({
     (aw) => aw.id === selectedAssetWatchlistId
   );
 
+  const currentAssetId = useMemo(
+    () => assetOptions.find((a) => a.slug === currentAssetSlug)?.id,
+    [assetOptions, currentAssetSlug],
+  );
+
+  const pairsForAsset = useMemo(() => {
+    if (!currentAssetId) return [];
+    return catalogPairs.filter(
+      (p) => p.baseAssetId === currentAssetId || p.quoteAssetId === currentAssetId,
+    );
+  }, [catalogPairs, currentAssetId]);
+
+  const selectedCatalogPair = useMemo(
+    () => pairsForAsset.find((p) => p.id === tradingPairId) ?? null,
+    [pairsForAsset, tradingPairId],
+  );
+
   const pairDraftStorageKey = useMemo(
     () => `watch-pair:${currentAssetSlug}:${mode}:${initialItem?.id ?? "new"}`,
     [currentAssetSlug, mode, initialItem?.id],
   );
+
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    pairsService
+      .getAll()
+      .then((pairs) => {
+        if (!cancelled) setCatalogPairs(Array.isArray(pairs) ? pairs : []);
+      })
+      .catch(() => {
+        if (!cancelled) setCatalogPairs([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open]);
 
   useEffect(() => {
     if (open && useAssetWatchlistMode && selectedAssetWatchlist) {
@@ -102,8 +136,7 @@ export function CreatePairModal({
     const stored = loadDraftJson<PairModalDraftV1>(pairDraftStorageKey);
     if (stored?.v === 1) {
       setCalendarId(stored.calendarId ?? "");
-      setBaseAsset(stored.baseAsset || currentAssetSlug);
-      setQuoteAsset(stored.quoteAsset || (currentAssetSlug === "usd" ? "eur" : "usd"));
+      setTradingPairId(stored.tradingPairId ?? "");
       setBias(stored.bias ?? "bullish");
       setThesisHtml(stored.html ?? "");
       if (stored.imagePaths?.length) {
@@ -126,19 +159,12 @@ export function CreatePairModal({
 
     const applyInitial = () => {
       if (mode === "edit" && initialItem) {
-        const baseSlug =
-          assetOptions.find((a) => a.label === initialItem.baseAsset.name)?.slug ??
-          initialItem.baseAsset.name.toLowerCase();
-        const quoteSlug =
-          assetOptions.find((a) => a.label === initialItem.quoteAsset.name)?.slug ??
-          initialItem.quoteAsset.name.toLowerCase();
         const wlId =
           initialItem.baseAssetWatchlist?.weeklyWatchlist?.id ??
           initialItem.quoteAssetWatchlist?.weeklyWatchlist?.id ??
           initialItem.watchlist?.id;
         setCalendarId(wlId ?? "");
-        setBaseAsset(baseSlug);
-        setQuoteAsset(quoteSlug);
+        setTradingPairId(initialItem.tradingPairId ?? initialItem.tradingPair?.id ?? "");
         const notes = initialItem.thesis?.notes ?? "";
         const images = (initialItem.thesis?.images ?? []).map((path) => ({
           path,
@@ -151,13 +177,8 @@ export function CreatePairModal({
           thesisRef.current.innerHTML = notes;
         }
       } else {
-        setCalendarId(
-          (selectedCalendarId ?? calendars[0]?.id) ?? ""
-        );
-        setBaseAsset(currentAssetSlug);
-        const other =
-          assetOptions.find((a) => a.slug !== currentAssetSlug)?.slug ?? "usd";
-        setQuoteAsset(other);
+        setCalendarId((selectedCalendarId ?? calendars[0]?.id) ?? "");
+        setTradingPairId("");
         setThesisHtml("");
         setBias("bullish");
         setThesisImages([]);
@@ -168,7 +189,6 @@ export function CreatePairModal({
       setError("");
     };
     applyInitial();
-    // Defer so DialogContent is mounted and refs are set (Radix renders in portal after open)
     const t = setTimeout(applyInitial, 0);
     const t2 = setTimeout(applyInitial, 50);
     return () => {
@@ -183,15 +203,21 @@ export function CreatePairModal({
     useAssetWatchlistMode,
     selectedAssetWatchlist?.id,
     currentAssetSlug,
-    assetOptions,
     mode,
     initialItem?.id,
+    initialItem?.tradingPairId,
     initialItem?.thesis?.notes,
     initialItem?.thesis?.images?.length,
     initialItem?.thesis?.images?.[0],
     pairDraftStorageKey,
-    currentAssetSlug,
   ]);
+
+  useEffect(() => {
+    if (!open || tradingPairId) return;
+    if (pairsForAsset.length > 0) {
+      setTradingPairId(pairsForAsset[0].id);
+    }
+  }, [open, tradingPairId, pairsForAsset]);
 
   useEffect(() => {
     if (!open) return;
@@ -201,8 +227,7 @@ export function CreatePairModal({
       saveDraftJson(pairDraftStorageKey, {
         v: 1,
         calendarId,
-        baseAsset,
-        quoteAsset,
+        tradingPairId,
         bias,
         html,
         imagePaths: paths,
@@ -213,8 +238,7 @@ export function CreatePairModal({
     open,
     pairDraftStorageKey,
     calendarId,
-    baseAsset,
-    quoteAsset,
+    tradingPairId,
     bias,
     thesisHtml,
     thesisImages,
@@ -225,13 +249,7 @@ export function CreatePairModal({
     onImageReady: (img) => setThesisImages((prev) => [...prev, img]),
   });
 
-  const pairName = useMemo(() => {
-    const base = assetOptions.find((a) => a.slug === baseAsset)?.label ?? baseAsset.toUpperCase();
-    const quote = assetOptions.find((a) => a.slug === quoteAsset)?.label ?? quoteAsset.toUpperCase();
-    return `${base} / ${quote}`;
-  }, [baseAsset, quoteAsset, assetOptions]);
-
-  const isValidPair = baseAsset === currentAssetSlug || quoteAsset === currentAssetSlug;
+  const pairLabel = selectedCatalogPair?.pair ?? "—";
 
   const applyFormat = useCallback((cmd: "bold" | "italic" | "underline") => {
     document.execCommand(cmd, false);
@@ -243,100 +261,59 @@ export function CreatePairModal({
     thesisRef.current?.focus();
   }, []);
 
-  /** Keep editor focus/selection when clicking toolbar so format applies to selection */
   const preventFocusLoss = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
   }, []);
 
+  const buildThesisPayload = () => {
+    const thesisNotes = thesisRef.current?.innerHTML ?? "";
+    const origImages = initialItem?.thesis?.images ?? [];
+    const origNames = initialItem?.thesis?.imageNames ?? [];
+    const imageNames =
+      mode === "edit" && origNames.length > 0
+        ? thesisImages.map((img) => origNames[origImages.indexOf(img.path)] ?? "")
+        : undefined;
+    if (!thesisNotes && thesisImages.length === 0) return undefined;
+    return {
+      notes: thesisNotes,
+      images: thesisImages.map((img) => img.path),
+      imageNames,
+    };
+  };
+
   const handleSave = () => {
     setError("");
-    if (!isValidPair) {
-      setError(`Either Base or Quote must be ${currentAssetLabel} (current asset).`);
+    if (!tradingPairId || !selectedCatalogPair) {
+      setError(`Select a catalog pair that includes ${currentAssetLabel}.`);
       return;
     }
-    if (baseAsset === quoteAsset) {
-      setError("Base and Quote must be different.");
-      return;
-    }
-    let baseAssetId = assetOptions.find((a) => a.slug === baseAsset)?.id;
-    let quoteAssetId = assetOptions.find((a) => a.slug === quoteAsset)?.id;
-    if (useAssetWatchlistMode && allAssetWatchlistsForWeek.length > 0) {
-      const baseSlug = baseAsset.toLowerCase().replace(/\s/g, "-");
-      const quoteSlug = quoteAsset.toLowerCase().replace(/\s/g, "-");
-      baseAssetId ??= allAssetWatchlistsForWeek.find(
-        (aw) => aw.asset.name.toLowerCase().replace(/\s/g, "-") === baseSlug
-      )?.asset.id;
-      quoteAssetId ??= allAssetWatchlistsForWeek.find(
-        (aw) => aw.asset.name.toLowerCase().replace(/\s/g, "-") === quoteSlug
-      )?.asset.id;
-    }
-    if (!baseAssetId || !quoteAssetId) {
-      setError(
-        "Could not resolve asset IDs. Ensure the server is running and assets are loaded, then try again."
-      );
-      return;
-    }
-    const thesisNotes = thesisRef.current?.innerHTML ?? "";
-
+    const thesisPayload = buildThesisPayload();
     let dto: CreateWatchItemDto;
+
     if (useAssetWatchlistMode && allAssetWatchlistsForWeek.length > 0) {
       const baseAW = allAssetWatchlistsForWeek.find(
-        (aw) => aw.asset.id === baseAssetId
+        (aw) => aw.asset.id === selectedCatalogPair.baseAssetId,
       );
       const quoteAW = allAssetWatchlistsForWeek.find(
-        (aw) => aw.asset.id === quoteAssetId
+        (aw) => aw.asset.id === selectedCatalogPair.quoteAssetId,
       );
       if (!baseAW || !quoteAW) {
-        setError("Could not find asset watchlists for the selected pair.");
+        setError(
+          "Could not find asset watchlists for both legs of this pair in the selected week.",
+        );
         return;
       }
-      const origImages = initialItem?.thesis?.images ?? [];
-      const origNames = initialItem?.thesis?.imageNames ?? [];
-      const imageNames =
-        mode === "edit" && origNames.length > 0
-          ? thesisImages.map(
-              (img) => origNames[origImages.indexOf(img.path)] ?? ""
-            )
-          : undefined;
-      const thesisPayload =
-        thesisNotes || thesisImages.length
-          ? {
-              notes: thesisNotes,
-              images: thesisImages.map((img) => img.path),
-              imageNames,
-            }
-          : undefined;
       dto = {
+        tradingPairId,
         baseAssetWatchlistId: baseAW.id,
         quoteAssetWatchlistId: quoteAW.id,
-        baseAssetId,
-        quoteAssetId,
-        pairName,
         bias,
         thesis: thesisPayload,
       };
     } else if (calendarId) {
-      const origImages = initialItem?.thesis?.images ?? [];
-      const origNames = initialItem?.thesis?.imageNames ?? [];
-      const imageNames =
-        mode === "edit" && origNames.length > 0
-          ? thesisImages.map(
-              (img) => origNames[origImages.indexOf(img.path)] ?? ""
-            )
-          : undefined;
-      const thesisPayload =
-        thesisNotes || thesisImages.length
-          ? {
-              notes: thesisNotes,
-              images: thesisImages.map((img) => img.path),
-              imageNames,
-            }
-          : undefined;
       dto = {
+        tradingPairId,
         watchlistId: calendarId,
-        baseAssetId,
-        quoteAssetId,
-        pairName,
         bias,
         thesis: thesisPayload,
       };
@@ -344,12 +321,12 @@ export function CreatePairModal({
       setError("Select a watchlist.");
       return;
     }
+
     onSubmit(dto);
     clearDraft(pairDraftStorageKey);
     setThesisHtml("");
     setThesisImages([]);
-    setBaseAsset(currentAssetSlug);
-    setQuoteAsset(currentAssetSlug === "usd" ? "eur" : "usd");
+    setTradingPairId("");
     onOpenChange(false);
   };
 
@@ -423,74 +400,39 @@ export function CreatePairModal({
             </div>
           )}
 
-          {/* Asset Selection */}
           <div>
             <div className="flex items-center gap-2 text-sm font-medium text-dashboard-foreground/80 mb-2">
               <Wrench className="h-4 w-4" />
-              Asset Selection
+              Trading pair
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs text-dashboard-foreground/60 mb-1">Base Asset</label>
-                <select
-                  value={baseAsset}
-                  onChange={(e) => {
-                    const next = e.target.value;
-                    setBaseAsset(next);
-                    if (next !== currentAssetSlug && quoteAsset !== currentAssetSlug) {
-                      setQuoteAsset(currentAssetSlug);
-                    }
-                    if (next === quoteAsset) {
-                      setQuoteAsset(currentAssetSlug === next ? (assetOptions.find((a) => a.slug !== next)?.slug ?? "usd") : currentAssetSlug);
-                    }
-                  }}
-                  className="w-full rounded-lg border border-sidebar-border bg-header-input px-3 py-2 text-sm text-dashboard-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                >
-                  {assetOptions.map((a) => (
-                    <option key={a.slug} value={a.slug}>
-                      {a.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs text-dashboard-foreground/60 mb-1">Quote Asset</label>
-                <select
-                  value={quoteAsset}
-                  onChange={(e) => {
-                    const next = e.target.value;
-                    setQuoteAsset(next);
-                    if (next !== currentAssetSlug && baseAsset !== currentAssetSlug) {
-                      setBaseAsset(currentAssetSlug);
-                    }
-                    if (next === baseAsset) {
-                      setBaseAsset(currentAssetSlug === next ? (assetOptions.find((a) => a.slug !== next)?.slug ?? "usd") : currentAssetSlug);
-                    }
-                  }}
-                  className="w-full rounded-lg border border-sidebar-border bg-header-input px-3 py-2 text-sm text-dashboard-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                >
-                  {assetOptions.map((a) => (
-                    <option key={a.slug} value={a.slug}>
-                      {a.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
+            <ScrollableSelect
+              value={tradingPairId}
+              onChange={setTradingPairId}
+              aria-label="Trading pair"
+              placeholder={
+                pairsForAsset.length === 0
+                  ? `No catalog pairs for ${currentAssetLabel}`
+                  : "Select a pair…"
+              }
+              options={pairsForAsset.map((p) => ({
+                value: p.id,
+                label: `${p.pair}${p.pipValue == null ? " (no pip)" : ""}`,
+              }))}
+              maxVisible={5}
+            />
             <div className="mt-2 rounded-lg border border-sidebar-border bg-sidebar/50 px-3 py-2">
               <span className="text-[10px] font-semibold uppercase tracking-wider text-dashboard-foreground/60">
-                Generated pair name
+                Pair
               </span>
-              <p className="text-lg font-semibold text-primary mt-0.5">{pairName}</p>
+              <p className="text-lg font-semibold text-primary mt-0.5">{pairLabel}</p>
             </div>
-            {!isValidPair && (
+            {pairsForAsset.length === 0 && (
               <p className="text-xs text-red-400 mt-1">
-                One of Base or Quote must be {currentAssetLabel} (current asset).
+                Add a pair including {currentAssetLabel} on the Pairs page.
               </p>
             )}
           </div>
 
-          {/* Bias */}
           <div>
             <label className="block text-sm font-medium text-dashboard-foreground/80 mb-2">
               Bias
@@ -505,7 +447,6 @@ export function CreatePairModal({
             </select>
           </div>
 
-          {/* Technical Thesis & Notes */}
           <div>
             <div className="flex items-center gap-2 text-sm font-medium text-dashboard-foreground/80 mb-2">
               <PenLine className="h-4 w-4" />
@@ -563,32 +504,13 @@ export function CreatePairModal({
               suppressHydrationWarning
             />
             {thesisImages.length > 0 && (
-              <div className="mt-3 flex flex-wrap gap-2">
-                {thesisImages.map((img) => (
-                  <div key={img.path} className="relative">
-                    <button
-                      type="button"
-                      onClick={() => setZoomedImageSrc(img.url)}
-                      className="block"
-                    >
-                      <img
-                        src={img.url}
-                        alt="Thesis attachment"
-                        className="h-20 w-28 object-cover rounded-lg border border-sidebar-border hover:border-primary/50 transition-colors"
-                      />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setImagePendingRemove(img.path)}
-                      className="absolute -top-2 -right-2 rounded-full bg-red-500 text-white text-xs w-5 h-5 flex items-center justify-center shadow"
-                      aria-label="Remove image"
-                      title="Remove image"
-                    >
-                      ×
-                    </button>
-                  </div>
-                ))}
-              </div>
+              <AttachedImagesStrip
+                items={thesisImages}
+                onReorder={setThesisImages}
+                onRemove={(path) => setImagePendingRemove(path)}
+                variant="cover"
+                label="Thesis images — click to preview · drag to reorder"
+              />
             )}
           </div>
 
@@ -596,7 +518,6 @@ export function CreatePairModal({
             <p className="text-sm text-red-400">{error}</p>
           )}
 
-          {/* Actions */}
           <div className="flex justify-end gap-2 pt-2 border-t border-sidebar-border">
             <button
               type="button"
@@ -608,7 +529,7 @@ export function CreatePairModal({
             <button
               type="button"
               onClick={handleSave}
-              disabled={!isValidPair || baseAsset === quoteAsset}
+              disabled={!tradingPairId || !selectedCatalogPair}
               className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:pointer-events-none"
             >
               {mode === "edit" ? "Save changes" : "Save to Watchlist"}
@@ -655,7 +576,7 @@ export function CreatePairModal({
       title="Discard this watchlist pair draft?"
       description="You will lose any unsaved pair and thesis. Uploaded images still in this draft will be deleted from storage."
       details={[
-        `Pair: ${baseAsset.toUpperCase()} / ${quoteAsset.toUpperCase()}`,
+        `Pair: ${pairLabel}`,
         `Mode: ${mode === "edit" ? "Edit" : "Create"}`,
         `Thesis images in draft: ${thesisImages.length}`,
       ].join("\n")}

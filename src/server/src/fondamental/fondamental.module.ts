@@ -24,6 +24,6 @@ import { AllAnalysisModule } from './all-analysis/all-analysis.module';
   ],
   controllers: [GlobalAnalysisController],
   providers: [GlobalAnalysisService],
-  exports: [AssetsModule, WeeklyModule],
+  exports: [AssetsModule, WeeklyModule, WatchItemsModule],
 })
 export class FondamentalModule {}

@@ -306,7 +306,7 @@ export function WatchListView() {
       onSubmit={async (dto) => {
         if (!editingItem) return;
         await updateWatchItem(editingItem.id, {
-          pairName: dto.pairName,
+          tradingPairId: dto.tradingPairId,
           bias: dto.bias,
           thesis: dto.thesis
             ? {

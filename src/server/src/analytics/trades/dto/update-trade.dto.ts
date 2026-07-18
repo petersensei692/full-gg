@@ -113,10 +113,15 @@ class TradeNoteDto {
 }
 
 export class UpdateTradeDto {
-  @ApiPropertyOptional({ description: 'Pair (e.g. EURUSD)' })
+  @ApiPropertyOptional({ description: 'Catalog trading pair ID' })
   @IsOptional()
-  @IsString()
-  pair?: string;
+  @IsUUID()
+  pairId?: string;
+
+  @ApiPropertyOptional({ description: 'Strategy ID' })
+  @IsOptional()
+  @IsUUID()
+  strategyId?: string;
 
   @ApiPropertyOptional({ description: 'Linked watch item ID', nullable: true })
   @IsOptional()

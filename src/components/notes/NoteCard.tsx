@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import type { Note, NoteTier } from "@/types/api";
-import { getImageUrl } from "@/lib/imageUrls";
 import { Trash2 } from "lucide-react";
 import { NoteFocusDialog } from "./NoteFocusDialog";
 import { ConfirmDeleteDialog } from "@/components/ui/ConfirmDeleteDialog";
@@ -36,7 +35,6 @@ export function NoteCard({ note, onEdit, onDelete }: NoteCardProps) {
   const [pendingDelete, setPendingDelete] = useState<Note | null>(null);
   const tier = (note.tier ?? "tier_2") as NoteTier;
   const borderClass = TIER_BORDER[tier] ?? TIER_BORDER.tier_2;
-  const firstImage = note.images?.[0];
 
   return (
     <>
@@ -50,9 +48,9 @@ export function NoteCard({ note, onEdit, onDelete }: NoteCardProps) {
             setFocusOpen(true);
           }
         }}
-        className={`rounded-xl ${borderClass} bg-sidebar/50 overflow-hidden shadow-sm cursor-pointer hover:opacity-90 transition-opacity flex flex-col min-h-[200px]`}
+        className={`rounded-xl ${borderClass} bg-sidebar/50 overflow-hidden shadow-sm cursor-pointer hover:opacity-90 transition-opacity`}
       >
-        <div className="px-4 py-3 border-b border-sidebar-border flex items-center justify-between gap-2 shrink-0">
+        <div className="px-4 py-3 flex items-center justify-between gap-2">
           <h4 className="text-base font-semibold text-dashboard-foreground truncate">
             {note.title}
           </h4>
@@ -86,17 +84,6 @@ export function NoteCard({ note, onEdit, onDelete }: NoteCardProps) {
               </button>
             )}
           </div>
-        </div>
-        <div className="flex-1 min-h-0 flex items-center justify-center p-4 bg-sidebar/30">
-          {firstImage ? (
-            <img
-              src={getImageUrl(firstImage)}
-              alt={note.title}
-              className="max-w-full max-h-[180px] w-auto h-auto object-contain rounded-lg"
-            />
-          ) : (
-            <span className="text-sm text-dashboard-foreground/40">No image</span>
-          )}
         </div>
       </article>
 
