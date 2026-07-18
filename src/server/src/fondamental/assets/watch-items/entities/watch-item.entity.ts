@@ -6,7 +6,15 @@ import {
   UpdateDateColumn,
   ManyToOne,
   JoinColumn,
+  ValueTransformer,
 } from 'typeorm';
+
+const stringArrayTransformer: ValueTransformer = {
+  to: (v: string[] | null): string | null =>
+    v == null || v.length === 0 ? null : JSON.stringify(v),
+  from: (v: string | null): string[] | null =>
+    v == null ? null : JSON.parse(v),
+};
 import { WeeklyWatchlist } from '../../../weekly/weekly-watchlist/entities/weekly-watchlist.entity';
 import { AssetWatchlist } from '../../../weekly/weekly-watchlist/asset-watchlist/entities/asset-watchlist.entity';
 import { Asset } from '../../entities/asset.entity';
@@ -60,6 +68,24 @@ export class WatchItem {
 
   @Column({ type: 'boolean', default: false })
   finished: boolean;
+
+  /** UUIDs of analyses linked from the base asset context (order preserved). */
+  @Column({
+    type: 'text',
+    nullable: true,
+    name: 'linked_base_analysis_ids',
+    transformer: stringArrayTransformer,
+  })
+  linkedBaseAnalysisIds: string[] | null;
+
+  /** UUIDs of analyses linked from the quote asset context (order preserved). */
+  @Column({
+    type: 'text',
+    nullable: true,
+    name: 'linked_quote_analysis_ids',
+    transformer: stringArrayTransformer,
+  })
+  linkedQuoteAnalysisIds: string[] | null;
 
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;

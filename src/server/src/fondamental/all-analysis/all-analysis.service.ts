@@ -17,6 +17,8 @@ export type AllAnalysisRow = {
   createdAt: string;
   scopeLabel: string | null;
   globalFullScope: boolean;
+  /** For scoped global analyses: asset UUIDs in scope; null for full-global or asset rows */
+  scopedAssetIds: string[] | null;
   assetId: string | null;
   assetName: string | null;
   assetType: string | null;
@@ -61,6 +63,12 @@ export class AllAnalysisService {
     const globalMapped = await Promise.all(
       globalRows.map(async (ga) => {
         const scopeLabel = await this.scopeDisplay(ga.scope);
+        const scopedAssetIds =
+          ga.scope === 'global'
+            ? null
+            : Array.isArray(ga.scope)
+              ? ga.scope.filter(Boolean)
+              : null;
         return {
           id: ga.id,
           source: 'global' as const,
@@ -73,6 +81,7 @@ export class AllAnalysisService {
           createdAt: ga.createdAt.toISOString(),
           scopeLabel: scopeLabel || null,
           globalFullScope: ga.scope === 'global',
+          scopedAssetIds,
           assetId: null,
           assetName: null,
           assetType: null,
@@ -100,6 +109,7 @@ export class AllAnalysisService {
         createdAt: a.createdAt.toISOString(),
         scopeLabel: a.scopeLabel ?? a.asset?.name ?? null,
         globalFullScope: a.scopeLabel === 'GLOBAL',
+        scopedAssetIds: null,
         assetId: a.assetId ?? null,
         assetName: a.asset?.name ?? null,
         assetType: a.asset?.type ?? null,
@@ -117,6 +127,19 @@ export class AllAnalysisService {
     return [...assetMapped, ...normalizedGlobals].sort(
       (x, y) => new Date(x.createdAt).getTime() - new Date(y.createdAt).getTime(),
     );
+  }
+
+  /** Analyses visible for a single asset: its asset-page analyses + global (full + scoped to this asset). */
+  async findAllForAsset(assetId: string): Promise<AllAnalysisRow[]> {
+    const rows = await this.findAll();
+    return rows.filter((row) => {
+      if (row.assetId === assetId) return true;
+      if (row.source === 'global') {
+        if (row.globalFullScope) return true;
+        return row.scopedAssetIds?.includes(assetId) ?? false;
+      }
+      return false;
+    });
   }
 }
 

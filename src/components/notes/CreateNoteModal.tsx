@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useCallback, useEffect, useState } from "react";
+import { useRef, useCallback, useEffect, useMemo, useState } from "react";
 import { Bold, Italic, Underline } from "lucide-react";
 import { Dialog, DialogContent } from "@/components/ui/Dialog";
 import { useAnalysisEditorPaste } from "@/hooks/useAnalysisEditorPaste";
@@ -8,6 +8,7 @@ import { deleteStoredImage } from "@/lib/imageUpload";
 import { ConfirmDeleteDialog } from "@/components/ui/ConfirmDeleteDialog";
 import { getImageUrl } from "@/lib/imageUrls";
 import type { Note, NoteTier, NoteType } from "@/types/api";
+import { clearDraft, loadDraftJson, saveDraftJson } from "@/lib/form-drafts";
 
 const TIER_OPTIONS: { value: NoteTier; label: string }[] = [
   { value: "tier_1", label: "Tier 1" },
@@ -37,6 +38,15 @@ function normalizeNoteHtml(html: string): string {
   return trimmed;
 }
 
+type NoteModalDraftV1 = {
+  v: 1;
+  title: string;
+  tier: NoteTier;
+  type: NoteType;
+  html: string;
+  imagePaths: string[];
+};
+
 export function CreateNoteModal({
   open,
   onOpenChange,
@@ -44,8 +54,8 @@ export function CreateNoteModal({
   initialNote,
   onSubmit,
 }: CreateNoteModalProps) {
-  const titleRef = useRef<HTMLInputElement>(null);
   const editorRef = useRef<HTMLDivElement>(null);
+  const [noteTitle, setNoteTitle] = useState("");
   const [tier, setTier] = useState<NoteTier>("tier_2");
   const [type, setType] = useState<NoteType>("other");
   const [noteImages, setNoteImages] = useState<Array<{ path: string; url: string }>>([]);
@@ -53,6 +63,12 @@ export function CreateNoteModal({
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [imagePendingRemove, setImagePendingRemove] = useState<string | null>(null);
+  const [editorPersistBump, setEditorPersistBump] = useState(0);
+
+  const draftStorageKey = useMemo(
+    () => `notes-modal:${mode}:${initialNote?.id ?? "new"}`,
+    [mode, initialNote?.id],
+  );
 
   const { handlePaste } = useAnalysisEditorPaste({
     editorRef,
@@ -67,24 +83,62 @@ export function CreateNoteModal({
       setZoomedImageSrc(null);
       return;
     }
+    const stored = loadDraftJson<NoteModalDraftV1>(draftStorageKey);
+    if (stored?.v === 1) {
+      setNoteTitle(stored.title ?? "");
+      setTier(stored.tier ?? "tier_2");
+      setType(stored.type ?? "other");
+      setNoteImages((stored.imagePaths ?? []).map((path) => ({ path, url: getImageUrl(path) })));
+      const html = stored.html ?? "";
+      const applyDraft = () => {
+        if (editorRef.current) editorRef.current.innerHTML = html;
+      };
+      applyDraft();
+      const t = setTimeout(applyDraft, 0);
+      const t2 = setTimeout(applyDraft, 50);
+      return () => {
+        clearTimeout(t);
+        clearTimeout(t2);
+      };
+    }
     const title = initialNote?.title ?? "";
     const noteHtml = initialNote?.note ?? "";
+    setNoteTitle(title);
     setTier((initialNote?.tier ?? "tier_2") as NoteTier);
     setType((initialNote?.type ?? "other") as NoteType);
     const images = initialNote?.images ?? [];
     setNoteImages(images.map((path) => ({ path, url: getImageUrl(path) })));
     const applyInitial = () => {
-      if (titleRef.current) titleRef.current.value = title;
       if (editorRef.current) editorRef.current.innerHTML = noteHtml;
     };
-    // Defer so DialogContent is mounted and refs are set (Radix renders in portal after open)
     const t = setTimeout(applyInitial, 0);
     const t2 = setTimeout(applyInitial, 50);
     return () => {
       clearTimeout(t);
       clearTimeout(t2);
     };
-  }, [open, initialNote?.id, initialNote?.title, initialNote?.note, initialNote?.tier, initialNote?.type, initialNote?.images?.length]);
+  }, [open, draftStorageKey, initialNote?.id, initialNote?.title, initialNote?.note, initialNote?.tier, initialNote?.type, initialNote?.images?.length]);
+
+  useEffect(() => {
+    if (!open) return;
+    const t = window.setTimeout(() => {
+      const rawNote = editorRef.current?.innerHTML?.trim() ?? "";
+      const noteNorm = normalizeNoteHtml(rawNote);
+      if (!noteTitle.trim() && noteNorm === "<p></p>" && noteImages.length === 0) {
+        clearDraft(draftStorageKey);
+        return;
+      }
+      saveDraftJson(draftStorageKey, {
+        v: 1,
+        title: noteTitle,
+        tier,
+        type,
+        html: rawNote,
+        imagePaths: noteImages.map((i) => i.path),
+      } satisfies NoteModalDraftV1);
+    }, 450);
+    return () => window.clearTimeout(t);
+  }, [open, draftStorageKey, noteTitle, tier, type, noteImages, editorPersistBump]);
 
   const applyFormat = useCallback((command: "bold" | "italic" | "underline") => {
     document.execCommand(command, false);
@@ -140,7 +194,7 @@ export function CreateNoteModal({
   }, []);
 
   const handleSubmit = useCallback(async () => {
-    const title = titleRef.current?.value?.trim() ?? "";
+    const title = noteTitle.trim();
     const rawNote = editorRef.current?.innerHTML?.trim() ?? "";
     const note = normalizeNoteHtml(rawNote);
     setError("");
@@ -157,13 +211,14 @@ export function CreateNoteModal({
         type,
         images: noteImages.length ? noteImages.map((img) => img.path) : undefined,
       }));
+      clearDraft(draftStorageKey);
       onOpenChange(false);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to save note.");
     } finally {
       setSubmitting(false);
     }
-  }, [onSubmit, onOpenChange, tier, type, noteImages]);
+  }, [onSubmit, onOpenChange, tier, type, noteImages, noteTitle, draftStorageKey]);
 
   return (
     <>
@@ -190,9 +245,9 @@ export function CreateNoteModal({
             </label>
             <input
               id="note-title-input"
-              ref={titleRef}
               type="text"
-              defaultValue={initialNote?.title ?? ""}
+              value={noteTitle}
+              onChange={(e) => setNoteTitle(e.target.value)}
               placeholder="Note title"
               maxLength={500}
               spellCheck={false}
@@ -305,6 +360,7 @@ export function CreateNoteModal({
               role="textbox"
               aria-multiline="true"
               onPaste={handlePaste}
+              onInput={() => setEditorPersistBump((n) => n + 1)}
               className="min-h-[200px] min-w-0 max-w-full flex-1 w-full overflow-x-hidden overflow-y-auto break-words rounded-lg border border-sidebar-border bg-header-input px-3 py-2.5 text-sm text-dashboard-foreground placeholder:text-dashboard-foreground/50 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary [&:empty::before]:content-[attr(data-placeholder)] [&:empty::before]:text-dashboard-foreground/50 [&_h1]:text-xl [&_h1]:font-bold [&_h2]:text-lg [&_h2]:font-semibold [&_h3]:text-base [&_h3]:font-medium [&_u]:underline [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:list-decimal [&_ol]:pl-6 [&_li]:my-0.5 [&_*]:break-words [&_*]:min-w-0 [&_*]:max-w-full [&_img]:max-w-[50%] [&_img]:rounded-lg [&_img]:my-2"
               style={{ wordBreak: "break-word" } as React.CSSProperties}
               suppressContentEditableWarning

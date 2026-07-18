@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useCallback } from "react";
+import { useRef, useState, useCallback, useEffect } from "react";
 import { Bold, Italic, Underline, PenSquare } from "lucide-react";
 import { useAnalysisEditorPaste } from "@/hooks/useAnalysisEditorPaste";
 import { Dialog, DialogContent } from "@/components/ui/Dialog";
@@ -8,9 +8,13 @@ import { EventImageThumb } from "@/components/analysis/EventImageThumb";
 import { deleteStoredImage } from "@/lib/imageUpload";
 import { ConfirmDeleteDialog } from "@/components/ui/ConfirmDeleteDialog";
 import { isHtmlEffectivelyEmpty } from "@/lib/html-empty";
+import { clearDraft, loadDraftJson, saveDraftJson } from "@/lib/form-drafts";
+import { getImageUrl } from "@/lib/imageUrls";
 
 interface PostAnalysisInputProps {
   placeholder: string;
+  /** Stable key for autosaved drafts (e.g. asset id). Omit to disable persistence. */
+  draftKey?: string;
   /** Called when user clicks Create with editor HTML and selected analysis type */
   onCreated?: (payload: {
     notes: string;
@@ -28,14 +32,62 @@ const ANALYSIS_TYPES = [
   { value: "yearly", label: "Yearly" },
 ] as const;
 
-export function PostAnalysisInput({ placeholder, onCreated }: PostAnalysisInputProps) {
+type AssetComposerDraftV1 = {
+  v: 1;
+  title: string;
+  analysisType: string;
+  html: string;
+  imagePaths: string[];
+};
+
+export function PostAnalysisInput({ placeholder, onCreated, draftKey }: PostAnalysisInputProps) {
   const editorRef = useRef<HTMLDivElement>(null);
   const [zoomedImageSrc, setZoomedImageSrc] = useState<string | null>(null);
   const [streamTitle, setStreamTitle] = useState("");
   const [analysisType, setAnalysisType] = useState<string>("daily");
   const [images, setImages] = useState<Array<{ path: string; url: string }>>([]);
-  const [, setEditorBump] = useState(0);
+  const [editorBump, setEditorBump] = useState(0);
   const [imagePendingRemove, setImagePendingRemove] = useState<string | null>(null);
+  const [draftHydrated, setDraftHydrated] = useState(() => !draftKey);
+
+  useEffect(() => {
+    if (!draftKey) {
+      setDraftHydrated(true);
+      return;
+    }
+    const d = loadDraftJson<AssetComposerDraftV1>(draftKey);
+    if (d?.v === 1) {
+      setStreamTitle(d.title ?? "");
+      setAnalysisType(d.analysisType ?? "daily");
+      if (d.imagePaths?.length) {
+        setImages(d.imagePaths.map((path) => ({ path, url: getImageUrl(path) })));
+      }
+      const html = d.html ?? "";
+      queueMicrotask(() => {
+        if (editorRef.current) editorRef.current.innerHTML = html;
+      });
+    }
+    setDraftHydrated(true);
+  }, [draftKey]);
+
+  useEffect(() => {
+    if (!draftKey || !draftHydrated) return;
+    const t = window.setTimeout(() => {
+      const html = editorRef.current?.innerHTML ?? "";
+      if (isHtmlEffectivelyEmpty(html) && !streamTitle.trim() && images.length === 0) {
+        clearDraft(draftKey);
+        return;
+      }
+      saveDraftJson(draftKey, {
+        v: 1,
+        title: streamTitle,
+        analysisType,
+        html,
+        imagePaths: images.map((i) => i.path),
+      } satisfies AssetComposerDraftV1);
+    }, 450);
+    return () => window.clearTimeout(t);
+  }, [draftKey, draftHydrated, streamTitle, analysisType, images, editorBump]);
 
   const { handlePaste } = useAnalysisEditorPaste({
     editorRef,
@@ -82,7 +134,8 @@ export function PostAnalysisInput({ placeholder, onCreated }: PostAnalysisInputP
     }
     setImages([]);
     setStreamTitle("");
-  }, [analysisType, streamTitle, onCreated, images]);
+    if (draftKey) clearDraft(draftKey);
+  }, [analysisType, streamTitle, onCreated, images, draftKey]);
 
   return (
     <>

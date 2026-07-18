@@ -82,6 +82,10 @@ export interface WatchItem {
   thesis: Thesis | null;
   /** Whether the watch item is marked as finished (greyed out) */
   finished?: boolean;
+  /** Linked analysis card order for the base leg */
+  linkedBaseAnalysisIds?: string[] | null;
+  /** Linked analysis card order for the quote leg */
+  linkedQuoteAnalysisIds?: string[] | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -96,6 +100,8 @@ export interface CreateWatchItemDto {
   pairName: string;
   bias: string;
   thesis?: Thesis;
+  linkedBaseAnalysisIds?: string[];
+  linkedQuoteAnalysisIds?: string[];
 }
 
 /** Body for updating a watch item */
@@ -107,6 +113,8 @@ export interface UpdateWatchItemDto {
   bias?: string;
   thesis?: Thesis | null;
   finished?: boolean;
+  linkedBaseAnalysisIds?: string[];
+  linkedQuoteAnalysisIds?: string[];
 }
 
 export type TradeType = "buy" | "sell";
@@ -428,6 +436,8 @@ export interface AllAnalysisItem {
   createdAt: string;
   scopeLabel?: string | null;
   globalFullScope?: boolean;
+  /** Present for scoped global rows: which assets the global analysis applies to */
+  scopedAssetIds?: string[] | null;
   assetId?: string | null;
   assetName?: string | null;
   assetType?: string | null;

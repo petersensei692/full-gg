@@ -107,6 +107,14 @@ export class WatchItemsService {
       bias: createDto.bias,
       thesis: createDto.thesis || null,
       finished: createDto.finished ?? false,
+      linkedBaseAnalysisIds:
+        createDto.linkedBaseAnalysisIds && createDto.linkedBaseAnalysisIds.length > 0
+          ? createDto.linkedBaseAnalysisIds
+          : null,
+      linkedQuoteAnalysisIds:
+        createDto.linkedQuoteAnalysisIds && createDto.linkedQuoteAnalysisIds.length > 0
+          ? createDto.linkedQuoteAnalysisIds
+          : null,
     });
 
     return this.watchItemRepository.save(watchItem);
@@ -206,6 +214,14 @@ export class WatchItemsService {
     }
     if (updateDto.finished !== undefined) {
       watchItem.finished = updateDto.finished;
+    }
+    if (updateDto.linkedBaseAnalysisIds !== undefined) {
+      watchItem.linkedBaseAnalysisIds =
+        updateDto.linkedBaseAnalysisIds.length > 0 ? updateDto.linkedBaseAnalysisIds : null;
+    }
+    if (updateDto.linkedQuoteAnalysisIds !== undefined) {
+      watchItem.linkedQuoteAnalysisIds =
+        updateDto.linkedQuoteAnalysisIds.length > 0 ? updateDto.linkedQuoteAnalysisIds : null;
     }
 
     return this.watchItemRepository.save(watchItem);

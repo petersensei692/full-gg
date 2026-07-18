@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import type { StreamEntry as StreamEntryType } from "@/types/asset";
 import { Trash2, X, Star, GripVertical } from "lucide-react";
 import { AnalysisImage } from "@/components/ui/AnalysisImage";
@@ -44,6 +44,13 @@ interface StreamEntryProps {
    * Omit to keep responsive max-width bands on large viewports.
    */
   fillColumnWidth?: boolean;
+  /** Shown at vertical center inside the card area only (e.g. watch-item link picker checkbox). */
+  linkPickerOverlay?: ReactNode;
+  /**
+   * Fires after three consecutive clicks on the card (same gesture sequence).
+   * Ignores clicks that start on buttons, links, inputs, etc.
+   */
+  onTripleClick?: () => void;
 }
 
 export function StreamEntry({
@@ -60,6 +67,8 @@ export function StreamEntry({
   onEdit,
   onToggleFavorite,
   fillColumnWidth = false,
+  linkPickerOverlay,
+  onTripleClick,
 }: StreamEntryProps) {
   const [draftNames, setDraftNames] = useState<Record<string, string>>({});
   const [dragPath, setDragPath] = useState<string | null>(null);
@@ -137,7 +146,7 @@ export function StreamEntry({
   const imageGallery =
     entry.images?.map((p, i) => {
       const savedName = entry.imageNames?.[i] ?? "";
-      const dn = p in draftNames ? draftNames[p] : savedName;
+      const dn = p in draftNames ? draftNames[p] : savedName.toUpperCase();
       const fb = `Chart ${i + 1}`;
       const label = (dn || "").trim() || fb;
       return {
@@ -147,17 +156,38 @@ export function StreamEntry({
       };
     }) ?? [];
 
+  const handleCardSurfaceClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!onTripleClick || e.detail !== 3) return;
+    const target = e.target as HTMLElement;
+    if (
+      target.closest(
+        "button, a, input, textarea, select, label, [role='button'], [contenteditable='true']",
+      )
+    ) {
+      return;
+    }
+    e.preventDefault();
+    onTripleClick();
+  };
+
   return (
     <>
     <article className="pb-3 last:pb-0">
       {separatorTop}
       <div
+        title={onTripleClick ? "Triple-click this card to unlink" : undefined}
+        onClick={onTripleClick ? handleCardSurfaceClick : undefined}
         className={
           fillColumnWidth
-            ? `min-w-0 w-full max-w-full rounded-xl border border-sidebar-border border-l-4 ${borderClass} bg-sidebar/50 p-4 shadow-sm overflow-hidden antialiased [transform:translateZ(0)]`
-            : `min-w-0 w-full max-w-full sm:max-w-[90%] md:max-w-[80%] lg:max-w-[70%] xl:max-w-[60%] 2xl:max-w-[50%] rounded-xl border border-sidebar-border border-l-4 ${borderClass} bg-sidebar/50 p-4 shadow-sm overflow-hidden antialiased [transform:translateZ(0)]`
+            ? `relative min-w-0 w-full max-w-full rounded-xl border border-sidebar-border border-l-4 ${borderClass} bg-sidebar/50 p-4 shadow-sm overflow-hidden antialiased [transform:translateZ(0)]${linkPickerOverlay ? " pl-10 sm:pl-11" : ""}`
+            : `relative min-w-0 w-full max-w-full sm:max-w-[90%] md:max-w-[80%] lg:max-w-[70%] xl:max-w-[60%] 2xl:max-w-[50%] rounded-xl border border-sidebar-border border-l-4 ${borderClass} bg-sidebar/50 p-4 shadow-sm overflow-hidden antialiased [transform:translateZ(0)]${linkPickerOverlay ? " pl-10 sm:pl-11" : ""}`
         }
       >
+        {linkPickerOverlay != null ? (
+          <div className="pointer-events-auto absolute left-3 top-1/2 z-10 -translate-y-1/2 flex items-center justify-center">
+            {linkPickerOverlay}
+          </div>
+        ) : null}
         <div className="flex items-center justify-between gap-2 mb-2">
           <div className={`text-xs font-semibold uppercase tracking-wider ${textColorClass}`}>
             {entry.tag} • {entry.time}
@@ -231,7 +261,8 @@ export function StreamEntry({
             {entry.images.map((path, index) => {
               const url = getImageUrl(path);
               const savedName = entry.imageNames?.[index] ?? "";
-              const displayName = path in draftNames ? draftNames[path] : savedName;
+              const displayName =
+                path in draftNames ? draftNames[path] : savedName.toUpperCase();
               const fallbackLabel = `Chart ${index + 1}`;
               return (
                 <div
@@ -278,9 +309,12 @@ export function StreamEntry({
                   <textarea
                     value={displayName}
                     spellCheck={false}
-                    onChange={(e) => setDraftNames((prev) => ({ ...prev, [path]: e.target.value }))}
+                    autoCapitalize="characters"
+                    onChange={(e) =>
+                      setDraftNames((prev) => ({ ...prev, [path]: e.target.value.toUpperCase() }))
+                    }
                     onBlur={(e) => {
-                      const value = (e.target.value || "").trim();
+                      const value = (e.target.value || "").trim().toUpperCase();
                       onUpdateImageName?.(path, value);
                       setDraftNames((prev) => {
                         const next = { ...prev };
@@ -290,7 +324,7 @@ export function StreamEntry({
                     }}
                     placeholder={fallbackLabel}
                     rows={1}
-                    className="resize-none px-3 py-2 border-b border-sidebar-border bg-sidebar/80 text-xs font-semibold uppercase tracking-wider text-dashboard-foreground placeholder:text-dashboard-foreground/50 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary w-full min-w-0 break-words overflow-auto rounded-none"
+                    className="resize-none px-3 py-2 border-b border-sidebar-border bg-sidebar/80 text-xs font-semibold uppercase tracking-wider text-dashboard-foreground placeholder:text-dashboard-foreground/50 placeholder:uppercase focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary focus:uppercase w-full min-w-0 break-words overflow-auto rounded-none"
                   />
                   <div className="relative w-full min-h-[120px]">
                     <AnalysisImage

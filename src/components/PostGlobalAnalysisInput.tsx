@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useCallback, useMemo } from "react";
+import { useRef, useState, useCallback, useMemo, useEffect } from "react";
 import { Bold, Italic, Underline, PenSquare, Check, ChevronDown } from "lucide-react";
 import { useAnalysisEditorPaste } from "@/hooks/useAnalysisEditorPaste";
 import { Dialog, DialogContent } from "@/components/ui/Dialog";
@@ -9,6 +9,8 @@ import { deleteStoredImage } from "@/lib/imageUpload";
 import { ConfirmDeleteDialog } from "@/components/ui/ConfirmDeleteDialog";
 import { isHtmlEffectivelyEmpty } from "@/lib/html-empty";
 import type { AssetConfig } from "@/types/asset";
+import { clearDraft, loadDraftJson, saveDraftJson } from "@/lib/form-drafts";
+import { getImageUrl } from "@/lib/imageUrls";
 
 const ASSET_TYPE_ORDER = ["currency", "commodity", "stocks", "crypto"] as const;
 const ASSET_TYPE_LABELS: Record<string, string> = {
@@ -36,6 +38,8 @@ function getAssetType(asset: AssetConfig): string {
 interface PostGlobalAnalysisInputProps {
   placeholder: string;
   assets: AssetConfig[];
+  /** localStorage key for drafts (default: global-analysis-compose) */
+  draftKey?: string;
   onCreated?: (payload: {
     notes: string;
     images: string[];
@@ -54,10 +58,21 @@ const ANALYSIS_TYPES = [
   { value: "yearly", label: "Yearly" },
 ] as const;
 
+type GlobalComposerDraftV1 = {
+  v: 1;
+  title: string;
+  scopeMode: "global" | "assets";
+  selectedAssetIds: string[];
+  analysisType: string;
+  html: string;
+  imagePaths: string[];
+};
+
 export function PostGlobalAnalysisInput({
   placeholder,
   assets,
   onCreated,
+  draftKey = "global-analysis-compose",
 }: PostGlobalAnalysisInputProps) {
   const editorRef = useRef<HTMLDivElement>(null);
   const [zoomedImageSrc, setZoomedImageSrc] = useState<string | null>(null);
@@ -67,8 +82,59 @@ export function PostGlobalAnalysisInput({
   const [analysisType, setAnalysisType] = useState<string>("daily");
   const [assetsDropdownOpen, setAssetsDropdownOpen] = useState(false);
   const [images, setImages] = useState<Array<{ path: string; url: string }>>([]);
-  const [, setEditorBump] = useState(0);
+  const [editorBump, setEditorBump] = useState(0);
   const [imagePendingRemove, setImagePendingRemove] = useState<string | null>(null);
+  const [draftHydrated, setDraftHydrated] = useState(() => false);
+
+  useEffect(() => {
+    const d = loadDraftJson<GlobalComposerDraftV1>(draftKey);
+    if (d?.v === 1) {
+      setStreamTitle(d.title ?? "");
+      setScopeMode(d.scopeMode ?? "global");
+      setSelectedAssetIds(new Set(d.selectedAssetIds ?? []));
+      setAnalysisType(d.analysisType ?? "daily");
+      if (d.imagePaths?.length) {
+        setImages(d.imagePaths.map((path) => ({ path, url: getImageUrl(path) })));
+      }
+      const html = d.html ?? "";
+      queueMicrotask(() => {
+        if (editorRef.current) editorRef.current.innerHTML = html;
+      });
+    }
+    setDraftHydrated(true);
+  }, [draftKey]);
+
+  useEffect(() => {
+    if (!draftHydrated) return;
+    const t = window.setTimeout(() => {
+      const html = editorRef.current?.innerHTML ?? "";
+      const emptyBody =
+        isHtmlEffectivelyEmpty(html) && !streamTitle.trim() && images.length === 0;
+      if (emptyBody && (scopeMode === "global" || selectedAssetIds.size === 0)) {
+        clearDraft(draftKey);
+        return;
+      }
+      saveDraftJson(draftKey, {
+        v: 1,
+        title: streamTitle,
+        scopeMode,
+        selectedAssetIds: Array.from(selectedAssetIds),
+        analysisType,
+        html,
+        imagePaths: images.map((i) => i.path),
+      } satisfies GlobalComposerDraftV1);
+    }, 450);
+    return () => window.clearTimeout(t);
+  }, [
+    draftKey,
+    draftHydrated,
+    streamTitle,
+    scopeMode,
+    selectedAssetIds,
+    analysisType,
+    images,
+    editorBump,
+  ]);
 
   const { handlePaste } = useAnalysisEditorPaste({
     editorRef,
@@ -150,7 +216,8 @@ export function PostGlobalAnalysisInput({
     setImages([]);
     setStreamTitle("");
     setEditorBump((n) => n + 1);
-  }, [scopeMode, selectedAssetIds, analysisType, streamTitle, onCreated, images]);
+    clearDraft(draftKey);
+  }, [scopeMode, selectedAssetIds, analysisType, streamTitle, onCreated, images, draftKey]);
 
   const scopeOk =
     scopeMode === "global" || (scopeMode === "assets" && selectedAssetIds.size > 0);

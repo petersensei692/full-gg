@@ -14,7 +14,7 @@ type FavoritesAnalysisSidebarProps = {
 };
 
 /**
- * Overlays the analysis shell (header + filters + stream): **50% width** from the right,
+ * Overlays the analysis shell (header + filters + stream): **75vw** from `md` up, **90vw** on small screens,
  * slides in/out horizontally with a backdrop. Parent must be `relative` and wrap the area to cover.
  * Place **below** the stream row in DOM but use `absolute inset-0` so it still covers header + filters + stream.
  * Keep the composer **outside** this overlay’s parent or with higher z-index.
@@ -111,7 +111,9 @@ export function FavoritesAnalysisSidebar({
       />
       <aside
         className={[
-          "absolute right-0 top-0 flex h-full w-1/2 min-w-0 flex-col border-l border-sidebar-border bg-sidebar text-dashboard-foreground shadow-xl",
+          "absolute right-0 top-0 flex h-full min-w-0 flex-col border-l border-sidebar-border bg-sidebar text-dashboard-foreground shadow-xl",
+          /* Narrowest: 90vw; from md up (including wide/desktop): 75vw */
+          "w-[90vw] max-w-[90vw] md:w-[75vw] md:max-w-[75vw]",
           "transition-transform duration-300 ease-out will-change-transform",
           open ? "translate-x-0" : "translate-x-full",
         ].join(" ")}

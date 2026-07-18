@@ -326,7 +326,8 @@ export function GlobalAnalysisView({ favoritesWindow = false }: { favoritesWindo
     return entries.sort((a, b) => (a.createdAt ?? 0) - (b.createdAt ?? 0));
   }, [visibleGlobalList]);
 
-  const filteredEntries = useMemo(() => {
+  /** All stream filters except the “Favorites” toggle — used so the favorites sidebar always lists favorites under the same filters, independent of that toggle. */
+  const entriesAfterFiltersExceptFavoritesToggle = useMemo(() => {
     let entries = mappedEntries;
     if (analysisFilter !== "all") {
       entries = entries.filter((e) => (e.analysisType ?? "daily") === analysisFilter);
@@ -354,21 +355,31 @@ export function GlobalAnalysisView({ favoritesWindow = false }: { favoritesWindo
     if (favoritesWindow) {
       entries = entries.filter((e) => e.favorite);
     }
+    return entries;
+  }, [mappedEntries, analysisFilter, dateRange, favoritesWindow]);
+
+  const filteredEntries = useMemo(() => {
+    let entries = entriesAfterFiltersExceptFavoritesToggle;
     if (!favoritesOnly) {
       entries = entries.filter((e) => !e.favorite);
     }
     return entries;
-  }, [mappedEntries, analysisFilter, dateRange, favoritesWindow, favoritesOnly]);
+  }, [entriesAfterFiltersExceptFavoritesToggle, favoritesOnly]);
+
+  const sidebarFavoriteEntries = useMemo(
+    () => entriesAfterFiltersExceptFavoritesToggle.filter((e) => e.favorite),
+    [entriesAfterFiltersExceptFavoritesToggle]
+  );
 
   const entriesWithGroups = useMemo(
     () => buildStreamEntryGroups(filteredEntries),
     [filteredEntries]
   );
 
-  const favoritesEntriesWithGroups = useMemo(() => {
-    const favOnly = filteredEntries.filter((e) => e.favorite);
-    return buildStreamEntryGroups(favOnly);
-  }, [filteredEntries]);
+  const favoritesEntriesWithGroups = useMemo(
+    () => buildStreamEntryGroups(sidebarFavoriteEntries),
+    [sidebarFavoriteEntries]
+  );
 
   const handleExportEntries = useCallback((entries: StreamEntry[], kind: "main" | "favorites") => {
     const text = buildAnalysisExportText(entries);
@@ -472,7 +483,7 @@ export function GlobalAnalysisView({ favoritesWindow = false }: { favoritesWindo
   );
 
   const globalHeaderBar = (
-    <div className="h-11 shrink-0 flex items-center gap-3 px-4 sm:px-6 border-b border-sidebar-border overflow-visible">
+    <div className="h-11 shrink-0 flex items-center gap-3 border-b border-sidebar-border overflow-visible pl-4 sm:pl-6 pr-6 sm:pr-10">
       <SidebarTrigger />
       <div className="relative shrink-0">
         <button
@@ -651,8 +662,8 @@ export function GlobalAnalysisView({ favoritesWindow = false }: { favoritesWindo
                 open={favoritesSidebarOpen}
                 onOpenChange={setFavoritesSidebarOpen}
                 title="Favorite analyses"
-                onExport={() => handleExportEntries(filteredEntries.filter((e) => e.favorite), "favorites")}
-                exportDisabled={filteredEntries.filter((e) => e.favorite).length === 0}
+                onExport={() => handleExportEntries(sidebarFavoriteEntries, "favorites")}
+                exportDisabled={sidebarFavoriteEntries.length === 0}
               >
                 {favoritesPanel}
               </FavoritesAnalysisSidebar>
@@ -681,6 +692,7 @@ export function GlobalAnalysisView({ favoritesWindow = false }: { favoritesWindo
           initialAnalysisType={editing.analysisType ?? "daily"}
           globalScopeEditor={{ initialScope: editing.scope, assets }}
           onSubmit={handleEditSubmit}
+          draftKey={`analysis-edit:${editing.id}`}
         />
       )}
     </>

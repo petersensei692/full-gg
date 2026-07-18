@@ -1,4 +1,4 @@
-import { Controller, Get } from '@nestjs/common';
+import { Controller, Get, Query } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { AllAnalysisService } from './all-analysis.service';
 
@@ -8,8 +8,15 @@ export class AllAnalysisController {
   constructor(private readonly allAnalysisService: AllAnalysisService) {}
 
   @Get()
-  @ApiOperation({ summary: 'List all analyses (global + asset) in chronological order' })
-  findAll() {
+  @ApiOperation({
+    summary:
+      'List all analyses (global + asset) in chronological order; optional assetId filters to analyses relevant for that asset',
+  })
+  findAll(@Query('assetId') assetId?: string) {
+    const id = assetId?.trim();
+    if (id) {
+      return this.allAnalysisService.findAllForAsset(id);
+    }
     return this.allAnalysisService.findAll();
   }
 }

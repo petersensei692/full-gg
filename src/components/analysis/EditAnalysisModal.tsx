@@ -9,6 +9,7 @@ import { EventImageThumb } from "@/components/analysis/EventImageThumb";
 import { deleteStoredImage } from "@/lib/imageUpload";
 import { ConfirmDeleteDialog } from "@/components/ui/ConfirmDeleteDialog";
 import type { AssetConfig } from "@/types/asset";
+import { clearDraft, loadDraftJson, saveDraftJson } from "@/lib/form-drafts";
 
 const ANALYSIS_TYPES = [
   { value: "daily", label: "Daily" },
@@ -65,7 +66,19 @@ interface EditAnalysisModalProps {
     initialScope: "global" | string[];
     assets: AssetConfig[];
   };
+  /** Restore/save unsaved edits when navigating away (same key as analysis id). */
+  draftKey?: string;
 }
+
+type AnalysisEditDraftV1 = {
+  v: 1;
+  title: string;
+  html: string;
+  images: string[];
+  analysisType: string;
+  scopeMode?: "global" | "assets";
+  selectedAssetIds?: string[];
+};
 
 export function EditAnalysisModal({
   open,
@@ -76,6 +89,7 @@ export function EditAnalysisModal({
   onSubmit,
   initialAnalysisType,
   globalScopeEditor,
+  draftKey,
 }: EditAnalysisModalProps) {
   const editorRef = useRef<HTMLDivElement>(null);
   const [images, setImages] = useState<string[]>([]);
@@ -86,6 +100,7 @@ export function EditAnalysisModal({
   const [assetsDropdownOpen, setAssetsDropdownOpen] = useState(false);
   const [scopeError, setScopeError] = useState("");
   const [imagePendingRemove, setImagePendingRemove] = useState<string | null>(null);
+  const [draftBump, setDraftBump] = useState(0);
 
   const assetsWithIds = useMemo(
     () => (globalScopeEditor?.assets ?? []).filter((a) => !!a.id),
@@ -105,10 +120,47 @@ export function EditAnalysisModal({
 
   useEffect(() => {
     if (!open) return;
+    setScopeError("");
+    const stored =
+      draftKey != null && draftKey !== ""
+        ? loadDraftJson<AnalysisEditDraftV1>(draftKey)
+        : null;
+    if (stored?.v === 1) {
+      setStreamTitle(stored.title ?? "");
+      setImages(stored.images ?? []);
+      setAnalysisType(stored.analysisType ?? initialAnalysisType ?? "daily");
+      if (globalScopeEditor && stored.scopeMode) {
+        setScopeMode(stored.scopeMode);
+        setSelectedAssetIds(new Set(stored.selectedAssetIds ?? []));
+      } else if (globalScopeEditor) {
+        const init = globalScopeEditor.initialScope;
+        if (init === "global") {
+          setScopeMode("global");
+          setSelectedAssetIds(new Set());
+        } else {
+          setScopeMode("assets");
+          setSelectedAssetIds(new Set(init.filter(Boolean)));
+        }
+      } else {
+        setScopeMode("global");
+        setSelectedAssetIds(new Set());
+      }
+      const html = stored.html ?? "";
+      const applyDraft = () => {
+        if (editorRef.current) editorRef.current.innerHTML = html;
+      };
+      applyDraft();
+      const t = setTimeout(applyDraft, 0);
+      const t2 = setTimeout(applyDraft, 50);
+      return () => {
+        clearTimeout(t);
+        clearTimeout(t2);
+      };
+    }
+
     setStreamTitle(initialTitle);
     setImages(initialImages);
     setAnalysisType(initialAnalysisType ?? "daily");
-    setScopeError("");
     if (globalScopeEditor) {
       const init = globalScopeEditor.initialScope;
       if (init === "global") {
@@ -134,7 +186,37 @@ export function EditAnalysisModal({
       clearTimeout(t);
       clearTimeout(t2);
     };
-  }, [open, initialTitle, initialNotes, initialImages, initialAnalysisType, globalScopeEditor]);
+  }, [open, draftKey, initialTitle, initialNotes, initialImages, initialAnalysisType, globalScopeEditor]);
+
+  useEffect(() => {
+    if (!open || !draftKey) return;
+    const t = window.setTimeout(() => {
+      saveDraftJson(draftKey, {
+        v: 1,
+        title: streamTitle,
+        html: editorRef.current?.innerHTML ?? "",
+        images,
+        analysisType,
+        ...(globalScopeEditor
+          ? {
+              scopeMode,
+              selectedAssetIds: Array.from(selectedAssetIds),
+            }
+          : {}),
+      } satisfies AnalysisEditDraftV1);
+    }, 450);
+    return () => window.clearTimeout(t);
+  }, [
+    open,
+    draftKey,
+    streamTitle,
+    images,
+    analysisType,
+    scopeMode,
+    selectedAssetIds,
+    draftBump,
+    globalScopeEditor,
+  ]);
 
   const { handlePaste } = useAnalysisEditorPaste({
     editorRef,
@@ -203,6 +285,7 @@ export function EditAnalysisModal({
     } else {
       onSubmit({ notes, images, title: titleNorm });
     }
+    if (draftKey) clearDraft(draftKey);
     onOpenChange(false);
   };
 
@@ -394,6 +477,7 @@ export function EditAnalysisModal({
               spellCheck={false}
               data-placeholder="Update your analysis notes..."
               onPaste={handlePaste}
+              onInput={() => setDraftBump((n) => n + 1)}
               className="min-h-[120px] max-h-[300px] w-full min-w-0 overflow-y-auto overflow-x-hidden rounded-b-lg rounded-t-none border border-sidebar-border bg-header-input px-3 py-2.5 text-sm text-dashboard-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary break-words antialiased [&:empty::before]:content-[attr(data-placeholder)] [&:empty::before]:text-dashboard-foreground/50 [&_*]:break-words [&_img]:max-w-[min(50%,480px)] [&_img]:max-h-[200px] [&_img]:w-auto [&_img]:h-auto [&_img]:object-contain [&_img]:rounded-lg [&_img]:cursor-pointer [&_img]:block [&_img]:my-2 [&_u]:underline [&_h1]:text-xl [&_h1]:font-bold [&_h2]:text-lg [&_h2]:font-semibold [&_h3]:text-base [&_h3]:font-medium"
               suppressContentEditableWarning
               suppressHydrationWarning

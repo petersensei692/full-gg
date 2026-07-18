@@ -129,7 +129,7 @@ export function AnalysisImage({
         <DialogContent showClose={true} className="bg-black/95 border-0">
           <div className="relative w-full h-[90dvh] flex flex-col items-center justify-center">
             {showCaption && (
-              <p className="text-sm font-medium text-white/90 text-center px-4 py-2 shrink-0">
+              <p className="text-sm font-semibold uppercase tracking-wider text-white/90 text-center px-4 py-2 shrink-0">
                 {display.caption}
               </p>
             )}

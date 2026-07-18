@@ -1,5 +1,14 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsNotEmpty, IsString, IsUUID, MaxLength, ValidateNested, IsOptional, IsArray, IsBoolean } from 'class-validator';
+import {
+  IsNotEmpty,
+  IsString,
+  IsUUID,
+  MaxLength,
+  ValidateNested,
+  IsOptional,
+  IsArray,
+  IsBoolean,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 
 class ThesisDto {
@@ -75,4 +84,16 @@ export class CreateWatchItemDto {
   @IsOptional()
   @IsBoolean()
   finished?: boolean;
+
+  @ApiPropertyOptional({ description: 'Linked analysis UUIDs for the base asset panel', type: [String] })
+  @IsOptional()
+  @IsArray()
+  @IsUUID('4', { each: true })
+  linkedBaseAnalysisIds?: string[];
+
+  @ApiPropertyOptional({ description: 'Linked analysis UUIDs for the quote asset panel', type: [String] })
+  @IsOptional()
+  @IsArray()
+  @IsUUID('4', { each: true })
+  linkedQuoteAnalysisIds?: string[];
 }

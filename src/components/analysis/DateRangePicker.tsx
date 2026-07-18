@@ -75,17 +75,40 @@ interface DateRangePickerProps {
   className?: string;
   /** Open the calendar popup beside the trigger (to the right) instead of below. */
   dropdownPlacement?: "below" | "beside";
+  /**
+   * Horizontal alignment for `below` placement: leading edge of trigger vs panel.
+   * `start` = panel left aligns with trigger left (calendar sits under the button).
+   */
+  dropdownAlign?: "start" | "end";
+  /** Smaller padding, grid, and panel width (e.g. nested filter popovers). */
+  compact?: boolean;
+  /**
+   * When `false`, the panel is not portaled to `document.body` and stays in the React tree.
+   * Use inside nested dialogs so the panel remains a descendant of the dialog content (Radix will not treat it as an outside interaction).
+   * @default true
+   */
+  portal?: boolean;
+  /** Notified when the calendar dropdown opens or closes (parent dialogs can suppress Radix dismiss). */
+  onDropdownOpenChange?: (open: boolean) => void;
 }
 
-const PANEL_WIDTH = 320;
-const PANEL_HEIGHT_EST = 440;
+const PANEL_WIDTH_DEFAULT = 320;
+const PANEL_WIDTH_COMPACT = 260;
+const PANEL_HEIGHT_EST_DEFAULT = 440;
+const PANEL_HEIGHT_EST_COMPACT = 360;
 
 export function DateRangePicker({
   value,
   onChange,
   className = "",
   dropdownPlacement = "below",
+  dropdownAlign = "end",
+  compact = false,
+  portal = true,
+  onDropdownOpenChange,
 }: DateRangePickerProps) {
+  const panelWidth = compact ? PANEL_WIDTH_COMPACT : PANEL_WIDTH_DEFAULT;
+  const panelHeightEst = compact ? PANEL_HEIGHT_EST_COMPACT : PANEL_HEIGHT_EST_DEFAULT;
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState<DateRange>(value);
   const [currentMonth, setCurrentMonth] = useState(() => new Date());
@@ -98,31 +121,43 @@ export function DateRangePicker({
     if (open) setDraft(value);
   }, [open, value]);
 
+  useEffect(() => {
+    onDropdownOpenChange?.(open);
+  }, [open, onDropdownOpenChange]);
+
   const updateDropdownPosition = useCallback(() => {
     if (!open || !containerRef.current) return;
     const rect = containerRef.current.getBoundingClientRect();
-    const gap = 8;
+    const gap = compact ? 4 : 8;
     let top: number;
     let left: number;
     if (dropdownPlacement === "beside") {
       left = rect.right + gap;
       top = rect.top;
-      if (left + PANEL_WIDTH > window.innerWidth - gap) {
-        left = rect.left - PANEL_WIDTH - gap;
+      if (left + panelWidth > window.innerWidth - gap) {
+        left = rect.left - panelWidth - gap;
       }
       if (left < gap) left = gap;
-      if (top + PANEL_HEIGHT_EST > window.innerHeight - gap) {
-        top = Math.max(gap, window.innerHeight - gap - PANEL_HEIGHT_EST);
+      if (top + panelHeightEst > window.innerHeight - gap) {
+        top = Math.max(gap, window.innerHeight - gap - panelHeightEst);
       }
     } else {
       top = rect.bottom + gap;
-      left = Math.max(0, rect.left + rect.width - PANEL_WIDTH);
-      if (left + PANEL_WIDTH > window.innerWidth - gap) {
-        left = Math.max(gap, window.innerWidth - gap - PANEL_WIDTH);
+      if (dropdownAlign === "start") {
+        left = rect.left;
+        if (left + panelWidth > window.innerWidth - gap) {
+          left = Math.max(gap, window.innerWidth - gap - panelWidth);
+        }
+      } else {
+        left = Math.max(0, rect.left + rect.width - panelWidth);
+        if (left + panelWidth > window.innerWidth - gap) {
+          left = Math.max(gap, window.innerWidth - gap - panelWidth);
+        }
       }
+      if (left < gap) left = gap;
     }
     setDropdownPos({ top, left });
-  }, [open, dropdownPlacement]);
+  }, [open, dropdownPlacement, dropdownAlign, compact, panelWidth, panelHeightEst]);
 
   useLayoutEffect(() => {
     if (!open) {
@@ -144,7 +179,10 @@ export function DateRangePicker({
     const onDocClick = (e: MouseEvent) => {
       const target = e.target as Node;
       const inTrigger = containerRef.current?.contains(target);
-      const inDropdown = dropdownRef.current?.contains(target);
+      let inDropdown = dropdownRef.current?.contains(target);
+      if (!inDropdown && dropdownRef.current && typeof e.composedPath === "function") {
+        inDropdown = e.composedPath().includes(dropdownRef.current);
+      }
       if (!inTrigger && !inDropdown) setOpen(false);
     };
     document.addEventListener("mousedown", onDocClick);
@@ -186,49 +224,53 @@ export function DateRangePicker({
   const renderCalendar = (year: number, month: number) => {
     const days = getDaysInMonth(year, month);
     const monthLabel = new Date(year, month).toLocaleDateString("en-US", { month: "long", year: "numeric" });
+    const navIcon = compact ? "h-3 w-3" : "h-4 w-4";
+    const dayCell = compact ? "w-7 h-7 text-[10px]" : "w-8 h-8 text-xs";
+    const dowLabel = compact ? "text-[9px] py-0.5" : "text-[10px] py-1";
+    const headerMonth = compact ? "text-xs" : "text-sm";
     return (
       <div className="flex flex-col">
-        <div className="flex items-center justify-between mb-2">
-          <span className="text-sm font-medium text-dashboard-foreground">{monthLabel}</span>
+        <div className={`flex items-center justify-between ${compact ? "mb-1.5" : "mb-2"}`}>
+          <span className={`font-medium text-dashboard-foreground ${headerMonth}`}>{monthLabel}</span>
           <div className="flex gap-0.5">
             <button
               type="button"
               onClick={() => setCurrentMonth((m) => addMonths(m, -12))}
-              className="p-1 rounded text-dashboard-foreground/70 hover:bg-sidebar-hover"
+              className={`${compact ? "p-0.5" : "p-1"} rounded text-dashboard-foreground/70 hover:bg-sidebar-hover`}
               aria-label="Previous year"
             >
-              <ChevronsLeft className="h-4 w-4" />
+              <ChevronsLeft className={navIcon} />
             </button>
             <button
               type="button"
               onClick={() => setCurrentMonth((m) => addMonths(m, -1))}
-              className="p-1 rounded text-dashboard-foreground/70 hover:bg-sidebar-hover"
+              className={`${compact ? "p-0.5" : "p-1"} rounded text-dashboard-foreground/70 hover:bg-sidebar-hover`}
               aria-label="Previous month"
             >
-              <ChevronLeft className="h-4 w-4" />
+              <ChevronLeft className={navIcon} />
             </button>
             <button
               type="button"
               onClick={() => setCurrentMonth((m) => addMonths(m, 1))}
-              className="p-1 rounded text-dashboard-foreground/70 hover:bg-sidebar-hover"
+              className={`${compact ? "p-0.5" : "p-1"} rounded text-dashboard-foreground/70 hover:bg-sidebar-hover`}
               aria-label="Next month"
             >
-              <ChevronRight className="h-4 w-4" />
+              <ChevronRight className={navIcon} />
             </button>
             <button
               type="button"
               onClick={() => setCurrentMonth((m) => addMonths(m, 12))}
-              className="p-1 rounded text-dashboard-foreground/70 hover:bg-sidebar-hover"
+              className={`${compact ? "p-0.5" : "p-1"} rounded text-dashboard-foreground/70 hover:bg-sidebar-hover`}
               aria-label="Next year"
             >
-              <ChevronsRight className="h-4 w-4" />
+              <ChevronsRight className={navIcon} />
             </button>
           </div>
         </div>
         <div className="grid grid-cols-7 gap-0.5 text-center">
           {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
-            <div key={day} className="text-[10px] font-medium text-dashboard-foreground/60 py-1">
-              {day}
+            <div key={day} className={`font-medium text-dashboard-foreground/60 ${dowLabel}`}>
+              {compact ? day.slice(0, 2) : day}
             </div>
           ))}
           {days.map((d, i) => {
@@ -244,7 +286,7 @@ export function DateRangePicker({
                 disabled={isEmpty}
                 onClick={() => handleDateClick(d)}
                 className={`
-                  w-8 h-8 text-xs rounded
+                  ${dayCell} rounded
                   ${isEmpty ? "invisible" : ""}
                   ${isStart || isEnd ? "bg-primary text-primary-foreground font-medium" : ""}
                   ${inRange && !isStart && !isEnd ? "bg-primary/30 text-dashboard-foreground" : ""}
@@ -261,32 +303,41 @@ export function DateRangePicker({
     );
   };
 
-  const dropdownContent = open && dropdownPos && typeof document !== "undefined" && (
+  const dropdownContent =
+    open &&
+    dropdownPos && (
     <div
       ref={(el) => { dropdownRef.current = el; }}
       data-date-range-picker-panel="true"
-      className="fixed z-[20000] rounded-xl border border-sidebar-border bg-sidebar shadow-xl p-4 w-[320px] max-w-[min(320px,calc(100vw-16px))]"
+      className={`fixed isolate rounded-xl border border-sidebar-border bg-sidebar shadow-xl ${
+        compact ? "p-3 max-w-[min(260px,calc(100vw-16px))]" : "p-4 max-w-[min(320px,calc(100vw-16px))]"
+      } ${portal ? "z-[20000]" : "z-[200]"}`}
       style={{
         top: dropdownPos.top,
         left: dropdownPos.left,
+        width: panelWidth,
       }}
     >
-      <div className="mb-3">
+      <div className={compact ? "mb-2" : "mb-3"}>
         <label className="block text-xs font-medium text-dashboard-foreground/70 mb-1">Date Range</label>
-        <div className="rounded-lg border border-sidebar-border bg-header-input px-3 py-2 text-sm text-dashboard-foreground">
+        <div
+          className={`rounded-lg border border-sidebar-border bg-header-input text-dashboard-foreground ${
+            compact ? "px-2 py-1.5 text-xs" : "px-3 py-2 text-sm"
+          }`}
+        >
           {formatRange(draft)}
         </div>
       </div>
-      <div className="mb-4">
+      <div className={compact ? "mb-2" : "mb-4"}>
         {renderCalendar(currentMonth.getFullYear(), currentMonth.getMonth())}
       </div>
-      <div className="flex flex-wrap gap-2 mb-4">
+      <div className={`flex flex-wrap gap-2 ${compact ? "mb-2 gap-1.5" : "mb-4"}`}>
         {quickRanges.map(({ label, get }) => (
           <button
             key={label}
             type="button"
             onClick={() => setDraft(get())}
-            className="text-xs text-primary hover:underline underline-offset-2"
+            className={`text-primary hover:underline underline-offset-2 ${compact ? "text-[10px]" : "text-xs"}`}
           >
             {label}
           </button>
@@ -296,20 +347,24 @@ export function DateRangePicker({
         <button
           type="button"
           onClick={handleCancel}
-          className="rounded-lg border border-sidebar-border px-3 py-1.5 text-sm font-medium text-dashboard-foreground hover:bg-sidebar-hover"
+          className={`rounded-lg border border-sidebar-border font-medium text-dashboard-foreground hover:bg-sidebar-hover ${
+            compact ? "px-2 py-1 text-xs" : "px-3 py-1.5 text-sm"
+          }`}
         >
           Cancel
         </button>
         <button
           type="button"
           onClick={handleApply}
-          className="rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+          className={`rounded-lg bg-primary font-medium text-primary-foreground hover:bg-primary/90 ${
+            compact ? "px-2 py-1 text-xs" : "px-3 py-1.5 text-sm"
+          }`}
         >
           Apply
         </button>
       </div>
     </div>
-  );
+    );
 
   return (
     <div ref={containerRef} className={`relative w-full ${className}`}>
@@ -323,7 +378,9 @@ export function DateRangePicker({
         <CalendarIcon className="h-4 w-4 shrink-0 text-dashboard-foreground/60" />
       </button>
 
-      {typeof document !== "undefined" && dropdownContent && createPortal(dropdownContent, document.body)}
+      {portal
+        ? typeof document !== "undefined" && dropdownContent && createPortal(dropdownContent, document.body)
+        : dropdownContent}
     </div>
   );
 }

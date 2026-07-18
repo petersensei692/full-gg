@@ -33,7 +33,7 @@ interface WatchlistEntryCardProps {
 }
 
 const BORDER_CLASS = {
-  bullish: "border-l-4 border-l-emerald-500 border border-sidebar-border",
+  bullish: "border-l-4 border-l-primary border border-sidebar-border",
   bearish: "border-l-4 border-l-red-500 border border-sidebar-border",
 } as const;
 

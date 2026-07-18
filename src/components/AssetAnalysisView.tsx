@@ -518,7 +518,8 @@ export function AssetAnalysisView({ asset, favoritesWindow = false }: AssetAnaly
       .sort((a, b) => (a.createdAt ?? 0) - (b.createdAt ?? 0));
   }, [analyses]);
 
-  const filteredEntries = useMemo(() => {
+  /** Stream filters except the “Favorites” toggle — favorites sidebar always shows favorites that match the other active filters. */
+  const entriesAfterFiltersExceptFavoritesToggle = useMemo(() => {
     let list = mappedEntries;
     if (analysisFilter !== "all") {
       list = list.filter((e) => (e.analysisType ?? "daily") === analysisFilter);
@@ -534,28 +535,33 @@ export function AssetAnalysisView({ asset, favoritesWindow = false }: AssetAnaly
     if (favoritesWindow) {
       list = list.filter((e) => e.favorite);
     }
-    if (!favoritesOnly) {
-      list = list.filter((e) => !e.favorite);
-    }
     if (hideGlobalScoped) {
       list = list.filter((e) => !e.globalFullScope);
     }
     return list;
-  }, [mappedEntries, analysisFilter, dateRange, favoritesWindow, hideGlobalScoped, favoritesOnly]);
+  }, [mappedEntries, analysisFilter, dateRange, favoritesWindow, hideGlobalScoped]);
+
+  const filteredEntries = useMemo(() => {
+    let list = entriesAfterFiltersExceptFavoritesToggle;
+    if (!favoritesOnly) {
+      list = list.filter((e) => !e.favorite);
+    }
+    return list;
+  }, [entriesAfterFiltersExceptFavoritesToggle, favoritesOnly]);
+
+  const sidebarFavoriteEntries = useMemo(
+    () => entriesAfterFiltersExceptFavoritesToggle.filter((e) => e.favorite),
+    [entriesAfterFiltersExceptFavoritesToggle]
+  );
 
   const entriesWithGroups = useMemo(
     () => buildStreamEntryGroups(filteredEntries),
     [filteredEntries]
   );
 
-  const favoritesEntriesWithGroups = useMemo(() => {
-    const favOnly = filteredEntries.filter((e) => e.favorite);
-    return buildStreamEntryGroups(favOnly);
-  }, [filteredEntries]);
-
-  const favoriteFilteredEntries = useMemo(
-    () => filteredEntries.filter((e) => e.favorite),
-    [filteredEntries]
+  const favoritesEntriesWithGroups = useMemo(
+    () => buildStreamEntryGroups(sidebarFavoriteEntries),
+    [sidebarFavoriteEntries]
   );
 
   const handleExportEntries = useCallback(
@@ -591,9 +597,13 @@ export function AssetAnalysisView({ asset, favoritesWindow = false }: AssetAnaly
     return () => document.removeEventListener("mousedown", onDown, true);
   }, [streamFiltersMenuOpen]);
 
-  const displayTitle = resolvedAsset.symbol
-    ? `${resolvedAsset.label} (${resolvedAsset.symbol})`
-    : resolvedAsset.label;
+  const labelNorm = resolvedAsset.label.trim();
+  const symbolNorm = resolvedAsset.symbol?.trim() ?? "";
+  const displayTitle =
+    symbolNorm !== "" &&
+    symbolNorm.toUpperCase() !== labelNorm.toUpperCase()
+      ? `${resolvedAsset.label} (${resolvedAsset.symbol})`
+      : resolvedAsset.label;
   const fullTitle = resolvedAsset.slug === "usd" ? "USD" : displayTitle;
 
   const streamFiltersPanel = (
@@ -660,56 +670,58 @@ export function AssetAnalysisView({ asset, favoritesWindow = false }: AssetAnaly
   );
 
   const assetHeaderBar = (
-    <div className="h-11 shrink-0 flex items-center gap-3 px-4 sm:px-6 border-b border-sidebar-border overflow-visible">
-      <SidebarTrigger />
-      {(favoritesWindow || activeTab === "stream") && (
-        <div className="relative flex shrink-0 items-center gap-1.5">
-          <button
-            ref={streamFiltersButtonRef}
-            type="button"
-            onClick={() => setStreamFiltersMenuOpen((o) => !o)}
-            className="shrink-0 rounded-lg border border-sidebar-border p-2 text-header-muted hover:bg-sidebar-hover hover:text-primary"
-            title="Filters"
-            aria-label="Analysis filters"
-            aria-expanded={streamFiltersMenuOpen}
-            aria-haspopup="dialog"
-          >
-            <SlidersHorizontal className="h-4 w-4" />
-          </button>
-          {!favoritesWindow && activeTab === "stream" && (
+    <div className="grid h-11 shrink-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 border-b border-sidebar-border overflow-visible pl-4 sm:pl-6 pr-6 sm:pr-10">
+      <div className="flex min-w-0 items-center gap-1.5 justify-self-start">
+        <SidebarTrigger />
+        {(favoritesWindow || activeTab === "stream") && (
+          <div className="relative flex shrink-0 items-center gap-1.5">
             <button
+              ref={streamFiltersButtonRef}
               type="button"
-              onClick={() => setFavoritesSidebarOpen((o) => !o)}
-              className={`shrink-0 rounded-lg border p-2 transition-colors ${
-                favoritesSidebarOpen
-                  ? "border-sky-500 bg-sky-500/15 text-sky-500"
-                  : "border-sidebar-border bg-sidebar text-dashboard-foreground/70 hover:bg-sidebar-hover hover:text-dashboard-foreground"
-              }`}
-              aria-pressed={favoritesSidebarOpen}
-              title="Show favorite analyses"
-              aria-label="Show favorite analyses"
+              onClick={() => setStreamFiltersMenuOpen((o) => !o)}
+              className="shrink-0 rounded-lg border border-sidebar-border p-2 text-header-muted hover:bg-sidebar-hover hover:text-primary"
+              title="Filters"
+              aria-label="Analysis filters"
+              aria-expanded={streamFiltersMenuOpen}
+              aria-haspopup="dialog"
             >
-              <Star className={`h-4 w-4 ${favoritesSidebarOpen ? "fill-current" : ""}`} />
+              <SlidersHorizontal className="h-4 w-4" />
             </button>
-          )}
-          {(favoritesWindow || activeTab === "stream") && (
-            <button
-              type="button"
-              onClick={() => handleExportEntries(filteredEntries, "main")}
-              disabled={filteredEntries.length === 0}
-              className="shrink-0 rounded-lg border border-sidebar-border p-2 text-header-muted hover:bg-sidebar-hover hover:text-primary disabled:opacity-40 disabled:cursor-not-allowed"
-              title="Export filtered analyses (.txt)"
-              aria-label="Export filtered analyses"
-            >
-              <Download className="h-4 w-4" />
-            </button>
-          )}
-        </div>
-      )}
-      <div className="flex-1 min-w-0 flex items-center justify-center gap-3 overflow-hidden">
+            {!favoritesWindow && activeTab === "stream" && (
+              <button
+                type="button"
+                onClick={() => setFavoritesSidebarOpen((o) => !o)}
+                className={`shrink-0 rounded-lg border p-2 transition-colors ${
+                  favoritesSidebarOpen
+                    ? "border-sky-500 bg-sky-500/15 text-sky-500"
+                    : "border-sidebar-border bg-sidebar text-dashboard-foreground/70 hover:bg-sidebar-hover hover:text-dashboard-foreground"
+                }`}
+                aria-pressed={favoritesSidebarOpen}
+                title="Show favorite analyses"
+                aria-label="Show favorite analyses"
+              >
+                <Star className={`h-4 w-4 ${favoritesSidebarOpen ? "fill-current" : ""}`} />
+              </button>
+            )}
+            {(favoritesWindow || activeTab === "stream") && (
+              <button
+                type="button"
+                onClick={() => handleExportEntries(filteredEntries, "main")}
+                disabled={filteredEntries.length === 0}
+                className="shrink-0 rounded-lg border border-sidebar-border p-2 text-header-muted hover:bg-sidebar-hover hover:text-primary disabled:opacity-40 disabled:cursor-not-allowed"
+                title="Export filtered analyses (.txt)"
+                aria-label="Export filtered analyses"
+              >
+                <Download className="h-4 w-4" />
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+      <div className="flex min-w-0 max-w-[min(92vw,56rem)] items-center justify-center gap-3 justify-self-center">
         <div
           className={
-            favoritesWindow ? "min-w-0 overflow-hidden flex items-center w-full" : "min-w-0 max-w-[45%] shrink overflow-hidden"
+            favoritesWindow ? "min-w-0 overflow-hidden flex items-center justify-center" : "min-w-0 shrink overflow-hidden flex justify-center"
           }
         >
           <AssetHeader title={fullTitle} />
@@ -718,6 +730,7 @@ export function AssetAnalysisView({ asset, favoritesWindow = false }: AssetAnaly
           <StreamTabs active={activeTab} onSelect={setActiveTab} noBorder />
         )}
       </div>
+      <div className="min-w-0 justify-self-end" aria-hidden="true" />
     </div>
   );
 
@@ -993,8 +1006,8 @@ export function AssetAnalysisView({ asset, favoritesWindow = false }: AssetAnaly
                   open={favoritesSidebarOpen}
                   onOpenChange={setFavoritesSidebarOpen}
                   title="Favorite analyses"
-                  onExport={() => handleExportEntries(favoriteFilteredEntries, "favorites")}
-                  exportDisabled={favoriteFilteredEntries.length === 0}
+                  onExport={() => handleExportEntries(sidebarFavoriteEntries, "favorites")}
+                  exportDisabled={sidebarFavoriteEntries.length === 0}
                 >
                   {favoritesPanel}
                 </FavoritesAnalysisSidebar>
@@ -1003,7 +1016,13 @@ export function AssetAnalysisView({ asset, favoritesWindow = false }: AssetAnaly
 
             {!favoritesWindow && !editModalOpen && (
               <div className="relative z-[70] shrink-0 w-full border-t border-sidebar-border/50 bg-dashboard-bg px-6 pb-6 pt-3">
-                <PostAnalysisInput placeholder={resolvedAsset.placeholder} onCreated={handleCreate} />
+                <PostAnalysisInput
+                  placeholder={resolvedAsset.placeholder}
+                  onCreated={handleCreate}
+                  draftKey={
+                    resolvedAsset.id ? `asset-analysis-compose:${resolvedAsset.id}` : undefined
+                  }
+                />
               </div>
             )}
           </div>
@@ -1054,6 +1073,7 @@ export function AssetAnalysisView({ asset, favoritesWindow = false }: AssetAnaly
           initialNotes={extractAnalysisType(editingAnalysis.notes).cleanedNotes}
           initialImages={editingAnalysis.images ?? []}
           initialAnalysisType={editingAnalysisType}
+          draftKey={`analysis-edit:${editingAnalysis.id}`}
           onSubmit={async ({ notes, images, analysisType: nextType, title: nextTitle }) => {
             if (!editingAnalysis) return;
             const type = nextType ?? editingAnalysisType;

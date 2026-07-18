@@ -35,10 +35,12 @@ const DialogContent = React.forwardRef<
     showClose?: boolean;
     /** When true, overlay and content are confined to main area (sidebar stays visible) */
     containToMain?: boolean;
+    /** Extra props for the overlay layer (e.g. `data-*` markers for nested-dialog coordination). */
+    overlayProps?: React.ComponentPropsWithoutRef<typeof DialogPrimitive.Overlay>;
   }
->(({ className = "", children, showClose = true, containToMain = false, onInteractOutside, onPointerDownOutside, onFocusOutside, ...props }, ref) => (
+>(({ className = "", children, showClose = true, containToMain = false, overlayProps, onInteractOutside, onPointerDownOutside, onFocusOutside, ...props }, ref) => (
   <DialogPortal>
-    <DialogOverlay containToMain={containToMain} />
+    <DialogOverlay containToMain={containToMain} {...overlayProps} />
     <DialogPrimitive.Content
       ref={ref}
       className={`fixed z-[130] flex max-h-[100dvh] translate-x-[-50%] translate-y-[-50%] flex-col items-center justify-center p-4 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 ${

@@ -16,6 +16,7 @@ import { ConfirmDeleteDialog } from "@/components/ui/ConfirmDeleteDialog";
 import { getImageUrl } from "@/lib/imageUrls";
 import { useAssets } from "@/context/AssetsContext";
 import { assetWatchlistService } from "@/lib/api";
+import { clearDraft, loadDraftJson, saveDraftJson } from "@/lib/form-drafts";
 
 interface CreatePairModalProps {
   open: boolean;
@@ -30,6 +31,16 @@ interface CreatePairModalProps {
   initialItem?: WatchItem;
   onSubmit: (dto: CreateWatchItemDto) => void;
 }
+
+type PairModalDraftV1 = {
+  v: 1;
+  calendarId: string;
+  baseAsset: string;
+  quoteAsset: string;
+  bias: WatchlistBias;
+  html: string;
+  imagePaths: string[];
+};
 
 export function CreatePairModal({
   open,
@@ -67,6 +78,11 @@ export function CreatePairModal({
     (aw) => aw.id === selectedAssetWatchlistId
   );
 
+  const pairDraftStorageKey = useMemo(
+    () => `watch-pair:${currentAssetSlug}:${mode}:${initialItem?.id ?? "new"}`,
+    [currentAssetSlug, mode, initialItem?.id],
+  );
+
   useEffect(() => {
     if (open && useAssetWatchlistMode && selectedAssetWatchlist) {
       assetWatchlistService
@@ -83,6 +99,31 @@ export function CreatePairModal({
       setError("");
       return;
     }
+    const stored = loadDraftJson<PairModalDraftV1>(pairDraftStorageKey);
+    if (stored?.v === 1) {
+      setCalendarId(stored.calendarId ?? "");
+      setBaseAsset(stored.baseAsset || currentAssetSlug);
+      setQuoteAsset(stored.quoteAsset || (currentAssetSlug === "usd" ? "eur" : "usd"));
+      setBias(stored.bias ?? "bullish");
+      setThesisHtml(stored.html ?? "");
+      if (stored.imagePaths?.length) {
+        setThesisImages(stored.imagePaths.map((path) => ({ path, url: getImageUrl(path) })));
+      } else {
+        setThesisImages([]);
+      }
+      const applyDraft = () => {
+        if (thesisRef.current) thesisRef.current.innerHTML = stored.html ?? "";
+      };
+      applyDraft();
+      const d1 = setTimeout(applyDraft, 0);
+      const d2 = setTimeout(applyDraft, 50);
+      setError("");
+      return () => {
+        clearTimeout(d1);
+        clearTimeout(d2);
+      };
+    }
+
     const applyInitial = () => {
       if (mode === "edit" && initialItem) {
         const baseSlug =
@@ -148,6 +189,35 @@ export function CreatePairModal({
     initialItem?.thesis?.notes,
     initialItem?.thesis?.images?.length,
     initialItem?.thesis?.images?.[0],
+    pairDraftStorageKey,
+    currentAssetSlug,
+  ]);
+
+  useEffect(() => {
+    if (!open) return;
+    const t = window.setTimeout(() => {
+      const html = thesisRef.current?.innerHTML ?? "";
+      const paths = thesisImages.map((i) => i.path);
+      saveDraftJson(pairDraftStorageKey, {
+        v: 1,
+        calendarId,
+        baseAsset,
+        quoteAsset,
+        bias,
+        html,
+        imagePaths: paths,
+      } satisfies PairModalDraftV1);
+    }, 500);
+    return () => window.clearTimeout(t);
+  }, [
+    open,
+    pairDraftStorageKey,
+    calendarId,
+    baseAsset,
+    quoteAsset,
+    bias,
+    thesisHtml,
+    thesisImages,
   ]);
 
   const { handlePaste: handleThesisPaste } = useAnalysisEditorPaste({
@@ -275,6 +345,7 @@ export function CreatePairModal({
       return;
     }
     onSubmit(dto);
+    clearDraft(pairDraftStorageKey);
     setThesisHtml("");
     setThesisImages([]);
     setBaseAsset(currentAssetSlug);
@@ -283,6 +354,7 @@ export function CreatePairModal({
   };
 
   const runDiscard = () => {
+    clearDraft(pairDraftStorageKey);
     setThesisHtml("");
     thesisImages.forEach((img) => {
       deleteStoredImage(img.path).catch(() => undefined);
