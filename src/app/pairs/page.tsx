@@ -8,6 +8,7 @@ import { ConfirmDeleteDialog } from "@/components/ui/ConfirmDeleteDialog";
 import { pairsService } from "@/lib/services/pairs.service";
 import { assetsService } from "@/lib/services/assets.service";
 import type { Asset, TradingPair } from "@/types/api";
+import { ScrollableSelect } from "@/components/ui/ScrollableSelect";
 
 function formatPip(value: number | null): string {
   if (value == null) return "—";
@@ -193,13 +194,15 @@ export default function PairsPage() {
                 No pairs yet. Seed the database or add a pair.
               </p>
             ) : (
-              <div className="max-h-[min(70vh,720px)] overflow-y-auto">
-                <table className="w-full text-sm">
+              <div className="max-h-[min(70vh,720px)] overflow-y-auto overflow-x-hidden">
+                <table className="w-full table-fixed text-sm">
                   <thead className="sticky top-0 bg-sidebar border-b border-sidebar-border text-left text-xs text-dashboard-foreground/60">
                     <tr>
-                      <th className="px-3 py-2 font-medium">Pair</th>
-                      <th className="px-3 py-2 font-medium">Pip value</th>
-                      <th className="px-3 py-2 font-medium w-[1%] whitespace-nowrap"> </th>
+                      <th className="px-2 sm:px-3 py-2 font-medium w-[36%]">Pair</th>
+                      <th className="px-2 sm:px-3 py-2 font-medium w-[28%]">Pip value</th>
+                      <th className="px-2 sm:px-3 py-2 font-medium w-[36%]">
+                        <span className="sr-only">Actions</span>
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
@@ -208,25 +211,29 @@ export default function PairsPage() {
                         key={row.id}
                         className="border-b border-sidebar-border/60 last:border-0 hover:bg-sidebar-hover/40"
                       >
-                        <td className="px-3 py-2 font-medium text-dashboard-foreground">{row.pair}</td>
-                        <td className="px-3 py-2 tabular-nums text-dashboard-foreground/80">
+                        <td className="px-2 sm:px-3 py-2 font-medium text-dashboard-foreground truncate">
+                          {row.pair}
+                        </td>
+                        <td className="px-2 sm:px-3 py-2 tabular-nums text-dashboard-foreground/80 truncate">
                           {formatPip(row.pipValue)}
                         </td>
-                        <td className="px-3 py-2 text-right whitespace-nowrap">
-                          <button
-                            type="button"
-                            onClick={() => openEdit(row)}
-                            className="rounded-lg border border-sidebar-border px-2.5 py-1 text-xs font-medium hover:bg-sidebar-hover hover:text-primary mr-1.5"
-                          >
-                            Edit
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setDeleteRow(row)}
-                            className="rounded-lg border border-red-500/40 px-2.5 py-1 text-xs font-medium text-red-400 hover:bg-red-500/10"
-                          >
-                            Delete
-                          </button>
+                        <td className="px-2 sm:px-3 py-2">
+                          <div className="flex flex-wrap items-center justify-end gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => openEdit(row)}
+                              className="rounded-lg border border-sidebar-border px-2 py-1 text-xs font-medium hover:bg-sidebar-hover hover:text-primary"
+                            >
+                              Edit
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setDeleteRow(row)}
+                              className="rounded-lg border border-red-500/40 px-2 py-1 text-xs font-medium text-red-400 hover:bg-red-500/10"
+                            >
+                              Delete
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -249,31 +256,21 @@ export default function PairsPage() {
             <form onSubmit={handleCreate} className="mt-4 space-y-4">
               <div>
                 <label className="block text-sm font-medium mb-1.5 text-dashboard-foreground/80">Base</label>
-                <select
+                <ScrollableSelect
                   value={baseId}
-                  onChange={(e) => setBaseId(e.target.value)}
-                  className="w-full rounded-lg border border-sidebar-border bg-header-input px-3 py-2 text-sm"
-                >
-                  {tradableAssets.map((a) => (
-                    <option key={a.id} value={a.id}>
-                      {a.name}
-                    </option>
-                  ))}
-                </select>
+                  onChange={setBaseId}
+                  options={tradableAssets.map((a) => ({ value: a.id, label: a.name }))}
+                  aria-label="Base asset"
+                />
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1.5 text-dashboard-foreground/80">Quote</label>
-                <select
+                <ScrollableSelect
                   value={quoteId}
-                  onChange={(e) => setQuoteId(e.target.value)}
-                  className="w-full rounded-lg border border-sidebar-border bg-header-input px-3 py-2 text-sm"
-                >
-                  {tradableAssets.map((a) => (
-                    <option key={a.id} value={a.id}>
-                      {a.name}
-                    </option>
-                  ))}
-                </select>
+                  onChange={setQuoteId}
+                  options={tradableAssets.map((a) => ({ value: a.id, label: a.name }))}
+                  aria-label="Quote asset"
+                />
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1.5 text-dashboard-foreground/80">

@@ -10,6 +10,8 @@ import { deleteStoredImage } from "@/lib/imageUpload";
 import { ConfirmDeleteDialog } from "@/components/ui/ConfirmDeleteDialog";
 import type { AssetConfig } from "@/types/asset";
 import { clearDraft, loadDraftJson, saveDraftJson } from "@/lib/form-drafts";
+import { readEditorHtml, sanitizeRichHtml } from "@/lib/sanitizeRichHtml";
+import { ScrollableSelect } from "@/components/ui/ScrollableSelect";
 
 const ANALYSIS_TYPES = [
   { value: "daily", label: "Daily" },
@@ -145,7 +147,7 @@ export function EditAnalysisModal({
         setScopeMode("global");
         setSelectedAssetIds(new Set());
       }
-      const html = stored.html ?? "";
+      const html = sanitizeRichHtml(stored.html ?? "");
       const applyDraft = () => {
         if (editorRef.current) editorRef.current.innerHTML = html;
       };
@@ -176,7 +178,7 @@ export function EditAnalysisModal({
     }
     const applyInitial = () => {
       if (editorRef.current) {
-        editorRef.current.innerHTML = initialNotes;
+        editorRef.current.innerHTML = sanitizeRichHtml(initialNotes);
       }
     };
     applyInitial();
@@ -218,7 +220,7 @@ export function EditAnalysisModal({
     globalScopeEditor,
   ]);
 
-  const { handlePaste } = useAnalysisEditorPaste({
+  const { handlePaste, handleDrop } = useAnalysisEditorPaste({
     editorRef,
     onImageReady: (img) => setImages((prev) => [...prev, img.path]),
   });
@@ -263,7 +265,7 @@ export function EditAnalysisModal({
   );
 
   const handleSave = () => {
-    const notes = editorRef.current?.innerHTML?.trim() ?? "";
+    const notes = readEditorHtml(editorRef.current).trim();
     const titleNorm = streamTitle.trim() ? streamTitle.trim() : null;
     setScopeError("");
     if (globalScopeEditor) {
@@ -301,7 +303,7 @@ export function EditAnalysisModal({
         className="max-h-[85dvh] flex flex-col items-stretch justify-start overflow-hidden bg-sidebar border border-sidebar-border rounded-xl p-0 shadow-xl data-[state=open]:zoom-in-100 data-[state=closed]:zoom-out-100"
       >
         <div className="scrollbar-modal flex flex-col min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
-          <div className="space-y-4 min-w-0 overflow-x-hidden p-6">
+          <div className="space-y-4 min-w-0 overflow-x-hidden p-4 sm:p-6">
             <h3 className="text-lg font-semibold text-dashboard-foreground">Edit Analysis</h3>
 
             <div className="space-y-1">
@@ -324,18 +326,12 @@ export function EditAnalysisModal({
                 {showTypeSelect && (
                   <label className="flex items-center gap-2 text-sm text-dashboard-foreground">
                     <span className="text-dashboard-foreground/70 shrink-0">Type</span>
-                    <select
+                    <ScrollableSelect
                       value={analysisType}
-                      onChange={(e) => setAnalysisType(e.target.value)}
-                      className="rounded-lg border border-sidebar-border bg-header-input px-3 py-1.5 text-sm text-dashboard-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                      onChange={setAnalysisType}
+                      options={ANALYSIS_TYPES.map((opt) => ({ value: opt.value, label: opt.label }))}
                       aria-label="Analysis type"
-                    >
-                      {ANALYSIS_TYPES.map((opt) => (
-                        <option key={opt.value} value={opt.value}>
-                          {opt.label}
-                        </option>
-                      ))}
-                    </select>
+                    />
                   </label>
                 )}
                 {showScope && (
@@ -477,6 +473,7 @@ export function EditAnalysisModal({
               spellCheck={false}
               data-placeholder="Update your analysis notes..."
               onPaste={handlePaste}
+              onDrop={handleDrop}
               onInput={() => setDraftBump((n) => n + 1)}
               className="min-h-[120px] max-h-[300px] w-full min-w-0 overflow-y-auto overflow-x-hidden rounded-b-lg rounded-t-none border border-sidebar-border bg-header-input px-3 py-2.5 text-sm text-dashboard-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary break-words antialiased [&:empty::before]:content-[attr(data-placeholder)] [&:empty::before]:text-dashboard-foreground/50 [&_*]:break-words [&_img]:max-w-[min(50%,480px)] [&_img]:max-h-[200px] [&_img]:w-auto [&_img]:h-auto [&_img]:object-contain [&_img]:rounded-lg [&_img]:cursor-pointer [&_img]:block [&_img]:my-2 [&_u]:underline [&_h1]:text-xl [&_h1]:font-bold [&_h2]:text-lg [&_h2]:font-semibold [&_h3]:text-base [&_h3]:font-medium"
               suppressContentEditableWarning

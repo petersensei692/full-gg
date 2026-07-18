@@ -4,6 +4,7 @@ import { Trash2, X, Star, GripVertical } from "lucide-react";
 import { AnalysisImage } from "@/components/ui/AnalysisImage";
 import { ConfirmDeleteDialog } from "@/components/ui/ConfirmDeleteDialog";
 import { getImageUrl } from "@/lib/imageUrls";
+import { sanitizeRichHtml } from "@/lib/sanitizeRichHtml";
 
 const TAG_COLOR_BORDER: Record<NonNullable<StreamEntryType["tagColor"]>, string> = {
   red: "border-l-red-500",
@@ -44,7 +45,7 @@ interface StreamEntryProps {
    * Omit to keep responsive max-width bands on large viewports.
    */
   fillColumnWidth?: boolean;
-  /** Shown at vertical center inside the card area only (e.g. watch-item link picker checkbox). */
+  /** Shown at the top-left inside the card area (e.g. watch-item link picker checkbox). */
   linkPickerOverlay?: ReactNode;
   /**
    * Fires after three consecutive clicks on the card (same gesture sequence).
@@ -184,7 +185,7 @@ export function StreamEntry({
         }
       >
         {linkPickerOverlay != null ? (
-          <div className="pointer-events-auto absolute left-3 top-1/2 z-10 -translate-y-1/2 flex items-center justify-center">
+          <div className="pointer-events-auto absolute left-3 top-3 z-10 flex items-center justify-center">
             {linkPickerOverlay}
           </div>
         ) : null}
@@ -251,9 +252,9 @@ export function StreamEntry({
         ) : null}
         {hasTextContent ? (
           <div
-            className="stream-entry-content min-w-0 max-w-full break-words text-sm text-dashboard-foreground leading-relaxed mb-2 antialiased [&_*]:break-words [&_*]:min-w-0 [&_*]:max-w-full [&_img]:max-w-[min(50%,480px)] [&_img]:max-h-[300px] [&_img]:h-auto [&_img]:w-auto [&_img]:object-contain [&_img]:rounded-lg [&_img]:my-2 [&_img]:cursor-pointer [&_h1]:text-xl [&_h1]:font-bold [&_h2]:text-lg [&_h2]:font-semibold [&_h3]:text-base [&_h3]:font-medium"
+            className="rich-html-content stream-entry-content min-w-0 max-w-full break-words text-sm text-dashboard-foreground leading-relaxed mb-2 antialiased [&_*]:break-words [&_*]:min-w-0 [&_*]:max-w-full [&_img]:max-w-[min(50%,480px)] [&_img]:max-h-[300px] [&_img]:h-auto [&_img]:w-auto [&_img]:object-contain [&_img]:rounded-lg [&_img]:my-2 [&_img]:cursor-pointer [&_h1]:text-xl [&_h1]:font-bold [&_h2]:text-lg [&_h2]:font-semibold [&_h3]:text-base [&_h3]:font-medium"
             style={{ overflowWrap: "break-word" } as React.CSSProperties}
-            dangerouslySetInnerHTML={{ __html: entry.content }}
+            dangerouslySetInnerHTML={{ __html: sanitizeRichHtml(entry.content) }}
           />
         ) : null}
         {entry.images && entry.images.length > 0 && (

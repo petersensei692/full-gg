@@ -28,6 +28,7 @@ import type {
 } from "@/types/api";
 import { buildTradePerformanceAxisTicks } from "@/lib/analytics/trade-performance-axis";
 import { APP_DATE_LOCALE, MONTH_SHORT_GRID } from "@/lib/date-locale";
+import { ScrollableSelect } from "@/components/ui/ScrollableSelect";
 
 function SurfaceCard({ children, className = "" }: { children: React.ReactNode; className?: string }) {
   return <div className={`rounded-xl border border-sidebar-border bg-sidebar ${className}`}>{children}</div>;
@@ -185,8 +186,8 @@ export default function PerformanceAnalyticsPage() {
             <AnalyticsScopeDropdowns pairOptions={pairOptions} scope={scope} onScopeChange={persistScope} />
           </header>
 
-          <div className="grid grid-cols-1 gap-4 min-[1260px]:grid-cols-[3fr_2fr] min-[1260px]:items-stretch">
-            <SurfaceCard className="flex min-h-0 min-w-0 flex-col p-4 min-[1260px]:h-full">
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-[3fr_2fr] xl:items-stretch">
+            <SurfaceCard className="flex min-h-0 min-w-0 flex-col p-4 xl:h-full">
               <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
                   <button
@@ -243,12 +244,12 @@ export default function PerformanceAnalyticsPage() {
                     {(data?.calendar.weeks ?? []).map((week, wi) => (
                       <div
                         key={`w-${wi}`}
-                        className="grid min-h-[44px] flex-1 grid-cols-8 gap-1 min-[1260px]:min-h-0"
+                        className="grid min-h-[44px] flex-1 grid-cols-8 gap-1 xl:min-h-0"
                       >
                         {week.cells.map((cell, ci) => (
                           <div
                             key={`c-${wi}-${ci}`}
-                            className={`flex min-h-[44px] flex-col justify-between rounded-md border border-sidebar-border/50 p-1 text-center min-[1260px]:min-h-0 min-[1260px]:flex-1 ${
+                            className={`flex min-h-[44px] flex-col justify-between rounded-md border border-sidebar-border/50 p-1 text-center xl:min-h-0 xl:flex-1 ${
                               cell.dayOfMonth ? "bg-header/30" : "border-transparent bg-transparent"
                             }`}
                           >
@@ -270,7 +271,7 @@ export default function PerformanceAnalyticsPage() {
                             ) : null}
                           </div>
                         ))}
-                        <div className="flex min-h-[44px] flex-col items-center justify-center rounded-md border border-primary/40 bg-primary/10 p-1 text-center min-[1260px]:min-h-0 min-[1260px]:flex-1">
+                        <div className="flex min-h-[44px] flex-col items-center justify-center rounded-md border border-primary/40 bg-primary/10 p-1 text-center xl:min-h-0 xl:flex-1">
                           <span className={`text-[11px] font-semibold ${week.weekTotalR >= 0 ? "text-primary" : "text-rose-400"}`}>
                             {week.weekTotalR >= 0 ? "+" : ""}
                             {formatR2(week.weekTotalR)}R
@@ -286,7 +287,7 @@ export default function PerformanceAnalyticsPage() {
             </SurfaceCard>
 
             <div className="flex min-h-0 min-w-0 flex-col gap-3">
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 min-[1260px]:grid-cols-[2fr_3fr]">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-[2fr_3fr]">
                 <SurfaceCard className="p-3">
                   <p className="text-center text-sm font-medium text-header-foreground">
                     {formatR2(winrate)}% Winrate
@@ -396,15 +397,16 @@ export default function PerformanceAnalyticsPage() {
                       Monthly
                     </button>
                   </div>
-                  <select
+                  <ScrollableSelect
                     value={freqMode}
-                    onChange={(e) => setFreqMode(e.target.value as PerformanceFrequencyMode)}
-                    className="rounded-lg border border-sidebar-border bg-header px-2 py-1.5 text-xs text-header-foreground"
-                  >
-                    <option value="winsLosses">Wins vs Losses</option>
-                    <option value="buysSells">Buys vs Sells</option>
-                    <option value="profitR">Total profits (R)</option>
-                  </select>
+                    onChange={(v) => setFreqMode(v as PerformanceFrequencyMode)}
+                    options={[
+                      { value: "winsLosses", label: "Wins vs Losses" },
+                      { value: "buysSells", label: "Buys vs Sells" },
+                      { value: "profitR", label: "Total profits (R)" },
+                    ]}
+                    aria-label="Frequency chart mode"
+                  />
                 </div>
                 <p className="mb-1 text-center text-xs text-header-muted">{freqModeLabel}</p>
                 <div className="h-[190px] w-full min-w-0">
@@ -446,7 +448,7 @@ export default function PerformanceAnalyticsPage() {
               <p className="text-sm font-semibold text-header-foreground">Performance</p>
               <span className="text-[10px] text-header-muted">One bar per trade (chronological)</span>
             </div>
-            <div className="h-[min(480px,55vh)] min-h-[420px] w-full min-w-0">
+            <div className="h-[min(480px,55vh)] min-h-[260px] sm:min-h-[420px] w-full min-w-0">
               {chartsReady && !loading && tradePerformance.length === 0 ? (
                 <div className="flex h-full items-center justify-center px-2 text-center text-xs text-header-muted">
                   No closed trades in this date range (with current filters).

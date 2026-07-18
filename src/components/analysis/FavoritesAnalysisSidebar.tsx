@@ -128,8 +128,8 @@ export function FavoritesAnalysisSidebar({
       <aside
         className={[
           "absolute right-0 top-0 flex h-full min-w-0 flex-col border-l border-sidebar-border bg-sidebar text-dashboard-foreground shadow-xl",
-          /* Narrowest: 90vw; from md up (including wide/desktop): 75vw */
-          "w-[90vw] max-w-[90vw] md:w-[75vw] md:max-w-[75vw]",
+          /* Phone: full width; sm+: 90vw; md+: 75vw */
+          "w-full max-w-full sm:w-[90vw] sm:max-w-[90vw] md:w-[75vw] md:max-w-[75vw]",
           "transition-transform duration-300 ease-out will-change-transform",
           open ? "translate-x-0" : "translate-x-full",
         ].join(" ")}

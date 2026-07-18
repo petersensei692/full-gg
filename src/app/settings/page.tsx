@@ -1,9 +1,11 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { FolderOpen, Database, AlertCircle, CheckCircle } from "lucide-react";
+import { FolderOpen, Database, AlertCircle, CheckCircle, Moon, Sun } from "lucide-react";
 import { DashboardLayout } from "@/components/DashboardLayout";
+import { useTheme } from "@/context/ThemeContext";
 import { settingsService, type AppSettings } from "@/lib/services/settings.service";
+import type { Theme } from "@/lib/theme";
 
 declare global {
   interface Window {
@@ -16,6 +18,7 @@ declare global {
 }
 
 export default function SettingsPage() {
+  const { theme, setTheme } = useTheme();
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -212,7 +215,7 @@ export default function SettingsPage() {
 
   return (
     <DashboardLayout>
-      <div className="p-6 max-w-2xl">
+      <div className="p-4 sm:p-6 max-w-2xl">
         <h1 className="text-xl font-semibold text-dashboard-foreground mb-6">Settings</h1>
 
         {message && (
@@ -232,10 +235,55 @@ export default function SettingsPage() {
           </div>
         )}
 
-        {loading ? (
-          <p className="text-dashboard-foreground/70">Loading settings…</p>
-        ) : (
-          <div className="space-y-8">
+        <div className="space-y-8">
+          {/* Appearance */}
+          <section className="rounded-xl border border-sidebar-border bg-sidebar p-4">
+            <h2 className="text-sm font-semibold text-dashboard-foreground flex items-center gap-2 mb-3">
+              <Sun className="h-4 w-4" />
+              Appearance
+            </h2>
+            <p className="text-xs text-dashboard-foreground/60 mb-3">
+              Choose the app color theme. Your preference is saved in this browser.
+            </p>
+            <div className="flex items-center gap-3">
+              <span className="text-sm text-dashboard-foreground/80">Theme</span>
+              <div
+                className="inline-flex rounded-lg border border-sidebar-border bg-header-input p-0.5"
+                role="group"
+                aria-label="Theme"
+              >
+                {(
+                  [
+                    { value: "dark" as Theme, label: "Dark", Icon: Moon },
+                    { value: "light" as Theme, label: "Light", Icon: Sun },
+                  ] as const
+                ).map(({ value, label, Icon }) => {
+                  const active = theme === value;
+                  return (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => setTheme(value)}
+                      className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm transition-colors ${
+                        active
+                          ? "bg-primary text-primary-foreground"
+                          : "text-dashboard-foreground/70 hover:text-dashboard-foreground hover:bg-sidebar-hover"
+                      }`}
+                      aria-pressed={active}
+                    >
+                      <Icon className="h-3.5 w-3.5" />
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </section>
+
+          {loading ? (
+            <p className="text-dashboard-foreground/70">Loading settings…</p>
+          ) : (
+            <>
             {/* Images directory */}
             <section className="rounded-xl border border-sidebar-border bg-sidebar p-4">
               <h2 className="text-sm font-semibold text-dashboard-foreground flex items-center gap-2 mb-3">
@@ -245,7 +293,7 @@ export default function SettingsPage() {
               <p className="text-xs text-dashboard-foreground/60 mb-3">
                 Choose the folder where uploaded images are stored. If not set, the app uses the path from .env (IMAGES_FOLDER_PATH).
               </p>
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap gap-2 [&>button]:w-full sm:[&>button]:w-auto [&>input]:w-full">
                 <input
                   type="text"
                   value={imagesPathInput}
@@ -284,7 +332,7 @@ export default function SettingsPage() {
                 database to create gg-journal.sqlite there. You can still type a path manually. Restart the server after
                 switching files.
               </p>
-              <div className="flex flex-wrap gap-2 mb-2">
+              <div className="flex flex-wrap gap-2 mb-2 [&>button]:w-full sm:[&>button]:w-auto [&>input]:w-full">
                 <input
                   type="text"
                   value={databasePathInput}
@@ -369,8 +417,9 @@ export default function SettingsPage() {
                 </div>
               )}
             </section>
-          </div>
-        )}
+            </>
+          )}
+        </div>
       </div>
     </DashboardLayout>
   );

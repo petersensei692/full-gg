@@ -168,7 +168,7 @@ export function PairWatchlistView({
             <p>No pairs in this watchlist yet. Create a pair to get started.</p>
           </div>
         ) : (
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {watchlistEntries.map((entry: WatchItem) => (
               <WatchlistEntryCard
                 key={entry.id}

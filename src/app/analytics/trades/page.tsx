@@ -15,6 +15,8 @@ import { uploadImageBlob } from "@/lib/imageUpload";
 import { getImageUrl } from "@/lib/imageUrls";
 import { pairsService } from "@/lib/services/pairs.service";
 import { strategiesService } from "@/lib/services/strategies.service";
+import { ScrollableSelect } from "@/components/ui/ScrollableSelect";
+import { WatchItemDetailPanels } from "@/components/analysis/WatchItemDetailPanels";
 import type {
   Trade,
   TradeCloseType,
@@ -192,6 +194,7 @@ export default function AnalyticsTradesPage() {
   const noteEditorRef = useRef<HTMLTextAreaElement>(null);
   const [linkModalOpen, setLinkModalOpen] = useState(false);
   const [addTradeOpen, setAddTradeOpen] = useState(false);
+  const [pairWatchedDetail, setPairWatchedDetail] = useState<WatchItem | null>(null);
   const [catalogPairs, setCatalogPairs] = useState<TradingPair[]>([]);
   const [strategies, setStrategies] = useState<Strategy[]>([]);
   const [addPairId, setAddPairId] = useState("");
@@ -236,6 +239,27 @@ export default function AnalyticsTradesPage() {
       setPanelTab("metrics");
     }
   }, [selectedTrade?.id, selectedTrade?.status]);
+
+  useEffect(() => {
+    const linked = selectedTrade?.pairWatched ?? null;
+    if (panelTab !== "pairWatched" || !linked?.id) {
+      setPairWatchedDetail(linked);
+      return;
+    }
+    let cancelled = false;
+    setPairWatchedDetail(linked);
+    watchItemsService
+      .getOne(linked.id)
+      .then((item) => {
+        if (!cancelled) setPairWatchedDetail(item);
+      })
+      .catch(() => {
+        if (!cancelled) setPairWatchedDetail(linked);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [panelTab, selectedTrade?.id, selectedTrade?.pairWatched?.id]);
 
   useEffect(() => {
     let cancelled = false;
@@ -602,7 +626,116 @@ export default function AnalyticsTradesPage() {
           />
 
           <div className="rounded-xl border border-sidebar-border bg-sidebar flex flex-col min-h-0">
-            <div className="isolate overflow-auto max-h-[min(70vh,calc(100dvh-13rem))] scrollbar-hide">
+            {/* Phone / small tablet: card list */}
+            <div className="md:hidden max-h-[min(70vh,calc(100dvh-13rem))] overflow-y-auto p-3 space-y-3">
+              {loading && rows.length === 0 ? (
+                <p className="py-10 text-center text-sm text-header-muted">Loading trades...</p>
+              ) : !loading && rows.length === 0 ? (
+                <p className="py-10 text-center text-sm text-header-muted">
+                  No trades match the current filters and date range.
+                </p>
+              ) : (
+                rows.map((trade) => {
+                  const earned = trade.profitFactorEarned.totalEarned;
+                  return (
+                    <div
+                      key={`card-${trade.id}`}
+                      className="rounded-xl border border-sidebar-border bg-header/30 p-3"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="font-semibold text-header-foreground truncate">
+                            {trade.pair}{" "}
+                            <span className="text-xs uppercase text-primary">{trade.type}</span>
+                          </p>
+                          <p className="text-xs text-header-muted mt-0.5">
+                            {formatCreatedAt(trade.createdAt)}
+                          </p>
+                        </div>
+                        <div className="flex shrink-0 items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedTrade(trade);
+                              setPanelOpen(true);
+                              setPanelTab("metrics");
+                            }}
+                            className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-primary/50 bg-primary/15 text-xs font-semibold text-primary"
+                            aria-label={`Open trade journal for ${trade.pair}`}
+                          >
+                            ↗
+                          </button>
+                          {isPersistedTradeId(trade.id) && (
+                            <button
+                              type="button"
+                              disabled={deletingId === trade.id}
+                              onClick={() => setTradePendingDelete(trade)}
+                              className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-rose-500/55 bg-rose-500/15 text-rose-400 disabled:opacity-50"
+                              aria-label={`Delete trade ${trade.pair}`}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                      <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+                        <div>
+                          <p className="text-header-muted">R earned</p>
+                          <p className={earned >= 0 ? "text-primary font-medium" : "text-rose-400 font-medium"}>
+                            {earned.toFixed(2)}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-header-muted">R targeted</p>
+                          <p className="text-header-foreground font-medium">
+                            {formatTargetedR(trade.profitFactorTargeted)}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-header-muted">Entry</p>
+                          <p className="text-header-foreground font-medium truncate">{trade.executionPrice}</p>
+                        </div>
+                        <div>
+                          <p className="text-header-muted">Status</p>
+                          <p className="text-header-foreground font-medium capitalize">{trade.status}</p>
+                        </div>
+                      </div>
+                      {trade.status === "pending" && (
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              const updated = await tradesApi.update(trade.id, { status: "cancelled" });
+                              setTrades((prev) =>
+                                (Array.isArray(prev) ? prev : []).map((t) => (t.id === updated.id ? updated : t)),
+                              );
+                              if (selectedTrade?.id === trade.id) setSelectedTrade(updated);
+                            }}
+                            className="rounded border border-rose-500/50 px-2.5 py-1.5 text-xs text-rose-400 hover:bg-rose-500/10"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setExecuteTarget(trade);
+                              setExecuteTime(new Date().toISOString().slice(0, 16));
+                              setExecuteModalOpen(true);
+                            }}
+                            className="rounded border border-primary/50 px-2.5 py-1.5 text-xs text-primary hover:bg-primary/10"
+                          >
+                            Execute
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            {/* Tablet / desktop: wide table */}
+            <div className="hidden md:block isolate overflow-auto max-h-[min(70vh,calc(100dvh-13rem))] scrollbar-hide">
               <table className="min-w-[1500px] w-full border-collapse">
                 <thead>
                   <tr className="border-b border-sidebar-border">
@@ -816,7 +949,7 @@ export default function AnalyticsTradesPage() {
         )}
         {/* Right-side detail panel */}
         <div
-          className={`fixed inset-y-0 right-0 z-[60] w-full md:w-2/3 border-l border-sidebar-border bg-dashboard-bg shadow-2xl transition-transform duration-300 ease-out ${
+          className={`fixed inset-y-0 right-0 z-[60] w-full sm:max-w-full md:w-2/3 border-l border-sidebar-border bg-dashboard-bg shadow-2xl transition-transform duration-300 ease-out pt-[env(safe-area-inset-top,0px)] pb-[env(safe-area-inset-bottom,0px)] ${
             panelOpen ? "translate-x-0" : "translate-x-full"
           }`}
         >
@@ -892,7 +1025,11 @@ export default function AnalyticsTradesPage() {
                 </div>
               </div>
 
-              <div className="flex-1 overflow-y-auto px-5 py-4">
+              <div
+                className={`flex-1 min-h-0 px-5 py-4 ${
+                  panelTab === "pairWatched" ? "flex flex-col overflow-hidden" : "overflow-y-auto"
+                }`}
+              >
                 {panelTab === "metrics" && (
                   <>
                     <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
@@ -1052,14 +1189,15 @@ export default function AnalyticsTradesPage() {
                     <div className="rounded-xl border border-sidebar-border bg-sidebar/40 p-4">
                       <p className="text-sm font-medium text-header-foreground">Add Close Price</p>
                       <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
-                        <select
+                        <ScrollableSelect
                           value={closeType}
-                          onChange={(e) => setCloseType(e.target.value as TradeCloseType)}
-                          className="h-10 rounded-lg border border-sidebar-border bg-header-input px-3 text-sm text-dashboard-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                        >
-                          <option value="partClose">partClose</option>
-                          <option value="fullClose">fullClose</option>
-                        </select>
+                          onChange={(v) => setCloseType(v as TradeCloseType)}
+                          aria-label="Close type"
+                          options={[
+                            { value: "partClose", label: "partClose" },
+                            { value: "fullClose", label: "fullClose" },
+                          ]}
+                        />
                         <input
                           type="datetime-local"
                           value={closeTimeInput}
@@ -1332,11 +1470,13 @@ export default function AnalyticsTradesPage() {
                 )}
 
                 {panelTab === "pairWatched" && (
-                  <div className="space-y-4">
+                  <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden">
                     {pairWatchReadOnly && (
-                      <p className="text-xs text-header-muted">Read-only: linking is disabled for closed or cancelled trades.</p>
+                      <p className="shrink-0 text-xs text-header-muted">
+                        Read-only: linking is disabled for closed or cancelled trades.
+                      </p>
                     )}
-                    <div className="flex items-center justify-between rounded-xl border border-sidebar-border bg-sidebar/40 p-4">
+                    <div className="flex shrink-0 items-center justify-between rounded-xl border border-sidebar-border bg-sidebar/40 p-4">
                       <div>
                         <p className="text-sm font-medium text-header-foreground">Linked Pair</p>
                         <p className="text-sm text-header-muted">
@@ -1350,7 +1490,9 @@ export default function AnalyticsTradesPage() {
                           <button
                             type="button"
                             onClick={async () => {
-                              const updated = await tradesApi.update(selectedTrade.id, { pairWatchedId: null });
+                              const updated = await tradesApi.update(selectedTrade.id, {
+                                pairWatchedId: null,
+                              });
                               updateSelectedTrade(updated);
                             }}
                             className="rounded-lg border border-sidebar-border px-3 py-2 text-sm font-medium text-header-foreground hover:bg-header"
@@ -1373,34 +1515,14 @@ export default function AnalyticsTradesPage() {
                       </div>
                     </div>
 
-                    {selectedTrade.pairWatched ? (
-                      <div className="rounded-xl border border-sidebar-border bg-sidebar/30 p-4">
-                        <p className="text-base font-semibold text-header-foreground">
-                          {selectedTrade.pairWatched.tradingPair?.pair ??
-                            selectedTrade.pairWatched.pairName}
-                        </p>
-                        <p className="mt-2 text-sm text-header-muted">{selectedTrade.pairWatched.bias}</p>
-                        {selectedTrade.pairWatched.thesis?.notes && (
-                          <p className="mt-3 whitespace-pre-wrap break-words text-sm text-dashboard-foreground">
-                            {selectedTrade.pairWatched.thesis.notes}
-                          </p>
-                        )}
-                        {!!selectedTrade.pairWatched.thesis?.images?.length && (
-                          <div className="mt-3 grid grid-cols-1 gap-3">
-                            {selectedTrade.pairWatched.thesis.images.map((img) => (
-                              <img
-                                key={img}
-                                src={getImageUrl(img)}
-                                alt="Pair watched"
-                                className="max-h-[280px] w-full rounded-lg border border-sidebar-border object-contain"
-                              />
-                            ))}
-                          </div>
-                        )}
+                    {pairWatchedDetail ? (
+                      <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-sidebar-border bg-sidebar/30">
+                        <WatchItemDetailPanels entry={pairWatchedDetail} mode="readonly" />
                       </div>
                     ) : (
                       <p className="text-sm text-header-muted">
-                        Click <span className="text-primary">Link</span> to attach a pair from the current weekly watchlist.
+                        Click <span className="text-primary">Link</span> to attach a pair from the
+                        current weekly watchlist.
                       </p>
                     )}
                   </div>
@@ -1486,21 +1608,20 @@ export default function AnalyticsTradesPage() {
               <div className="space-y-3 text-sm">
                 <label className="block space-y-1">
                   <span className="text-header-muted">Trading pair</span>
-                  <select
+                  <ScrollableSelect
                     value={addPairId}
-                    onChange={(e) => setAddPairId(e.target.value)}
-                    className="w-full rounded-lg border border-sidebar-border bg-header-input px-3 py-2 text-dashboard-foreground"
-                  >
-                    {tradableCatalogPairs.length === 0 ? (
-                      <option value="">No pairs with pip value</option>
-                    ) : (
-                      tradableCatalogPairs.map((p) => (
-                        <option key={p.id} value={p.id}>
-                          {p.pair}
-                        </option>
-                      ))
-                    )}
-                  </select>
+                    onChange={setAddPairId}
+                    aria-label="Trading pair"
+                    placeholder={
+                      tradableCatalogPairs.length === 0
+                        ? "No pairs with pip value"
+                        : "Select a pair…"
+                    }
+                    options={tradableCatalogPairs.map((p) => ({
+                      value: p.id,
+                      label: p.pair,
+                    }))}
+                  />
                 </label>
                 {tradableCatalogPairs.length === 0 && (
                   <p className="text-xs text-header-muted">
@@ -1509,21 +1630,18 @@ export default function AnalyticsTradesPage() {
                 )}
                 <label className="block space-y-1">
                   <span className="text-header-muted">Strategy</span>
-                  <select
+                  <ScrollableSelect
                     value={addStrategyId}
-                    onChange={(e) => setAddStrategyId(e.target.value)}
-                    className="w-full rounded-lg border border-sidebar-border bg-header-input px-3 py-2 text-dashboard-foreground"
-                  >
-                    {strategies.length === 0 ? (
-                      <option value="">No strategies yet</option>
-                    ) : (
-                      strategies.map((s) => (
-                        <option key={s.id} value={s.id}>
-                          {s.name}
-                        </option>
-                      ))
-                    )}
-                  </select>
+                    onChange={setAddStrategyId}
+                    aria-label="Strategy"
+                    placeholder={
+                      strategies.length === 0 ? "No strategies yet" : "Select a strategy…"
+                    }
+                    options={strategies.map((s) => ({
+                      value: s.id,
+                      label: s.name,
+                    }))}
+                  />
                 </label>
                 {strategies.length === 0 && (
                   <p className="text-xs text-header-muted">
@@ -1533,28 +1651,24 @@ export default function AnalyticsTradesPage() {
                 <div className="grid grid-cols-2 gap-2">
                   <label className="space-y-1">
                     <span className="text-header-muted">Direction</span>
-                    <select
+                    <ScrollableSelect
                       value={addType}
-                      onChange={(e) => setAddType(e.target.value as Trade["type"])}
-                      className="w-full rounded-lg border border-sidebar-border bg-header-input px-3 py-2 text-dashboard-foreground"
-                    >
-                      <option value="buy">Buy</option>
-                      <option value="sell">Sell</option>
-                    </select>
+                      onChange={(v) => setAddType(v as Trade["type"])}
+                      aria-label="Direction"
+                      options={[
+                        { value: "buy", label: "Buy" },
+                        { value: "sell", label: "Sell" },
+                      ]}
+                    />
                   </label>
                   <label className="space-y-1">
                     <span className="text-header-muted">Order type</span>
-                    <select
+                    <ScrollableSelect
                       value={addExecType}
-                      onChange={(e) => setAddExecType(e.target.value as TradeExecutionType)}
-                      className="w-full rounded-lg border border-sidebar-border bg-header-input px-3 py-2 text-dashboard-foreground"
-                    >
-                      {EXECUTION_TYPES.map((t) => (
-                        <option key={t} value={t}>
-                          {t}
-                        </option>
-                      ))}
-                    </select>
+                      onChange={(v) => setAddExecType(v as TradeExecutionType)}
+                      aria-label="Order type"
+                      options={EXECUTION_TYPES.map((t) => ({ value: t, label: t }))}
+                    />
                   </label>
                 </div>
                 <label className="block space-y-1">

@@ -11,8 +11,22 @@ function clipboardHasImageFile(data: DataTransfer | null): boolean {
   );
 }
 
+function insertPlainTextAtSelection(editor: HTMLElement, text: string): void {
+  editor.focus();
+  const ok = document.execCommand("insertText", false, text);
+  if (ok) return;
+  const sel = window.getSelection();
+  if (!sel?.rangeCount) return;
+  const range = sel.getRangeAt(0);
+  range.deleteContents();
+  range.insertNode(document.createTextNode(text));
+  range.collapse(false);
+  sel.removeAllRanges();
+  sel.addRange(range);
+}
+
 /**
- * Image paste uploads and forwards to onImageReady; any other paste inserts plain text only.
+ * Image paste uploads and forwards to onImageReady; any other paste/drop inserts plain text only.
  */
 export function useAnalysisEditorPaste(options: {
   editorRef: React.RefObject<HTMLElement | null>;
@@ -32,23 +46,24 @@ export function useAnalysisEditorPaste(options: {
       }
       e.preventDefault();
       const text = getPlainTextFromDataTransfer(e.clipboardData);
-      if (!text) return;
-      editorRef.current?.focus();
-      const ok = document.execCommand("insertText", false, text);
-      if (!ok) {
-        const sel = window.getSelection();
-        if (sel?.rangeCount) {
-          const range = sel.getRangeAt(0);
-          range.deleteContents();
-          range.insertNode(document.createTextNode(text));
-          range.collapse(false);
-          sel.removeAllRanges();
-          sel.addRange(range);
-        }
-      }
+      if (!text || !editorRef.current) return;
+      insertPlainTextAtSelection(editorRef.current, text);
     },
     [editorRef, handleImagePaste]
   );
 
-  return { handlePaste };
+  const handleDrop = useCallback(
+    (e: React.DragEvent) => {
+      const data = e.dataTransfer;
+      if (clipboardHasImageFile(data)) return;
+      const text = getPlainTextFromDataTransfer(data);
+      if (!text) return;
+      e.preventDefault();
+      if (!editorRef.current) return;
+      insertPlainTextAtSelection(editorRef.current, text);
+    },
+    [editorRef]
+  );
+
+  return { handlePaste, handleDrop };
 }

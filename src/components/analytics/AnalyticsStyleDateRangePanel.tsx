@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ScrollableSelect } from "@/components/ui/ScrollableSelect";
 
 export type AnalyticsRangePreset = "1D" | "1W" | "1M" | "1Y" | "ALL";
 
@@ -293,17 +294,13 @@ export function AnalyticsStyleDateRangePanel({
           </button>
           <div className="flex min-w-0 flex-1 items-center justify-center gap-2">
             <span className="truncate text-base font-semibold text-header-foreground">{title}</span>
-            <select
-              value={yearOptions.includes(my.y) ? my.y : yearOptions[0] ?? my.y}
-              onChange={(e) => setYear(Number(e.target.value))}
-              className="max-w-[88px] rounded-md border border-sidebar-border bg-header px-1.5 py-1 text-sm text-header-foreground"
-            >
-              {yearOptions.map((y) => (
-                <option key={y} value={y}>
-                  {y}
-                </option>
-              ))}
-            </select>
+            <ScrollableSelect
+              value={String(yearOptions.includes(my.y) ? my.y : yearOptions[0] ?? my.y)}
+              onChange={(v) => setYear(Number(v))}
+              options={yearOptions.map((y) => ({ value: String(y), label: String(y) }))}
+              className="max-w-[88px]"
+              aria-label="Year"
+            />
           </div>
           <button
             type="button"
@@ -398,10 +395,10 @@ export function AnalyticsStyleDateRangePanel({
               }}
               className="h-9 w-20 rounded-md border border-sidebar-border bg-header px-2 text-sm"
             />
-            <select
+            <ScrollableSelect
               value={relativeUnit}
-              onChange={(e) => {
-                const unit = e.target.value as "days" | "months";
+              onChange={(v) => {
+                const unit = v as "days" | "months";
                 setRelativeUnit(unit);
                 setDateMode("relative");
                 const end = new Date();
@@ -412,11 +409,12 @@ export function AnalyticsStyleDateRangePanel({
                 setDraftTo(endOfDay(end));
                 setRangeAnchor(null);
               }}
-              className="h-9 rounded-md border border-sidebar-border bg-header px-2 text-sm"
-            >
-              <option value="days">days</option>
-              <option value="months">months</option>
-            </select>
+              options={[
+                { value: "days", label: "days" },
+                { value: "months", label: "months" },
+              ]}
+              aria-label="Relative date unit"
+            />
           </div>
         </>
       ) : null}

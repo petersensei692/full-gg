@@ -95,7 +95,7 @@ export function WatchListView() {
   return (
     <>
     <div className="flex h-full min-h-0 flex-col overflow-auto">
-      <div className="p-6 pt-4 flex flex-col min-h-0 flex-1">
+      <div className="p-4 sm:p-6 sm:pt-4 flex flex-col min-h-0 flex-1">
         <h1 className="text-xl font-semibold text-dashboard-foreground mb-4">
           Weekly Watchlists
         </h1>
@@ -177,10 +177,10 @@ export function WatchListView() {
                   key={cal.id}
                   className="rounded-xl border border-sidebar-border bg-sidebar/50 overflow-hidden shadow-sm"
                 >
-                  <div className="px-5 py-4 border-b border-sidebar-border bg-sidebar/80 flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-2">
-                      <Calendar className="h-5 w-5 text-primary/80" />
-                      <h2 className="text-lg font-semibold text-dashboard-foreground">
+                  <div className="px-4 sm:px-5 py-4 border-b border-sidebar-border bg-sidebar/80 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <Calendar className="h-5 w-5 text-primary/80 shrink-0" />
+                      <h2 className="text-lg font-semibold text-dashboard-foreground truncate">
                         {formatDateRange(cal.startDate, cal.endDate)}
                       </h2>
                     </div>
@@ -214,7 +214,7 @@ export function WatchListView() {
                         No pairs in this watchlist yet.
                       </p>
                     ) : (
-                      <div className="grid grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                         {pairs.map((entry) => (
                           <WatchlistEntryCard
                             key={entry.id}

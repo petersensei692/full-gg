@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { Dialog, DialogContent } from "@/components/ui/Dialog";
 import { ConfirmDeleteDialog } from "@/components/ui/ConfirmDeleteDialog";
 import type { AssetWithStats } from "@/types/api";
+import { ScrollableSelect } from "@/components/ui/ScrollableSelect";
 
 const ASSET_TYPES = [
   { value: "currency", label: "Currency" },
@@ -96,17 +97,12 @@ export function EditAssetModal({
             </div>
             <div>
               <label className="block text-sm font-medium text-dashboard-foreground/80 mb-1.5">Type</label>
-              <select
+              <ScrollableSelect
                 value={type}
-                onChange={(e) => setType(e.target.value)}
-                className="w-full rounded-lg border border-sidebar-border bg-header-input px-3 py-2 text-sm text-dashboard-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-              >
-                {ASSET_TYPES.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
+                onChange={setType}
+                options={ASSET_TYPES}
+                aria-label="Asset type"
+              />
             </div>
             <label className="flex items-center gap-2 text-sm text-dashboard-foreground cursor-pointer select-none">
               <input

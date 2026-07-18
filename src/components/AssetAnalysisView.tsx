@@ -670,7 +670,7 @@ export function AssetAnalysisView({ asset, favoritesWindow = false }: AssetAnaly
   );
 
   const assetHeaderBar = (
-    <div className="grid h-11 shrink-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 border-b border-sidebar-border overflow-visible pl-4 sm:pl-6 pr-6 sm:pr-10">
+    <div className="shrink-0 flex flex-col gap-2 border-b border-sidebar-border overflow-visible px-4 sm:px-6 sm:pr-10 py-2 sm:py-0 sm:h-11 sm:grid sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] sm:items-center sm:gap-2">
       <div className="flex min-w-0 items-center gap-1.5 justify-self-start">
         <SidebarTrigger />
         {(favoritesWindow || activeTab === "stream") && (
@@ -679,7 +679,7 @@ export function AssetAnalysisView({ asset, favoritesWindow = false }: AssetAnaly
               ref={streamFiltersButtonRef}
               type="button"
               onClick={() => setStreamFiltersMenuOpen((o) => !o)}
-              className="shrink-0 rounded-lg border border-sidebar-border p-2 text-header-muted hover:bg-sidebar-hover hover:text-primary"
+              className="shrink-0 rounded-lg border border-sidebar-border p-2.5 sm:p-2 text-header-muted hover:bg-sidebar-hover hover:text-primary"
               title="Filters"
               aria-label="Analysis filters"
               aria-expanded={streamFiltersMenuOpen}
@@ -691,7 +691,7 @@ export function AssetAnalysisView({ asset, favoritesWindow = false }: AssetAnaly
               <button
                 type="button"
                 onClick={() => setFavoritesSidebarOpen((o) => !o)}
-                className={`shrink-0 rounded-lg border p-2 transition-colors ${
+                className={`shrink-0 rounded-lg border p-2.5 sm:p-2 transition-colors ${
                   favoritesSidebarOpen
                     ? "border-sky-500 bg-sky-500/15 text-sky-500"
                     : "border-sidebar-border bg-sidebar text-dashboard-foreground/70 hover:bg-sidebar-hover hover:text-dashboard-foreground"
@@ -708,7 +708,7 @@ export function AssetAnalysisView({ asset, favoritesWindow = false }: AssetAnaly
                 type="button"
                 onClick={() => handleExportEntries(filteredEntries, "main")}
                 disabled={filteredEntries.length === 0}
-                className="shrink-0 rounded-lg border border-sidebar-border p-2 text-header-muted hover:bg-sidebar-hover hover:text-primary disabled:opacity-40 disabled:cursor-not-allowed"
+                className="shrink-0 rounded-lg border border-sidebar-border p-2.5 sm:p-2 text-header-muted hover:bg-sidebar-hover hover:text-primary disabled:opacity-40 disabled:cursor-not-allowed"
                 title="Export filtered analyses (.txt)"
                 aria-label="Export filtered analyses"
               >
@@ -717,26 +717,39 @@ export function AssetAnalysisView({ asset, favoritesWindow = false }: AssetAnaly
             )}
           </div>
         )}
+        <div className="min-w-0 flex-1 overflow-hidden sm:hidden">
+          <AssetHeader title={fullTitle} />
+        </div>
       </div>
-      <div className="flex min-w-0 max-w-[min(92vw,56rem)] items-center justify-center gap-3 justify-self-center">
+      <div
+        className={
+          favoritesWindow
+            ? "hidden sm:flex min-w-0 max-w-full sm:max-w-[min(92vw,56rem)] flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:justify-center sm:gap-3 sm:justify-self-center"
+            : "flex min-w-0 max-w-full sm:max-w-[min(92vw,56rem)] flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:justify-center sm:gap-3 sm:justify-self-center"
+        }
+      >
         <div
           className={
-            favoritesWindow ? "min-w-0 overflow-hidden flex items-center justify-center" : "min-w-0 shrink overflow-hidden flex justify-center"
+            favoritesWindow
+              ? "hidden sm:flex min-w-0 overflow-hidden items-center justify-center"
+              : "hidden sm:flex min-w-0 shrink overflow-hidden justify-center"
           }
         >
           <AssetHeader title={fullTitle} />
         </div>
         {!favoritesWindow && (
-          <StreamTabs active={activeTab} onSelect={setActiveTab} noBorder />
+          <div className="flex justify-center w-full sm:w-auto">
+            <StreamTabs active={activeTab} onSelect={setActiveTab} noBorder />
+          </div>
         )}
       </div>
-      <div className="min-w-0 justify-self-end" aria-hidden="true" />
+      <div className="hidden sm:block min-w-0 justify-self-end" aria-hidden="true" />
     </div>
   );
 
   const watchlistToolbar =
     !favoritesWindow && activeTab === "watchlist" ? (
-      <div className="shrink-0 flex flex-wrap items-center gap-3 px-6 pt-4 pb-3 border-b border-sidebar-border">
+      <div className="shrink-0 flex flex-wrap items-center gap-3 px-4 sm:px-6 pt-4 pb-3 border-b border-sidebar-border">
         <div className="relative">
           <button
             ref={watchlistTriggerRef}
@@ -923,7 +936,7 @@ export function AssetAnalysisView({ asset, favoritesWindow = false }: AssetAnaly
                   <div className="relative min-h-0 flex-1 overflow-hidden">
                     <div
                       ref={streamScrollRef}
-                      className="absolute inset-0 overflow-x-hidden overflow-y-auto px-6"
+                      className="absolute inset-0 overflow-x-hidden overflow-y-auto px-4 sm:px-6"
                     >
                       <div className="w-full max-w-full space-y-0 pb-4">
                         {entriesWithGroups.map(({ entry, separatorType, yearGroup, monthGroup, weekGroup, dateGroup }) => {
@@ -1015,7 +1028,7 @@ export function AssetAnalysisView({ asset, favoritesWindow = false }: AssetAnaly
             </div>
 
             {!favoritesWindow && !editModalOpen && (
-              <div className="relative z-[70] shrink-0 w-full border-t border-sidebar-border/50 bg-dashboard-bg px-6 pb-6 pt-3">
+              <div className="relative z-[70] shrink-0 w-full border-t border-sidebar-border/50 bg-dashboard-bg px-4 sm:px-6 pb-[max(1.5rem,env(safe-area-inset-bottom,0px))] pt-3">
                 <PostAnalysisInput
                   placeholder={resolvedAsset.placeholder}
                   onCreated={handleCreate}

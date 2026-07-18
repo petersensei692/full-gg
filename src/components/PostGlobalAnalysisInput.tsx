@@ -11,6 +11,8 @@ import { isHtmlEffectivelyEmpty } from "@/lib/html-empty";
 import type { AssetConfig } from "@/types/asset";
 import { clearDraft, loadDraftJson, saveDraftJson } from "@/lib/form-drafts";
 import { getImageUrl } from "@/lib/imageUrls";
+import { readEditorHtml, sanitizeRichHtml } from "@/lib/sanitizeRichHtml";
+import { ScrollableSelect } from "@/components/ui/ScrollableSelect";
 
 const ASSET_TYPE_ORDER = ["currency", "commodity", "stocks", "crypto"] as const;
 const ASSET_TYPE_LABELS: Record<string, string> = {
@@ -96,7 +98,7 @@ export function PostGlobalAnalysisInput({
       if (d.imagePaths?.length) {
         setImages(d.imagePaths.map((path) => ({ path, url: getImageUrl(path) })));
       }
-      const html = d.html ?? "";
+      const html = sanitizeRichHtml(d.html ?? "");
       queueMicrotask(() => {
         if (editorRef.current) editorRef.current.innerHTML = html;
       });
@@ -136,7 +138,7 @@ export function PostGlobalAnalysisInput({
     editorBump,
   ]);
 
-  const { handlePaste } = useAnalysisEditorPaste({
+  const { handlePaste, handleDrop } = useAnalysisEditorPaste({
     editorRef,
     onImageReady: (img) => {
       setImages((prev) => [...prev, img]);
@@ -200,7 +202,7 @@ export function PostGlobalAnalysisInput({
   }, []);
 
   const handleCreate = useCallback(() => {
-    const html = editorRef.current?.innerHTML ?? "";
+    const html = readEditorHtml(editorRef.current);
     if (isHtmlEffectivelyEmpty(html) && images.length === 0) return;
     const scope: "global" | string[] =
       scopeMode === "global" ? "global" : Array.from(selectedAssetIds);
@@ -250,6 +252,7 @@ export function PostGlobalAnalysisInput({
         role="textbox"
         aria-multiline="true"
         onPaste={handlePaste}
+        onDrop={handleDrop}
         onInput={() => setEditorBump((n) => n + 1)}
         onClick={handleEditorClick}
         className="min-h-[82px] max-h-[123px] overflow-y-auto w-full min-w-0 rounded-lg border border-sidebar-border bg-header-input px-3 py-2.5 text-sm text-dashboard-foreground placeholder:text-dashboard-foreground/50 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary break-words antialiased [&:empty::before]:content-[attr(data-placeholder)] [&:empty::before]:text-dashboard-foreground/50 [&_*]:break-words [&_img]:max-w-[min(50%,480px)] [&_img]:w-auto [&_img]:h-auto [&_img]:object-contain [&_img]:rounded-lg [&_img]:cursor-pointer [&_img]:block [&_img]:my-2 [&_h1]:text-xl [&_h1]:font-bold [&_h2]:text-lg [&_h2]:font-semibold [&_h3]:text-base [&_h3]:font-medium [&_u]:underline"
@@ -257,8 +260,8 @@ export function PostGlobalAnalysisInput({
         suppressHydrationWarning
       />
 
-      <div className="flex items-center justify-between mt-2 flex-wrap gap-2">
-        <div className="flex items-center gap-1">
+      <div className="mt-2 flex flex-col gap-2 min-w-0">
+        <div className="flex flex-wrap items-center gap-0.5 sm:gap-1 min-w-0">
           <button
             type="button"
             onMouseDown={preventFocusLoss}
@@ -321,7 +324,7 @@ export function PostGlobalAnalysisInput({
             P
           </button>
         </div>
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex flex-wrap items-center gap-2 min-w-0">
           <span className="text-xs font-medium text-dashboard-foreground/70 shrink-0">Scope</span>
           <label className="flex items-center gap-1.5 cursor-pointer shrink-0">
             <button
@@ -451,23 +454,19 @@ export function PostGlobalAnalysisInput({
               )}
             </div>
           )}
-          <select
+          <ScrollableSelect
             value={analysisType}
-            onChange={(e) => setAnalysisType(e.target.value)}
-            className="rounded-lg border border-sidebar-border bg-sidebar px-3 py-2 text-sm text-dashboard-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary shrink-0"
+            onChange={setAnalysisType}
+            options={ANALYSIS_TYPES.map((opt) => ({ value: opt.value, label: opt.label }))}
+            placement="top"
+            className="w-[7.5rem] shrink-0"
             aria-label="Analysis type"
-          >
-            {ANALYSIS_TYPES.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
+          />
           <button
             type="button"
             onClick={handleCreate}
             disabled={!canCreate}
-            className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:pointer-events-none transition-colors shrink-0"
+            className="flex flex-1 sm:flex-initial items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:pointer-events-none transition-colors shrink-0 min-w-0 sm:ml-auto"
           >
             <PenSquare className="h-4 w-4" />
             Create

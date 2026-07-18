@@ -85,7 +85,7 @@ export function AssetsView() {
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-auto">
-      <div className="p-6 pt-4 flex flex-col min-h-0 flex-1">
+      <div className="p-4 sm:p-6 sm:pt-4 flex flex-col min-h-0 flex-1">
         <h1 className="text-xl font-semibold text-dashboard-foreground mb-2">Assets</h1>
         <p className="text-sm text-dashboard-foreground/70 mb-6">
           Manage assets by type. Click a card to edit. View analysis from the sidebar or the link on the card.
@@ -95,7 +95,7 @@ export function AssetsView() {
           <button
             type="button"
             onClick={() => setCreateOpen(true)}
-            className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
+            className="flex w-full sm:w-auto items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 sm:py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
           >
             <Plus className="h-4 w-4" />
             Create asset

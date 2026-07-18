@@ -16,6 +16,7 @@ import { deleteStoredImage } from "@/lib/imageUpload";
 import { ConfirmDeleteDialog } from "@/components/ui/ConfirmDeleteDialog";
 import { AttachedImagesStrip } from "@/components/analysis/AttachedImagesStrip";
 import { getImageUrl } from "@/lib/imageUrls";
+import { readEditorHtml, sanitizeRichHtml } from "@/lib/sanitizeRichHtml";
 import { useAssets } from "@/context/AssetsContext";
 import { assetWatchlistService } from "@/lib/api";
 import { pairsService } from "@/lib/services/pairs.service";
@@ -138,14 +139,15 @@ export function CreatePairModal({
       setCalendarId(stored.calendarId ?? "");
       setTradingPairId(stored.tradingPairId ?? "");
       setBias(stored.bias ?? "bullish");
-      setThesisHtml(stored.html ?? "");
+      setThesisHtml(sanitizeRichHtml(stored.html ?? ""));
       if (stored.imagePaths?.length) {
         setThesisImages(stored.imagePaths.map((path) => ({ path, url: getImageUrl(path) })));
       } else {
         setThesisImages([]);
       }
+      const draftHtml = sanitizeRichHtml(stored.html ?? "");
       const applyDraft = () => {
-        if (thesisRef.current) thesisRef.current.innerHTML = stored.html ?? "";
+        if (thesisRef.current) thesisRef.current.innerHTML = draftHtml;
       };
       applyDraft();
       const d1 = setTimeout(applyDraft, 0);
@@ -165,7 +167,7 @@ export function CreatePairModal({
           initialItem.watchlist?.id;
         setCalendarId(wlId ?? "");
         setTradingPairId(initialItem.tradingPairId ?? initialItem.tradingPair?.id ?? "");
-        const notes = initialItem.thesis?.notes ?? "";
+        const notes = sanitizeRichHtml(initialItem.thesis?.notes ?? "");
         const images = (initialItem.thesis?.images ?? []).map((path) => ({
           path,
           url: getImageUrl(path),
@@ -244,7 +246,7 @@ export function CreatePairModal({
     thesisImages,
   ]);
 
-  const { handlePaste: handleThesisPaste } = useAnalysisEditorPaste({
+  const { handlePaste: handleThesisPaste, handleDrop: handleThesisDrop } = useAnalysisEditorPaste({
     editorRef: thesisRef,
     onImageReady: (img) => setThesisImages((prev) => [...prev, img]),
   });
@@ -266,7 +268,7 @@ export function CreatePairModal({
   }, []);
 
   const buildThesisPayload = () => {
-    const thesisNotes = thesisRef.current?.innerHTML ?? "";
+    const thesisNotes = readEditorHtml(thesisRef.current);
     const origImages = initialItem?.thesis?.images ?? [];
     const origNames = initialItem?.thesis?.imageNames ?? [];
     const imageNames =
@@ -351,7 +353,7 @@ export function CreatePairModal({
         className="max-h-[85dvh] flex flex-col items-stretch justify-start overflow-hidden bg-sidebar border border-sidebar-border rounded-xl p-0 shadow-xl"
       >
         <div className="scrollbar-modal flex flex-col min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
-          <div className="space-y-6 min-w-0 overflow-x-hidden p-6">
+          <div className="space-y-6 min-w-0 overflow-x-hidden p-4 sm:p-6">
           <div>
             <span className="text-xs font-semibold uppercase tracking-wider text-dashboard-foreground/60">
               {mode === "edit" ? "Edit entry" : "New entry"}
@@ -384,19 +386,18 @@ export function CreatePairModal({
               <label className="block text-sm font-medium text-dashboard-foreground/80 mb-2">
                 Weekly watchlist
               </label>
-              <select
+              <ScrollableSelect
                 value={calendarId}
-                onChange={(e) => setCalendarId(e.target.value)}
-                className="w-full rounded-lg border border-sidebar-border bg-header-input px-3 py-2 text-sm text-dashboard-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-              >
-                <option value="">Select a watchlist...</option>
-                {calendars.map((cal) => (
-                  <option key={cal.id} value={cal.id}>
-                    {new Date(cal.startDate).toISOString().slice(0, 10)} →{" "}
-                    {new Date(cal.endDate).toISOString().slice(0, 10)}
-                  </option>
-                ))}
-              </select>
+                onChange={setCalendarId}
+                placeholder="Select a watchlist..."
+                options={calendars.map((cal) => ({
+                  value: cal.id,
+                  label: `${new Date(cal.startDate).toISOString().slice(0, 10)} → ${new Date(
+                    cal.endDate
+                  ).toISOString().slice(0, 10)}`,
+                }))}
+                aria-label="Weekly watchlist"
+              />
             </div>
           )}
 
@@ -437,14 +438,15 @@ export function CreatePairModal({
             <label className="block text-sm font-medium text-dashboard-foreground/80 mb-2">
               Bias
             </label>
-            <select
+            <ScrollableSelect
               value={bias}
-              onChange={(e) => setBias(e.target.value as WatchlistBias)}
-              className="w-full rounded-lg border border-sidebar-border bg-header-input px-3 py-2 text-sm text-dashboard-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-            >
-              <option value="bullish">Bullish</option>
-              <option value="bearish">Bearish</option>
-            </select>
+              onChange={(v) => setBias(v as WatchlistBias)}
+              options={[
+                { value: "bullish", label: "Bullish" },
+                { value: "bearish", label: "Bearish" },
+              ]}
+              aria-label="Bias"
+            />
           </div>
 
           <div>
@@ -492,6 +494,7 @@ export function CreatePairModal({
               spellCheck={false}
               data-placeholder="Start typing your technical thesis... (Key levels, RSI divergence, Order block confirmation)"
               onPaste={handleThesisPaste}
+              onDrop={handleThesisDrop}
               onInput={() => setThesisHtml(thesisRef.current?.innerHTML ?? "")}
               onClick={(e) => {
                 const target = e.target as HTMLElement;

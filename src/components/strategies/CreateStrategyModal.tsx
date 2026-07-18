@@ -10,6 +10,7 @@ import { AttachedImagesStrip } from "@/components/analysis/AttachedImagesStrip";
 import { getImageUrl } from "@/lib/imageUrls";
 import type { Strategy } from "@/types/api";
 import { clearDraft, loadDraftJson, saveDraftJson } from "@/lib/form-drafts";
+import { readEditorHtml, sanitizeRichHtml } from "@/lib/sanitizeRichHtml";
 
 interface CreateStrategyModalProps {
   open: boolean;
@@ -25,7 +26,7 @@ interface CreateStrategyModalProps {
 }
 
 function normalizeHtml(html: string): string {
-  const trimmed = html?.trim() ?? "";
+  const trimmed = sanitizeRichHtml(html?.trim() ?? "");
   if (!trimmed) return "<p></p>";
   if (/^<br\s*\/?>$/i.test(trimmed) || /^<p>\s*<br\s*\/?>\s*<\/p>$/i.test(trimmed)) return "<p></p>";
   return trimmed;
@@ -58,7 +59,7 @@ export function CreateStrategyModal({
     [mode, initialStrategy?.id],
   );
 
-  const { handlePaste } = useAnalysisEditorPaste({
+  const { handlePaste, handleDrop } = useAnalysisEditorPaste({
     editorRef,
     onImageReady: (img) => setImages((prev) => [...prev, img]),
   });
@@ -74,7 +75,7 @@ export function CreateStrategyModal({
     if (stored?.v === 1) {
       setName(stored.name ?? "");
       setImages((stored.imagePaths ?? []).map((path) => ({ path, url: getImageUrl(path) })));
-      const html = stored.html ?? "";
+      const html = sanitizeRichHtml(stored.html ?? "");
       const applyDraft = () => {
         if (editorRef.current) editorRef.current.innerHTML = html;
       };
@@ -87,7 +88,7 @@ export function CreateStrategyModal({
       };
     }
     const title = initialStrategy?.name ?? "";
-    const descHtml = initialStrategy?.description ?? "";
+    const descHtml = sanitizeRichHtml(initialStrategy?.description ?? "");
     setName(title);
     const imgs = initialStrategy?.images ?? [];
     setImages(imgs.map((path) => ({ path, url: getImageUrl(path) })));
@@ -179,7 +180,7 @@ export function CreateStrategyModal({
 
   const handleSubmit = useCallback(async () => {
     const title = name.trim();
-    const raw = editorRef.current?.innerHTML?.trim() ?? "";
+    const raw = readEditorHtml(editorRef.current).trim();
     const description = normalizeHtml(raw);
     setError("");
     if (!title) {
@@ -210,10 +211,10 @@ export function CreateStrategyModal({
         <DialogContent
           showClose
           containToMain
-          className="!w-[min(56rem,calc(100dvw-var(--sidebar-width,0px)-2rem))] !max-w-[min(56rem,calc(100dvw-var(--sidebar-width,0px)-2rem))] !min-w-0 min-h-[min(80dvh,36rem)] max-h-[90dvh] flex flex-col items-stretch overflow-hidden bg-sidebar border border-sidebar-border rounded-xl p-0 box-border"
+          className="!w-[min(56rem,calc(100dvw-var(--sidebar-width,0px)-1rem))] !max-w-[min(56rem,calc(100dvw-var(--sidebar-width,0px)-1rem))] !min-w-0 min-h-[min(70dvh,32rem)] sm:min-h-[min(80dvh,36rem)] max-h-[90dvh] flex flex-col items-stretch overflow-hidden bg-sidebar border border-sidebar-border rounded-xl p-0 box-border"
         >
           <div className="w-full flex flex-col flex-1 min-h-0 min-w-0 overflow-hidden">
-            <div className="scrollbar-modal flex flex-col min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden w-full max-w-full p-6 space-y-5">
+            <div className="scrollbar-modal flex flex-col min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden w-full max-w-full p-4 sm:p-6 space-y-5">
               <div className="min-w-0 w-full">
                 <span className="text-xs font-semibold uppercase tracking-wider text-dashboard-foreground/60">
                   {mode === "edit" ? "Edit strategy" : "New strategy"}
@@ -310,6 +311,7 @@ export function CreateStrategyModal({
                   role="textbox"
                   aria-multiline="true"
                   onPaste={handlePaste}
+                  onDrop={handleDrop}
                   onInput={() => setEditorPersistBump((n) => n + 1)}
                   className="min-h-[200px] min-w-0 max-w-full flex-1 w-full overflow-x-hidden overflow-y-auto break-words rounded-lg border border-sidebar-border bg-header-input px-3 py-2.5 text-sm text-dashboard-foreground placeholder:text-dashboard-foreground/50 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary [&:empty::before]:content-[attr(data-placeholder)] [&:empty::before]:text-dashboard-foreground/50 [&_h1]:text-xl [&_h1]:font-bold [&_h2]:text-lg [&_h2]:font-semibold [&_h3]:text-base [&_h3]:font-medium [&_u]:underline [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:list-decimal [&_ol]:pl-6 [&_li]:my-0.5 [&_*]:break-words [&_*]:min-w-0 [&_*]:max-w-full [&_img]:max-w-[50%] [&_img]:rounded-lg [&_img]:my-2"
                   style={{ wordBreak: "break-word" } as React.CSSProperties}

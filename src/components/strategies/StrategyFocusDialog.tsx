@@ -5,6 +5,7 @@ import { Dialog, DialogContent } from "@/components/ui/Dialog";
 import { ConfirmDeleteDialog } from "@/components/ui/ConfirmDeleteDialog";
 import type { Strategy } from "@/types/api";
 import { getImageUrl } from "@/lib/imageUrls";
+import { sanitizeRichHtml } from "@/lib/sanitizeRichHtml";
 import { Trash2 } from "lucide-react";
 
 function formatStrategyDeleteDetails(strategy: Strategy): string {
@@ -39,7 +40,7 @@ export function StrategyFocusDialog({
         <DialogContent
           showClose
           containToMain
-          className="bg-sidebar border border-sidebar-border rounded-xl !w-[min(56rem,calc(100dvw-var(--sidebar-width,0px)-2rem))] !max-w-[min(56rem,calc(100dvw-var(--sidebar-width,0px)-2rem))] max-h-[85dvh] flex flex-col overflow-hidden p-0 min-w-0"
+                  className="bg-sidebar border border-sidebar-border rounded-xl !w-[min(56rem,calc(100dvw-var(--sidebar-width,0px)-1rem))] !max-w-[min(56rem,calc(100dvw-var(--sidebar-width,0px)-1rem))] max-h-[85dvh] flex flex-col overflow-hidden p-0 min-w-0"
         >
           {strategy && (
             <>
@@ -72,11 +73,11 @@ export function StrategyFocusDialog({
                   )}
                 </div>
               </div>
-              <div className="flex-1 min-h-0 min-w-0 overflow-x-hidden overflow-y-auto p-6 space-y-4">
+              <div className="flex-1 min-h-0 min-w-0 overflow-x-hidden overflow-y-auto p-4 sm:p-6 space-y-4">
                 <div
-                  className="min-w-0 max-w-full columns-1 break-words break-all text-sm text-dashboard-foreground/90 leading-relaxed prose prose-invert prose-sm px-3 overflow-hidden [&_h1]:text-xl [&_h1]:font-bold [&_h2]:text-lg [&_h2]:font-semibold [&_h3]:text-base [&_h3]:font-medium [&_u]:underline [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:list-decimal [&_ol]:pl-6 [&_li]:my-0.5 [&_*]:break-words [&_*]:min-w-0 [&_*]:max-w-full [&_*]:columns-1 [&_img]:max-w-full [&_img]:rounded-lg [&_img]:my-2"
+                  className="rich-html-content min-w-0 max-w-full columns-1 break-words break-all text-sm text-dashboard-foreground/90 leading-relaxed prose prose-sm dark:prose-invert px-3 overflow-hidden [&_h1]:text-xl [&_h1]:font-bold [&_h2]:text-lg [&_h2]:font-semibold [&_h3]:text-base [&_h3]:font-medium [&_u]:underline [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:list-decimal [&_ol]:pl-6 [&_li]:my-0.5 [&_*]:break-words [&_*]:min-w-0 [&_*]:max-w-full [&_*]:columns-1 [&_img]:max-w-full [&_img]:rounded-lg [&_img]:my-2"
                   style={{ wordBreak: "break-word", overflowWrap: "break-word" } as React.CSSProperties}
-                  dangerouslySetInnerHTML={{ __html: strategy.description }}
+                  dangerouslySetInnerHTML={{ __html: sanitizeRichHtml(strategy.description) }}
                 />
                 {strategy.images && strategy.images.length > 0 && (
                   <div className="flex flex-wrap gap-3 pt-2">

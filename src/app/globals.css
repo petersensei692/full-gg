@@ -1,6 +1,10 @@
 @import "tailwindcss";
 
-:root {
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root,
+[data-theme="dark"],
+.dark {
   --background: #0d0d0f;
   --foreground: #ededed;
   /* Dashboard dark theme */
@@ -20,6 +24,31 @@
   --primary: #3b82f6;
   --primary-foreground: #ffffff;
   --scrollbar-track: #050506;
+  --scrollbar-thumb: var(--primary);
+  --scrollbar-size: 10px;
+  --scrollbar-button-size: 11px;
+}
+
+[data-theme="light"],
+.light {
+  --background: #f4f4f5;
+  --foreground: #18181b;
+  --dashboard-bg: #f4f4f5;
+  --dashboard-foreground: #18181b;
+  --sidebar: #ffffff;
+  --sidebar-border: #e4e4e7;
+  --sidebar-foreground: #18181b;
+  --sidebar-muted: #71717a;
+  --sidebar-hover: #f4f4f5;
+  --header: #ffffff;
+  --header-border: #e4e4e7;
+  --header-foreground: #18181b;
+  --header-muted: #71717a;
+  --header-hover: #f4f4f5;
+  --header-input: #f4f4f5;
+  --primary: #3b82f6;
+  --primary-foreground: #ffffff;
+  --scrollbar-track: #e4e4e7;
   --scrollbar-thumb: var(--primary);
   --scrollbar-size: 10px;
   --scrollbar-button-size: 11px;
@@ -160,4 +189,12 @@ body {
 }
 .scrollbar-hide::-webkit-scrollbar {
   display: none;
+}
+
+/* Pasted Word/Notion/etc. inline colors must not override the app theme */
+.rich-html-content,
+.rich-html-content * {
+  color: inherit !important;
+  background-color: transparent !important;
+  background-image: none !important;
 }

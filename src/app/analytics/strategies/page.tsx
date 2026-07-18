@@ -77,26 +77,26 @@ export default function AnalyticsStrategiesPage() {
   return (
     <DashboardLayout>
       <div className="flex h-full min-h-0 flex-col overflow-auto">
-        <div className="p-6 pt-4 flex flex-col min-h-0 flex-1">
+        <div className="p-4 sm:p-6 sm:pt-4 flex flex-col min-h-0 flex-1">
           <h1 className="text-xl font-semibold text-dashboard-foreground mb-2">Strategies</h1>
           <p className="text-sm text-dashboard-foreground/70 mb-6">
             Your strategies appear as cards. Click a card to view the full description.
           </p>
 
-          <div className="flex flex-wrap items-center gap-3 mb-6">
+          <div className="flex flex-col gap-3 mb-6 sm:flex-row sm:flex-wrap sm:items-center">
             <input
               type="search"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search strategies by name..."
               spellCheck={false}
-              className="rounded-lg border border-sidebar-border bg-sidebar px-3 py-2 text-sm text-dashboard-foreground placeholder:text-dashboard-foreground/50 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary min-w-[200px] max-w-[320px]"
+              className="w-full sm:w-auto rounded-lg border border-sidebar-border bg-sidebar px-3 py-2.5 sm:py-2 text-sm text-dashboard-foreground placeholder:text-dashboard-foreground/50 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary sm:min-w-[200px] sm:max-w-[320px]"
               aria-label="Search strategies by name"
             />
             <button
               type="button"
               onClick={() => setCreateOpen(true)}
-              className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
+              className="flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 sm:py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors w-full sm:w-auto"
             >
               <Plus className="h-4 w-4" />
               Create strategy
@@ -121,7 +121,7 @@ export default function AnalyticsStrategiesPage() {
               <p className="text-xs mt-1">Try a different name or clear the search.</p>
             </div>
           ) : (
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {filtered.map((strategy) => (
                 <StrategyCard
                   key={strategy.id}

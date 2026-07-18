@@ -14,6 +14,7 @@ import { mapAllAnalysisItemsToStreamEntries } from "@/lib/all-analysis-map";
 import { buildStreamEntryGroups } from "@/lib/analysis-stream-entry-groups";
 import { StreamEntry as StreamEntryComponent } from "@/components/analysis/StreamEntry";
 import { ChevronDown, ChevronUp, SlidersHorizontal, X } from "lucide-react";
+import { ScrollableSelect } from "@/components/ui/ScrollableSelect";
 
 const ANALYSIS_FILTER_OPTIONS = [
   { value: "all", label: "All" },
@@ -224,17 +225,12 @@ export function WatchItemAnalysisLinkPickerModal({
     <div className="space-y-3">
       <div className="space-y-1">
         <span className="text-xs font-medium text-dashboard-foreground/70">Analysis type</span>
-        <select
+        <ScrollableSelect
           value={analysisFilter}
-          onChange={(e) => setAnalysisFilter(e.target.value)}
-          className="w-full rounded-lg border border-sidebar-border bg-sidebar px-3 py-2 text-sm text-dashboard-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-        >
-          {ANALYSIS_FILTER_OPTIONS.map((opt) => (
-            <option key={opt.value} value={opt.value}>
-              {opt.label}
-            </option>
-          ))}
-        </select>
+          onChange={setAnalysisFilter}
+          options={ANALYSIS_FILTER_OPTIONS.map((opt) => ({ value: opt.value, label: opt.label }))}
+          aria-label="Analysis type"
+        />
       </div>
       <div className="space-y-1">
         <span className="text-xs font-medium text-dashboard-foreground/70">Date range</span>

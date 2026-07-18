@@ -24,6 +24,7 @@ import { broadcastAnalysisOrFavoriteChanged, subscribeAnalysisOrFavoriteChanged 
 import { buildStreamEntryGroups } from "@/lib/analysis-stream-entry-groups";
 import { FavoritesAnalysisSidebar } from "./analysis/FavoritesAnalysisSidebar";
 import { buildAnalysisExportText, downloadAnalysisTxt } from "@/lib/analysis-export";
+import { ScrollableSelect } from "@/components/ui/ScrollableSelect";
 
 const ANALYSIS_TYPE_TO_TAG: Record<
   string,
@@ -429,17 +430,12 @@ export function GlobalAnalysisView({ favoritesWindow = false }: { favoritesWindo
     <div className="space-y-3">
       <div className="space-y-1">
         <span className="text-xs font-medium text-dashboard-foreground/70">Analysis type</span>
-        <select
+        <ScrollableSelect
           value={analysisFilter}
-          onChange={(e) => setAnalysisFilter(e.target.value)}
-          className="w-full rounded-lg border border-sidebar-border bg-sidebar px-3 py-2 text-sm text-dashboard-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-        >
-          {ANALYSIS_FILTER_OPTIONS.map((opt) => (
-            <option key={opt.value} value={opt.value}>
-              {opt.label}
-            </option>
-          ))}
-        </select>
+          onChange={setAnalysisFilter}
+          options={ANALYSIS_FILTER_OPTIONS.map((opt) => ({ value: opt.value, label: opt.label }))}
+          aria-label="Analysis type"
+        />
       </div>
       <div className="space-y-1">
         <span className="text-xs font-medium text-dashboard-foreground/70">Date range</span>
@@ -489,14 +485,14 @@ export function GlobalAnalysisView({ favoritesWindow = false }: { favoritesWindo
   );
 
   const globalHeaderBar = (
-    <div className="h-11 shrink-0 flex items-center gap-3 border-b border-sidebar-border overflow-visible pl-4 sm:pl-6 pr-6 sm:pr-10">
+    <div className="min-h-11 shrink-0 flex flex-wrap items-center gap-2 sm:gap-3 border-b border-sidebar-border overflow-visible px-4 sm:pl-6 sm:pr-10 py-2 sm:py-0">
       <SidebarTrigger />
       <div className="relative shrink-0">
         <button
           ref={globalFiltersButtonRef}
           type="button"
           onClick={() => setGlobalFiltersMenuOpen((o) => !o)}
-          className="shrink-0 rounded-lg border border-sidebar-border p-2 text-header-muted hover:bg-sidebar-hover hover:text-primary"
+          className="shrink-0 rounded-lg border border-sidebar-border p-2.5 sm:p-2 text-header-muted hover:bg-sidebar-hover hover:text-primary"
           title="Filters"
           aria-label="Analysis filters"
           aria-expanded={globalFiltersMenuOpen}
@@ -509,7 +505,7 @@ export function GlobalAnalysisView({ favoritesWindow = false }: { favoritesWindo
         type="button"
         onClick={() => handleExportEntries(filteredEntries, "main")}
         disabled={loading || filteredEntries.length === 0}
-        className="shrink-0 rounded-lg border border-sidebar-border p-2 text-header-muted hover:bg-sidebar-hover hover:text-primary disabled:opacity-40 disabled:cursor-not-allowed"
+        className="shrink-0 rounded-lg border border-sidebar-border p-2.5 sm:p-2 text-header-muted hover:bg-sidebar-hover hover:text-primary disabled:opacity-40 disabled:cursor-not-allowed"
         title="Export filtered analyses (.txt)"
         aria-label="Export filtered analyses"
       >
@@ -519,7 +515,7 @@ export function GlobalAnalysisView({ favoritesWindow = false }: { favoritesWindo
         <button
           type="button"
           onClick={() => setFavoritesSidebarOpen((o) => !o)}
-          className={`shrink-0 rounded-lg border p-2 transition-colors ${
+          className={`shrink-0 rounded-lg border p-2.5 sm:p-2 transition-colors ${
             favoritesSidebarOpen
               ? "border-sky-500 bg-sky-500/15 text-sky-500"
               : "border-sidebar-border bg-sidebar text-dashboard-foreground/70 hover:bg-sidebar-hover hover:text-dashboard-foreground"
@@ -531,7 +527,7 @@ export function GlobalAnalysisView({ favoritesWindow = false }: { favoritesWindo
           <Star className={`h-4 w-4 ${favoritesSidebarOpen ? "fill-current" : ""}`} />
         </button>
       )}
-      <h2 className="flex-1 min-w-0 truncate text-center text-sm font-semibold text-dashboard-foreground sm:text-left">
+      <h2 className="flex-1 min-w-0 basis-full sm:basis-auto truncate text-center text-sm font-semibold text-dashboard-foreground sm:text-left order-last sm:order-none mt-1 sm:mt-0">
         Global Analysis
       </h2>
     </div>
@@ -599,7 +595,7 @@ export function GlobalAnalysisView({ favoritesWindow = false }: { favoritesWindo
               <div className="relative min-h-0 flex-1 overflow-hidden">
                 <div
                   ref={streamScrollRef}
-                  className="absolute inset-0 overflow-x-hidden overflow-y-auto px-6"
+                  className="absolute inset-0 overflow-x-hidden overflow-y-auto px-4 sm:px-6"
                 >
                   <div className="w-full max-w-full space-y-0 pb-4">
                     {loading ? (
@@ -637,7 +633,7 @@ export function GlobalAnalysisView({ favoritesWindow = false }: { favoritesWindo
                 </div>
 
                 <div className="pointer-events-none absolute inset-0 z-20">
-                      <div className="pointer-events-auto absolute bottom-4 right-8 flex flex-col gap-2">
+                      <div className="pointer-events-auto absolute bottom-4 right-4 sm:right-8 flex flex-col gap-2 pb-[env(safe-area-inset-bottom,0px)]">
                     <button
                       type="button"
                       onClick={scrollToTop}
@@ -677,7 +673,7 @@ export function GlobalAnalysisView({ favoritesWindow = false }: { favoritesWindo
           </div>
 
           {!favoritesWindow && !editModalOpen && (
-            <div className="relative z-[70] w-full shrink-0 border-t border-sidebar-border/50 bg-dashboard-bg px-6 pb-6 pt-3">
+            <div className="relative z-[70] w-full shrink-0 border-t border-sidebar-border/50 bg-dashboard-bg px-4 sm:px-6 pb-[max(1.5rem,env(safe-area-inset-bottom,0px))] pt-3">
               <PostGlobalAnalysisInput
                 placeholder="Post a new global analysis..."
                 assets={assets}

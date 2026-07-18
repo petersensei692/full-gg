@@ -47,7 +47,7 @@ export function DashboardLayout({ children, favoritesNav = false }: DashboardLay
 
   return (
     <SidebarContextProvider openOverlay={() => setOverlayOpen(true)}>
-      <div className="flex h-screen bg-dashboard-bg text-dashboard-foreground">
+      <div className="flex h-dvh max-h-dvh bg-dashboard-bg text-dashboard-foreground">
         <Suspense
           fallback={
             <aside className="flex h-full w-[260px] shrink-0 flex-col border-r border-sidebar-border bg-sidebar" />
@@ -78,11 +78,11 @@ export function DashboardLayout({ children, favoritesNav = false }: DashboardLay
           {!isDesktop &&
             !isAssetAnalysisPage &&
             !hideMobileTopBarForDedicatedHeaderPage && (
-            <div className="shrink-0 h-11 flex items-center gap-3 px-4 border-b border-sidebar-border bg-dashboard-bg lg:hidden">
+            <div className="shrink-0 min-h-11 flex items-center gap-3 px-4 border-b border-sidebar-border bg-dashboard-bg lg:hidden pt-[env(safe-area-inset-top,0px)]">
               <SidebarTrigger />
             </div>
           )}
-          <main className="flex-1 overflow-auto">
+          <main className="flex-1 min-h-0 overflow-auto pb-[env(safe-area-inset-bottom,0px)]">
             {children}
           </main>
         </div>

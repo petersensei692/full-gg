@@ -10,6 +10,8 @@ import { AttachedImagesStrip } from "@/components/analysis/AttachedImagesStrip";
 import { getImageUrl } from "@/lib/imageUrls";
 import type { Note, NoteTier, NoteType } from "@/types/api";
 import { clearDraft, loadDraftJson, saveDraftJson } from "@/lib/form-drafts";
+import { readEditorHtml, sanitizeRichHtml } from "@/lib/sanitizeRichHtml";
+import { ScrollableSelect } from "@/components/ui/ScrollableSelect";
 
 const TIER_OPTIONS: { value: NoteTier; label: string }[] = [
   { value: "tier_1", label: "Tier 1" },
@@ -34,7 +36,7 @@ interface CreateNoteModalProps {
 
 /** Normalize contenteditable HTML to a non-empty string for API (backend requires note). */
 function normalizeNoteHtml(html: string): string {
-  const trimmed = html?.trim() ?? "";
+  const trimmed = sanitizeRichHtml(html?.trim() ?? "");
   if (!trimmed) return "<p></p>";
   if (/^<br\s*\/?>$/i.test(trimmed) || /^<p>\s*<br\s*\/?>\s*<\/p>$/i.test(trimmed)) return "<p></p>";
   return trimmed;
@@ -71,7 +73,7 @@ export function CreateNoteModal({
     [mode, initialNote?.id],
   );
 
-  const { handlePaste } = useAnalysisEditorPaste({
+  const { handlePaste, handleDrop } = useAnalysisEditorPaste({
     editorRef,
     onImageReady: (img) => setNoteImages((prev) => [...prev, img]),
   });
@@ -89,7 +91,7 @@ export function CreateNoteModal({
       setTier(stored.tier ?? "tier_2");
       setType(stored.type ?? "other");
       setNoteImages((stored.imagePaths ?? []).map((path) => ({ path, url: getImageUrl(path) })));
-      const html = stored.html ?? "";
+      const html = sanitizeRichHtml(stored.html ?? "");
       const applyDraft = () => {
         if (editorRef.current) editorRef.current.innerHTML = html;
       };
@@ -102,7 +104,7 @@ export function CreateNoteModal({
       };
     }
     const title = initialNote?.title ?? "";
-    const noteHtml = initialNote?.note ?? "";
+    const noteHtml = sanitizeRichHtml(initialNote?.note ?? "");
     setNoteTitle(title);
     setTier((initialNote?.tier ?? "tier_2") as NoteTier);
     setType((initialNote?.type ?? "other") as NoteType);
@@ -195,7 +197,7 @@ export function CreateNoteModal({
 
   const handleSubmit = useCallback(async () => {
     const title = noteTitle.trim();
-    const rawNote = editorRef.current?.innerHTML?.trim() ?? "";
+    const rawNote = readEditorHtml(editorRef.current).trim();
     const note = normalizeNoteHtml(rawNote);
     setError("");
     if (!title) {
@@ -226,10 +228,10 @@ export function CreateNoteModal({
       <DialogContent
         showClose
         containToMain
-        className="!w-[min(56rem,calc(100dvw-var(--sidebar-width,0px)-2rem))] !max-w-[min(56rem,calc(100dvw-var(--sidebar-width,0px)-2rem))] !min-w-0 min-h-[min(80dvh,36rem)] max-h-[90dvh] flex flex-col items-stretch overflow-hidden bg-sidebar border border-sidebar-border rounded-xl p-0 box-border"
+        className="!w-[min(56rem,calc(100dvw-var(--sidebar-width,0px)-1rem))] !max-w-[min(56rem,calc(100dvw-var(--sidebar-width,0px)-1rem))] !min-w-0 min-h-[min(70dvh,32rem)] sm:min-h-[min(80dvh,36rem)] max-h-[90dvh] flex flex-col items-stretch overflow-hidden bg-sidebar border border-sidebar-border rounded-xl p-0 box-border"
       >
         <div className="w-full flex flex-col flex-1 min-h-0 min-w-0 overflow-hidden">
-          <div className="scrollbar-modal flex flex-col min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden w-full max-w-full p-6 space-y-5">
+          <div className="scrollbar-modal flex flex-col min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden w-full max-w-full p-4 sm:p-6 space-y-5">
           <div className="min-w-0 w-full">
             <span className="text-xs font-semibold uppercase tracking-wider text-dashboard-foreground/60">
               {mode === "edit" ? "Edit note" : "New note"}
@@ -260,37 +262,26 @@ export function CreateNoteModal({
             <label htmlFor="note-tier-input" className="block text-sm font-medium text-dashboard-foreground/80 mb-2 whitespace-nowrap">
               Tier <span className="text-red-400">*</span>
             </label>
-            <select
+            <ScrollableSelect
               id="note-tier-input"
               value={tier}
-              onChange={(e) => setTier(e.target.value as NoteTier)}
-              required
-              className="w-full min-w-0 rounded-lg border border-sidebar-border bg-header-input px-3 py-2 text-sm text-dashboard-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-            >
-              {TIER_OPTIONS.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
+              onChange={(v) => setTier(v as NoteTier)}
+              options={TIER_OPTIONS}
+              aria-label="Tier"
+            />
           </div>
 
           <div className="min-w-0 w-full">
             <label htmlFor="note-type-input" className="block text-sm font-medium text-dashboard-foreground/80 mb-2 whitespace-nowrap">
               Type
             </label>
-            <select
+            <ScrollableSelect
               id="note-type-input"
               value={type}
-              onChange={(e) => setType(e.target.value as NoteType)}
-              className="w-full min-w-0 rounded-lg border border-sidebar-border bg-header-input px-3 py-2 text-sm text-dashboard-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-            >
-              {TYPE_OPTIONS.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
+              onChange={(v) => setType(v as NoteType)}
+              options={TYPE_OPTIONS}
+              aria-label="Type"
+            />
           </div>
 
           <div className="min-w-0 w-full flex flex-col flex-1 min-h-0">
@@ -360,6 +351,7 @@ export function CreateNoteModal({
               role="textbox"
               aria-multiline="true"
               onPaste={handlePaste}
+              onDrop={handleDrop}
               onInput={() => setEditorPersistBump((n) => n + 1)}
               className="min-h-[200px] min-w-0 max-w-full flex-1 w-full overflow-x-hidden overflow-y-auto break-words rounded-lg border border-sidebar-border bg-header-input px-3 py-2.5 text-sm text-dashboard-foreground placeholder:text-dashboard-foreground/50 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary [&:empty::before]:content-[attr(data-placeholder)] [&:empty::before]:text-dashboard-foreground/50 [&_h1]:text-xl [&_h1]:font-bold [&_h2]:text-lg [&_h2]:font-semibold [&_h3]:text-base [&_h3]:font-medium [&_u]:underline [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:list-decimal [&_ol]:pl-6 [&_li]:my-0.5 [&_*]:break-words [&_*]:min-w-0 [&_*]:max-w-full [&_img]:max-w-[50%] [&_img]:rounded-lg [&_img]:my-2"
               style={{ wordBreak: "break-word" } as React.CSSProperties}

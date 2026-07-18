@@ -240,7 +240,7 @@ export function Sidebar({
   return (
     <aside
       className={`flex h-full shrink-0 flex-col border-r border-sidebar-border bg-sidebar transition-[width,transform] duration-200 ease-out ${widthClass} ${
-        showAsOverlay ? "fixed inset-y-0 left-0 z-[100] shadow-xl" : ""
+        showAsOverlay ? "fixed inset-y-0 left-0 z-[100] shadow-xl max-w-[min(260px,85vw)] pt-[env(safe-area-inset-top,0px)] pb-[env(safe-area-inset-bottom,0px)]" : ""
       }`}
       style={showAsOverlay && !overlayOpen ? { transform: "translateX(-100%)" } : undefined}
     >
